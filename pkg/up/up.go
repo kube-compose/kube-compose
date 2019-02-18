@@ -65,26 +65,42 @@ func Run (cfg *config.Config) error {
 			return err
 		}
 
-		containerPorts := []v1.ContainerPort{}
-		servicePorts := []v1.ServicePort{}
-		for _, port := range ports {
-			containerPorts = append(containerPorts, v1.ContainerPort{
-				ContainerPort: port.ContainerPort,
-				Protocol: v1.Protocol(port.Protocol),
-			})
-			servicePorts = append(servicePorts, v1.ServicePort{
-				Port: port.ExternalPort,
-				Protocol: v1.Protocol(port.Protocol),
-				TargetPort: intstr.FromInt(int(port.ContainerPort)),
-			})
+		var containerPorts []v1.ContainerPort
+		var servicePorts []v1.ServicePort
+		if len(ports) > 0 {
+			containerPorts = make([]v1.ContainerPort, len(ports))
+			servicePorts = make([]v1.ServicePort, len(ports))
+			for i, port := range ports {
+				containerPorts[i] = v1.ContainerPort{
+					ContainerPort: port.ContainerPort,
+					Protocol: v1.Protocol(port.Protocol),
+				}
+				servicePorts[i] = v1.ServicePort{
+					Port: port.ExternalPort,
+					Protocol: v1.Protocol(port.Protocol),
+					TargetPort: intstr.FromInt(int(port.ContainerPort)),
+				}
+			}
+		}
+
+		var envVars []v1.EnvVar
+		if len(service.Environment) > 0 {
+			envVars := make([]v1.EnvVar, len(service.Environment))[:0]
+			for key, value := range service.Environment {
+				envVars = append(envVars, v1.EnvVar{
+					Name: key,
+					Value: value,
+				})
+			}
 		}
 
 		pod := v1.Pod{
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{
 					v1.Container{
-						Name: name,
+						Env: envVars,
 						Image: service.Image,
+						Name: name,
 						Ports: containerPorts,
 						WorkingDir: service.WorkingDir,
 					},
@@ -96,7 +112,7 @@ func Run (cfg *config.Config) error {
 		if err != nil {
 			return err
 		}
-
+		
 		if len(servicePorts) > 0 {
 			service := v1.Service{
 				Spec: v1.ServiceSpec{

@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"log"
-
 	"github.com/urfave/cli"
 
 	"github.com/jbrekelmans/k8s-docker-compose/pkg/config"

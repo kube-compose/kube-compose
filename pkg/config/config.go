@@ -17,6 +17,7 @@ type Config struct {
 				Context string `yaml:"context"`
 				Dockerfile string `yaml:"dockerfile"`
 			} `yaml:"build"`
+			Environment map[string]string `yaml:"environment"`
 			Image string `yaml:"image"`
 			Ports []string `yaml:"ports"`
 			Volumes []string `yaml:"volumes"`

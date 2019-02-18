@@ -8,4 +8,3 @@ services:
     volumes:
     - ./test:/app/test:rw
     working_dir: /app/test
-
