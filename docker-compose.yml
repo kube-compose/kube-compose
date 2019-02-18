@@ -1,0 +1,7 @@
+version: "2.1"
+services:
+  k8s-docker-compose:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: k8s-docker-compose:latest
