@@ -40,7 +40,7 @@ type serviceYAML2_1 struct{
 		Dockerfile string `yaml:"dockerfile"`
 	} `yaml:"build"`
 	Environment map[string]string `yaml:"environment"`
-	Healthcheck healthcheckCompose2_1 `yaml:"healthcheck"`
+	Healthcheck *healthcheckCompose2_1 `yaml:"healthcheck"`
 	Image string `yaml:"image"`
 	Ports []string `yaml:"ports"`
 	Volumes []string `yaml:"volumes"`

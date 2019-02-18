@@ -14,20 +14,23 @@ type Healthcheck struct {
 	IsShell bool
 	StartPeriod time.Duration
 	Retries uint
-	// If Test is empty slice or nil then this means no healthcheck. 
 	Test []string
 	Timeout time.Duration
 }
 
-func parseHealthcheck (healthcheckYAML *healthcheckCompose2_1) (*Healthcheck, error) {
+func parseHealthcheck (healthcheckYAML *healthcheckCompose2_1) (*Healthcheck, bool, error) {
+	if healthcheckYAML == nil {
+		return nil, false, nil
+	}
+	
 	if healthcheckYAML.Disable {
-		return nil, nil
+		return nil, true, nil
 	}
 
 	// Parse Test
 	test := healthcheckYAML.GetTest()
 	if len(test) == 0 {
-		return nil, nil
+		return nil, false, fmt.Errorf("Field \"test\" of Healthcheck must not be an empty array")
 	}
 	healthcheck := &Healthcheck{}
 	switch test[0] {
@@ -36,10 +39,13 @@ func parseHealthcheck (healthcheckYAML *healthcheckCompose2_1) (*Healthcheck, er
 	case healthcheckCommandShell:
 		healthcheck.IsShell = true
 	default:
-		return nil, fmt.Errorf("Field \"test\" of Healthcheck must have a first element that is one of \"NONE\", \"CMD\" and \"%s\"\n", healthcheckCommandShell)
+		return nil, false, fmt.Errorf("Field \"test\" of Healthcheck must have a first element that is one of \"NONE\", \"CMD\" and \"%s\"\n", healthcheckCommandShell)
 	}
 	if test[0] == "NONE" {
-		return nil, nil
+		return nil, true, nil
+	}
+	if len(test) == 1 {
+		return nil, false, fmt.Errorf("Field \"test\" of Healthcheck must have size at least 2 of its first element is not \"NONE\"")
 	}
 	healthcheck.Test = test[1:]
 
@@ -52,23 +58,23 @@ func parseHealthcheck (healthcheckYAML *healthcheckCompose2_1) (*Healthcheck, er
 
 	interval, err := time.ParseDuration(healthcheckYAML.Interval)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if interval <= 0 {
-		return nil, fmt.Errorf("Field \"interval\" of Healthcheck must not be negative")
+		return nil, false, fmt.Errorf("Field \"interval\" of Healthcheck must not be negative")
 	}
 	healthcheck.Interval = interval
 
 	timeout, err := time.ParseDuration(healthcheckYAML.Interval)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if interval <= 0 {
-		return nil, fmt.Errorf("Field \"timeout\" of Healthcheck must not be negative")
+		return nil, false, fmt.Errorf("Field \"timeout\" of Healthcheck must not be negative")
 	}
 	healthcheck.Timeout = timeout
 
 	healthcheck.Retries = healthcheckYAML.Retries
 	
-	return healthcheck, nil
+	return healthcheck, false, nil
 }

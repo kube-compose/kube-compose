@@ -3,6 +3,7 @@ package up
 import (
 	"encoding/json"
 	"io/ioutil"
+	"math"
 	"os"
 	"path/filepath"
 	
@@ -51,6 +52,52 @@ func initObjectMeta (objectMeta *metav1.ObjectMeta, name string) {
 	objectMeta.Labels["app"] = name
 }
 
+// https://docs.docker.com/engine/reference/builder/#healthcheck
+// https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
+func healthcheckToProbe (healthcheck *config.Healthcheck) *v1.Probe {
+	if healthcheck == nil {
+		return nil
+	}
+	
+	var retriesInt32 int32
+	if healthcheck.Retries > math.MaxInt32 {
+		retriesInt32 = math.MaxInt32
+	} else {
+		retriesInt32 = int32(healthcheck.Retries)
+	}
+
+	offset := 0
+	if healthcheck.IsShell {
+		// Assume the Shell is /bin/sh
+		// Add 2 to accomodate for /bin/sh -c
+		offset = 2
+	}
+	n := len(healthcheck.Test) + offset
+	execCommand := make([]string, n)
+	if offset > 0 {
+		execCommand[0] = "/bin/sh"
+		execCommand[1] = "-c"
+	}
+	for i := offset; i < n; i++ {
+		execCommand[i] = healthcheck.Test[i - offset]
+	}
+	probe := &v1.Probe{
+		FailureThreshold: retriesInt32,
+		Handler: v1.Handler{
+			Exec: &v1.ExecAction{
+				Command: execCommand,
+			},
+		},
+		// StartPeriod and InitialDelaySeconds are not exactly the same, but this is good enough.
+		InitialDelaySeconds: int32(math.RoundToEven(healthcheck.StartPeriod.Seconds())),
+		PeriodSeconds: int32(math.RoundToEven(healthcheck.Interval.Seconds())),
+		TimeoutSeconds: int32(math.RoundToEven(healthcheck.Timeout.Seconds())),
+		// This is the default value.
+		// SuccessThreshold: 1,
+	}
+	return probe
+}
+
 func Run (cfg *config.Config) error {
 	o := outputHelper{}
 	err := o.init()
@@ -91,6 +138,8 @@ func Run (cfg *config.Config) error {
 			}
 		}
 
+		// TODO use HEALTHCHECK from docker image, unless service.HealthcheckDisabled is true
+		probe := healthcheckToProbe(service.Healthcheck)
 
 		pod := v1.Pod{
 			Spec: v1.PodSpec{
@@ -100,6 +149,7 @@ func Run (cfg *config.Config) error {
 						Image: service.Image,
 						Name: name,
 						Ports: containerPorts,
+						ReadinessProbe: probe,
 						WorkingDir: service.WorkingDir,
 					},
 				},

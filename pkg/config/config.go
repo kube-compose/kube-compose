@@ -16,6 +16,7 @@ type DockerComposeFile struct {
 type Service struct{
 	Environment map[string]string
 	Healthcheck *Healthcheck
+	HealthcheckDisabled bool
 	Image string
 	Ports []Port
 	WorkingDir string
@@ -94,11 +95,12 @@ func parseServiceYAML2_1 (serviceYAML *serviceYAML2_1) (Service, error) {
 	}
 	service.Ports = ports
 
-	healthcheck, err := parseHealthcheck(&serviceYAML.Healthcheck)
+	healthcheck, healthcheckDisabled, err := parseHealthcheck(serviceYAML.Healthcheck)
 	if err != nil {
 		return service, err
 	}
 	service.Healthcheck = healthcheck
+	service.HealthcheckDisabled = healthcheckDisabled
 
 	return service, nil
 }
