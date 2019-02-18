@@ -5,3 +5,7 @@ services:
       context: .
       dockerfile: Dockerfile
     image: k8s-docker-compose:latest
+    volumes:
+    - .:/app/test:ro
+    working_dir: /app/test
+

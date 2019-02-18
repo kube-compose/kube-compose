@@ -7,6 +7,8 @@ import (
 )
 
 func Run (cfg *config.Config) error {
+	image := cfg.ComposeYaml.Services["k8s-docker-compose"].Image
 	fmt.Println("Hello World from package \"up\"!")
+	fmt.Println(image)
 	return nil
 }
