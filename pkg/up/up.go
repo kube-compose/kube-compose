@@ -7,8 +7,10 @@ import (
 )
 
 func Run (cfg *config.Config) error {
-	image := cfg.ComposeYaml.Services["k8s-docker-compose"].Image
 	fmt.Println("Hello World from package \"up\"!")
-	fmt.Println(image)
+	for name, service := range cfg.ComposeYaml.Services {
+		_ = name
+		fmt.Println(service)
+	}
 	return nil
 }

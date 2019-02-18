@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"io/ioutil"
 
 	"gopkg.in/yaml.v2"
@@ -30,10 +31,12 @@ func New() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	// "^[a-zA-Z0-9._-]+$"
 	err = yaml.Unmarshal(data, &cfg.ComposeYaml)
 	if err != nil {
 		return nil, err
+	}
+	if cfg.ComposeYaml.Version != "2.1" {
+		return nil, fmt.Errorf("Unsupported docker-compose version")	
 	}
 	return cfg, nil
 }
