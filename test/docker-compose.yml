@@ -1,9 +1,22 @@
 version: "2.1"
 services:
-  app1:
-    image: app1:latest
+  myapp:
+    image: myapp:latest
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_URL: postgresql://db:5432
     ports:
     - "8080"
     working_dir: /app/test
-  app2:
-    image: app2:latest
+  db:
+    image: postgres:latest
+    healthcheck:
+      test:
+      - pg_isready
+      - -U
+      - postgres
+      interval: 10s
+      timeout: 5s
+      retries: 5
