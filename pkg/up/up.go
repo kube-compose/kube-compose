@@ -97,20 +97,22 @@ func Run (cfg *config.Config) error {
 			return err
 		}
 
-		service := v1.Service{
-			Spec: v1.ServiceSpec{
-				Ports: servicePorts,
-				Selector: map[string]string {
-					"app": name,
+		if len(servicePorts) > 0 {
+			service := v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: servicePorts,
+					Selector: map[string]string {
+						"app": name,
+					},
+					// This is the default value.
+					// Type: v1.ServiceType("ClusterIP"),
 				},
-				// This is the default value.
-				// Type: v1.ServiceType("ClusterIP"),
-			},
-		}
-		initObjectMeta(&service.ObjectMeta, name)
-		err = o.addResource("Service", name, &service)
-		if err != nil {
-			return err
+			}
+			initObjectMeta(&service.ObjectMeta, name)
+			err = o.addResource("Service", name, &service)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil

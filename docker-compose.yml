@@ -5,9 +5,7 @@ services:
       context: .
       dockerfile: Dockerfile
     image: k8s-docker-compose:latest
-    ports:
-    - "3000"
     volumes:
-    - .:/app/test:rw
+    - ./test:/app/test:rw
     working_dir: /app/test
 

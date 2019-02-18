@@ -1,0 +1,9 @@
+version: "2.1"
+services:
+  app1:
+    image: app1:latest
+    ports:
+    - "8080"
+    working_dir: /app/test
+  app2:
+    image: app2:latest
