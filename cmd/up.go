@@ -14,12 +14,10 @@ func NewCommand() cli.Command {
 		Name: "up",
 		Usage: "Create and start containers",
 		Action: func (c *cli.Context) error {
-			log.Println("Loading config...")
 			cfg, err := config.New()
 			if err != nil {
 				return err
 			}
-			log.Println("Done loading config...")
 			return up.Run(cfg)
 		},
 	}
