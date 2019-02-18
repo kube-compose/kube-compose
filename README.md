@@ -6,3 +6,4 @@ docker-compose build
 ```
 docker-compose run k8s-docker-compose up
 ```
+This writes to the directory `output` the Kubernetes representation of docker-compose.yml.
