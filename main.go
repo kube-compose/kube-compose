@@ -6,8 +6,8 @@ import (
 
 	"github.com/urfave/cli"
 
-	"github.com/jabrekelmans/k8s-docker-compose/pkg/config"
-	"github.com/jabrekelmans/k8s-docker-compose/pkg/up"
+	"github.com/jbrekelmans/k8s-docker-compose/pkg/config"
+	"github.com/jbrekelmans/k8s-docker-compose/pkg/up"
 )
 
 func main () {

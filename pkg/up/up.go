@@ -1,7 +1,7 @@
 package up
 
 import (
-	"github.com/jabrekelmans/k8s-docker-compose/config"
+	"github.com/jbrekelmans/k8s-docker-compose/pkg/config"
 )
 
 func Run (cfg *config.Config) error {
