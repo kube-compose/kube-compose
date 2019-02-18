@@ -147,6 +147,9 @@ func Run (cfg *config.Config) error {
 					v1.Container{
 						Env: envVars,
 						Image: service.Image,
+						
+						// TODO set ImagePullPolicy based on the image we have here...
+
 						Name: name,
 						Ports: containerPorts,
 						ReadinessProbe: probe,

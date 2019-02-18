@@ -28,3 +28,11 @@ services:
       timeout: 5s
       retries: 5
       
+x-k8s-docker-compose:
+  api_base_url: https://my-k8s-cluster.example.com
+  namespace: mynamespace
+  rewrite_images:
+    host: docker-registry-default.apps.my-k8s-cluster.example.com
+    user: unused
+    password: ${TOKEN}
+    style: openshift
