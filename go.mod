@@ -1,4 +1,4 @@
-module github.com/jabrekelmans/k8s-docker-compose
+module github.com/jbrekelmans/k8s-docker-compose
 
 require (
 	github.com/urfave/cli v1.20.0

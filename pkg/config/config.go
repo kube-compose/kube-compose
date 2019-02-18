@@ -5,13 +5,16 @@ import (
 )
 
 type Config struct {
-	ComposeYamlData byte[]
+	ComposeYamlData []byte
 }
 
-func New() (*config, error) {
-	cfg = &Config{}
+func New() (*Config, error) {
+	cfg := &Config{}
 
-	// yaml.Unmarshal()
-
+	bla := struct{}{}
+	err := yaml.Unmarshal([]byte{1,2}, &bla)
+	if err != nil {
+		return nil, err
+	}
 	return cfg, nil
 }

@@ -1,35 +1,20 @@
 package main
 
 import (
-	"fmt"
 	"log"
+	"os"
 
 	"github.com/urfave/cli"
 
-	"github.com/jbrekelmans/k8s-docker-compose/pkg/config"
-	"github.com/jbrekelmans/k8s-docker-compose/pkg/up"
+	"github.com/jbrekelmans/k8s-docker-compose/cmd"
 )
 
 func main () {
-
-	config := config.Config{
-		A: "hello"
-	}
-
 	app := cli.NewApp()
-
 	app.Commands = []cli.Command{
-		{
-			Name: "up",
-			Usage: "Create and start containers",
-			Action: func (c *cli.Context) error {
-				cfg := config.New()
-				return up.Run(cfg)
-			},
-		},
+		cmd.NewCommand(),
 	}
-
-	err := app.Run()
+	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatal(err)
 	}

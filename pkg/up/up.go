@@ -1,6 +1,8 @@
 package up
 
 import (
+	"fmt"
+
 	"github.com/jbrekelmans/k8s-docker-compose/pkg/config"
 )
 
