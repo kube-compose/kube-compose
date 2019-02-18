@@ -16,7 +16,7 @@ type outputHelper struct {
 	outputDir string
 }
 
-func (o *outputHelper) init (cfg *config.Config) error {
+func (o *outputHelper) init () error {
 	outputDir, err := filepath.Abs("output")
 	if err != nil {
 		return err
@@ -53,20 +53,14 @@ func initObjectMeta (objectMeta *metav1.ObjectMeta, name string) {
 
 func Run (cfg *config.Config) error {
 	o := outputHelper{}
-	err := o.init(cfg)
+	err := o.init()
 	if err != nil {
 		return err
 	}
-	for name, service := range cfg.ComposeYaml.Services {
-
-
-		ports, err := config.ParsePorts(service.Ports)
-		if err != nil {
-			return err
-		}
-
+	for name, service := range cfg.DockerComposeFile.Services {
 		var containerPorts []v1.ContainerPort
 		var servicePorts []v1.ServicePort
+		ports := service.Ports
 		if len(ports) > 0 {
 			containerPorts = make([]v1.ContainerPort, len(ports))
 			servicePorts = make([]v1.ServicePort, len(ports))
@@ -84,15 +78,19 @@ func Run (cfg *config.Config) error {
 		}
 
 		var envVars []v1.EnvVar
-		if len(service.Environment) > 0 {
-			envVars := make([]v1.EnvVar, len(service.Environment))[:0]
+		envVarCount := len(service.Environment)
+		if envVarCount > 0 {
+			envVars = make([]v1.EnvVar, envVarCount)
+			i := 0
 			for key, value := range service.Environment {
-				envVars = append(envVars, v1.EnvVar{
+				envVars[i] = v1.EnvVar{
 					Name: key,
 					Value: value,
-				})
+				}
+				i++
 			}
 		}
+
 
 		pod := v1.Pod{
 			Spec: v1.PodSpec{

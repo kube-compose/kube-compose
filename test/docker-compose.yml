@@ -1,7 +1,7 @@
 version: "2.1"
 services:
-  myapp:
-    image: myapp:latest
+  authentication_service:
+    image: authentication_service:latest
     depends_on:
       db:
         condition: service_healthy
@@ -10,13 +10,22 @@ services:
     ports:
     - "8080"
     working_dir: /app/test
+  permissions_service:
+    image: permissions_service:latest
+    healthcheck:
+      disable: true
+    ports:
+    - "8080"
+    working_dir: /app/test
+
   db:
     image: postgres:latest
     healthcheck:
       test:
-      - pg_isready
-      - -U
-      - postgres
+      - CMD-SHELL
+      # We have to convert non-zero exit codes to one as per https://docs.docker.com/engine/reference/builder/#healthcheck
+      - 'pg_isready -U postgres || exit 1'
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 40s
