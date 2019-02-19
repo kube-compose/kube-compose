@@ -10,19 +10,19 @@ const (
 )
 
 type Healthcheck struct {
-	Interval time.Duration
-	IsShell bool
+	Interval    time.Duration
+	IsShell     bool
 	StartPeriod time.Duration
-	Retries uint
-	Test []string
-	Timeout time.Duration
+	Retries     uint
+	Test        []string
+	Timeout     time.Duration
 }
 
-func parseHealthcheck (healthcheckYAML *healthcheckCompose2_1) (*Healthcheck, bool, error) {
+func parseHealthcheck(healthcheckYAML *healthcheckCompose2_1) (*Healthcheck, bool, error) {
 	if healthcheckYAML == nil {
 		return nil, false, nil
 	}
-	
+
 	if healthcheckYAML.Disable {
 		return nil, true, nil
 	}
@@ -51,7 +51,7 @@ func parseHealthcheck (healthcheckYAML *healthcheckCompose2_1) (*Healthcheck, bo
 
 	// We do not set StartPeriod because it is unsupported in docker-compose 2.1 and
 	// should therefore  be treated as 0.
-	
+
 	// time.ParseDuration supports a superset of duration compared to docker-compose:
 	// https://golang.org/pkg/time/#Duration
 	// https://docs.docker.com/compose/compose-file/compose-file-v2/#specifying-durations
@@ -75,6 +75,6 @@ func parseHealthcheck (healthcheckYAML *healthcheckCompose2_1) (*Healthcheck, bo
 	healthcheck.Timeout = timeout
 
 	healthcheck.Retries = healthcheckYAML.Retries
-	
+
 	return healthcheck, false, nil
 }

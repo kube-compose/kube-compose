@@ -7,8 +7,8 @@ import (
 
 type Port struct {
 	ContainerPort int32
-	ExternalPort int32
-	Protocol string
+	ExternalPort  int32
+	Protocol      string
 }
 
 // https://docs.docker.com/compose/compose-file/compose-file-v2/
@@ -22,7 +22,7 @@ type Port struct {
 //  - "127.0.0.1:5000-5010:5000-5010"
 //  - "6060:6060/udp"
 //  - "12400-12500:1240"
-func parsePorts (inPorts []string) ([]Port, error) {
+func parsePorts(inPorts []string) ([]Port, error) {
 	n := len(inPorts)
 	if n == 0 {
 		return nil, nil
@@ -38,9 +38,9 @@ func parsePorts (inPorts []string) ([]Port, error) {
 		}
 		outPorts[i] = Port{
 			ContainerPort: int32(port),
-			ExternalPort: int32(port),
-			Protocol: "TCP",
+			ExternalPort:  int32(port),
+			Protocol:      "TCP",
 		}
 	}
 	return outPorts, nil
-} 
+}

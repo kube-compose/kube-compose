@@ -1,7 +1,7 @@
 version: "2.1"
 services:
-  authentication_service:
-    image: authentication_service:latest
+  authentication-service:
+    image: authentication-service:latest
     depends_on:
       db:
         condition: service_healthy
@@ -10,8 +10,8 @@ services:
     ports:
     - "8080"
     working_dir: /app/test
-  permissions_service:
-    image: permissions_service:latest
+  permission-service:
+    image: permission-service:latest
     healthcheck:
       disable: true
     ports:

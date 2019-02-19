@@ -2,22 +2,62 @@ package up
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"math"
 	"os"
 	"path/filepath"
-	
+
 	"github.com/jbrekelmans/k8s-docker-compose/pkg/config"
+	k8sUtil "github.com/jbrekelmans/k8s-docker-compose/pkg/k8s"
 	v1 "k8s.io/api/core/v1"
-	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"k8s.io/client-go/kubernetes"
+	clientV1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/rest"
 )
 
-type outputHelper struct {
-	outputDir string
+const annotationName = "k8s-docker-compose/service"
+
+type app struct {
+	clusterIP      string
+	nameEncoded    string
+	desiredPod     *v1.Pod
+	desiredService *v1.Service
 }
 
-func (o *outputHelper) init () error {
+type upRunner struct {
+	cfg              *config.Config
+	apps             map[string]*app
+	k8sClientset     *kubernetes.Clientset
+	k8sServiceClient clientV1.ServiceInterface
+	k8sPodClient     clientV1.PodInterface
+	outputDir        string
+}
+
+func (u *upRunner) initKubernetesClientset() error {
+	k8sConfig := &rest.Config{
+		Host: "https://192.168.64.2:8443",
+		TLSClientConfig: rest.TLSClientConfig{
+			ServerName: "localhost",
+			CertData:   clientCertData,
+			KeyData:    clientKeyData,
+			CAData:     caData,
+		},
+	}
+	k8sClientset, err := kubernetes.NewForConfig(k8sConfig)
+	if err != nil {
+		return err
+	}
+	u.k8sClientset = k8sClientset
+	u.k8sServiceClient = u.k8sClientset.CoreV1().Services(u.cfg.Namespace)
+	u.k8sPodClient = u.k8sClientset.CoreV1().Pods(u.cfg.Namespace)
+	return nil
+}
+
+func (u *upRunner) initOutputDir() error {
 	outputDir, err := filepath.Abs("output")
 	if err != nil {
 		return err
@@ -26,16 +66,107 @@ func (o *outputHelper) init () error {
 	if err != nil {
 		return err
 	}
-	o.outputDir = outputDir
+	u.outputDir = outputDir
 	return nil
 }
 
-func (o *outputHelper) addResource (kind, name string, r interface{}) error {
+func (u *upRunner) initApps() error {
+	u.apps = make(map[string]*app, len(u.cfg.DockerComposeFile.Services))
+	for name, service := range u.cfg.DockerComposeFile.Services {
+		app := &app{
+			nameEncoded: k8sUtil.EncodeName(name),
+		}
+		var containerPorts []v1.ContainerPort
+		var servicePorts []v1.ServicePort
+		ports := service.Ports
+		if len(ports) > 0 {
+			containerPorts = make([]v1.ContainerPort, len(ports))
+			servicePorts = make([]v1.ServicePort, len(ports))
+			for i, port := range ports {
+				containerPorts[i] = v1.ContainerPort{
+					ContainerPort: port.ContainerPort,
+					Protocol:      v1.Protocol(port.Protocol),
+				}
+				servicePorts[i] = v1.ServicePort{
+					Port:       port.ExternalPort,
+					Protocol:   v1.Protocol(port.Protocol),
+					TargetPort: intstr.FromInt(int(port.ContainerPort)),
+				}
+			}
+		}
+
+		var envVars []v1.EnvVar
+		envVarCount := len(service.Environment)
+		if envVarCount > 0 {
+			envVars = make([]v1.EnvVar, envVarCount)
+			i := 0
+			for key, value := range service.Environment {
+				envVars[i] = v1.EnvVar{
+					Name:  key,
+					Value: value,
+				}
+				i++
+			}
+		}
+
+		// TODO use HEALTHCHECK from docker image, unless service.HealthcheckDisabled is true
+		readinessProbe := healthcheckToProbe(service.Healthcheck)
+
+		app.desiredPod = &v1.Pod{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					v1.Container{
+						Env:   envVars,
+						Image: service.Image,
+						// TODO set ImagePullPolicy based on the image we have here...
+
+						Name:           app.nameEncoded,
+						Ports:          containerPorts,
+						ReadinessProbe: readinessProbe,
+						WorkingDir:     service.WorkingDir,
+					},
+				},
+			},
+		}
+		u.initResourceObjectMeta(&app.desiredPod.ObjectMeta, app.nameEncoded, name)
+		if len(servicePorts) > 0 {
+			app.desiredService = &v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: servicePorts,
+					Selector: map[string]string{
+						"app":                  app.nameEncoded,
+						u.cfg.EnvironmentLabel: u.cfg.EnvironmentID,
+					},
+					// This is the default value.
+					// Type: v1.ServiceType("ClusterIP"),
+				},
+			}
+			u.initResourceObjectMeta(&app.desiredService.ObjectMeta, app.nameEncoded, name)
+		}
+		u.apps[name] = app
+	}
+	return nil
+}
+
+func (u *upRunner) initResourceObjectMeta(objectMeta *metav1.ObjectMeta, nameEncoded, name string) {
+	objectMeta.Name = nameEncoded + "-" + u.cfg.EnvironmentID
+	if objectMeta.Labels == nil {
+		objectMeta.Labels = map[string]string{}
+	}
+	objectMeta.Labels["app"] = nameEncoded
+	objectMeta.Labels[u.cfg.EnvironmentLabel] = u.cfg.EnvironmentID
+	if objectMeta.Annotations == nil {
+		objectMeta.Annotations = map[string]string{}
+	}
+	objectMeta.Annotations[annotationName] = name
+}
+
+func (u *upRunner) writeResourceDebugFile(kind, name string, r interface{}) error {
 	json, err := json.MarshalIndent(r, "", "  ")
 	if err != nil {
 		return err
 	}
-	file := filepath.Join(o.outputDir, name, kind + ".json")
+	file := filepath.Join(u.outputDir, name, kind+".json")
 	os.MkdirAll(filepath.Dir(file), 0700)
 	err = ioutil.WriteFile(file, json, 0600)
 	if err != nil {
@@ -44,21 +175,13 @@ func (o *outputHelper) addResource (kind, name string, r interface{}) error {
 	return nil
 }
 
-func initObjectMeta (objectMeta *metav1.ObjectMeta, name string) {
-	objectMeta.Name = name
-	if objectMeta.Labels == nil {
-		objectMeta.Labels = map[string]string{}
-	}
-	objectMeta.Labels["app"] = name
-}
-
 // https://docs.docker.com/engine/reference/builder/#healthcheck
 // https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
-func healthcheckToProbe (healthcheck *config.Healthcheck) *v1.Probe {
+func healthcheckToProbe(healthcheck *config.Healthcheck) *v1.Probe {
 	if healthcheck == nil {
 		return nil
 	}
-	
+
 	var retriesInt32 int32
 	if healthcheck.Retries > math.MaxInt32 {
 		retriesInt32 = math.MaxInt32
@@ -79,7 +202,7 @@ func healthcheckToProbe (healthcheck *config.Healthcheck) *v1.Probe {
 		execCommand[1] = "-c"
 	}
 	for i := offset; i < n; i++ {
-		execCommand[i] = healthcheck.Test[i - offset]
+		execCommand[i] = healthcheck.Test[i-offset]
 	}
 	probe := &v1.Probe{
 		FailureThreshold: retriesInt32,
@@ -88,9 +211,10 @@ func healthcheckToProbe (healthcheck *config.Healthcheck) *v1.Probe {
 				Command: execCommand,
 			},
 		},
-		// StartPeriod and InitialDelaySeconds are not exactly the same, but this is good enough.
-		InitialDelaySeconds: int32(math.RoundToEven(healthcheck.StartPeriod.Seconds())),
-		PeriodSeconds: int32(math.RoundToEven(healthcheck.Interval.Seconds())),
+		// InitialDelaySeconds must always be zero so we start the healthcheck immediately. Irrespective of Docker's StartPeriod we should set this to zero.
+		InitialDelaySeconds: 0,
+
+		PeriodSeconds:  int32(math.RoundToEven(healthcheck.Interval.Seconds())),
 		TimeoutSeconds: int32(math.RoundToEven(healthcheck.Timeout.Seconds())),
 		// This is the default value.
 		// SuccessThreshold: 1,
@@ -98,89 +222,116 @@ func healthcheckToProbe (healthcheck *config.Healthcheck) *v1.Probe {
 	return probe
 }
 
-func Run (cfg *config.Config) error {
-	o := outputHelper{}
-	err := o.init()
-	if err != nil {
-		return err
+func (u *upRunner) run() error {
+	serviceCount := 0
+	for _, app := range u.apps {
+		if app.desiredService != nil {
+			serviceCount++
+		}
 	}
-	for name, service := range cfg.DockerComposeFile.Services {
-		var containerPorts []v1.ContainerPort
-		var servicePorts []v1.ServicePort
-		ports := service.Ports
-		if len(ports) > 0 {
-			containerPorts = make([]v1.ContainerPort, len(ports))
-			servicePorts = make([]v1.ServicePort, len(ports))
-			for i, port := range ports {
-				containerPorts[i] = v1.ContainerPort{
-					ContainerPort: port.ContainerPort,
-					Protocol: v1.Protocol(port.Protocol),
+	if serviceCount > 0 {
+		waitForClusterIPChannel := make(chan error)
+		go func() {
+			defer close(waitForClusterIPChannel)
+			watch, err := u.k8sServiceClient.Watch(metav1.ListOptions{
+				LabelSelector: u.cfg.EnvironmentLabel + "=" + u.cfg.EnvironmentID,
+				Watch:         true,
+			})
+			if err != nil {
+				waitForClusterIPChannel <- err
+				return
+			}
+			defer watch.Stop()
+			eventChannel := watch.ResultChan()
+			remaining := serviceCount
+			for {
+				event, ok := <-eventChannel
+				if !ok {
+					waitForClusterIPChannel <- fmt.Errorf("Channel unexpectedly closed")
+					break
 				}
-				servicePorts[i] = v1.ServicePort{
-					Port: port.ExternalPort,
-					Protocol: v1.Protocol(port.Protocol),
-					TargetPort: intstr.FromInt(int(port.ContainerPort)),
+				if event.Type == "ADDED" || event.Type == "MODIFIED" {
+					service := event.Object.(*v1.Service)
+					if len(service.Spec.ClusterIP) > 0 && service.Spec.Type == "ClusterIP" && service.ObjectMeta.Annotations != nil {
+						if name, ok := service.ObjectMeta.Annotations[annotationName]; ok {
+							if app, ok := u.apps[name]; ok && len(app.clusterIP) == 0 {
+								app.clusterIP = service.Spec.ClusterIP
+								remaining--
+								if remaining == 0 {
+									break
+								}
+							}
+						}
+					}
+				} else if event.Type != "DELETED" {
+					fmt.Println(event.Object)
+				}
+			}
+		}()
+		for _, app := range u.apps {
+			if app.desiredService != nil {
+				_, err := u.k8sServiceClient.Create(app.desiredService)
+				if err != nil {
+					return err
+				}
+				err = u.writeResourceDebugFile("Service", app.nameEncoded, app.desiredService)
+				if err != nil {
+					return err
 				}
 			}
 		}
-
-		var envVars []v1.EnvVar
-		envVarCount := len(service.Environment)
-		if envVarCount > 0 {
-			envVars = make([]v1.EnvVar, envVarCount)
-			i := 0
-			for key, value := range service.Environment {
-				envVars[i] = v1.EnvVar{
-					Name: key,
-					Value: value,
+		err, ok := <-waitForClusterIPChannel
+		if ok {
+			return err
+		}
+		hostAliases := make([]v1.HostAlias, serviceCount)
+		i := 0
+		for name, app := range u.apps {
+			if app.desiredService != nil {
+				hostAliases[i] = v1.HostAlias{
+					IP: app.clusterIP,
+					Hostnames: []string{
+						name,
+					},
 				}
 				i++
 			}
 		}
-
-		// TODO use HEALTHCHECK from docker image, unless service.HealthcheckDisabled is true
-		probe := healthcheckToProbe(service.Healthcheck)
-
-		pod := v1.Pod{
-			Spec: v1.PodSpec{
-				Containers: []v1.Container{
-					v1.Container{
-						Env: envVars,
-						Image: service.Image,
-						
-						// TODO set ImagePullPolicy based on the image we have here...
-
-						Name: name,
-						Ports: containerPorts,
-						ReadinessProbe: probe,
-						WorkingDir: service.WorkingDir,
-					},
-				},
-			},
-		}
-		initObjectMeta(&pod.ObjectMeta, name)
-		err = o.addResource("Pod", name, &pod)
-		if err != nil {
-			return err
-		}
-		
-		if len(servicePorts) > 0 {
-			service := v1.Service{
-				Spec: v1.ServiceSpec{
-					Ports: servicePorts,
-					Selector: map[string]string {
-						"app": name,
-					},
-					// This is the default value.
-					// Type: v1.ServiceType("ClusterIP"),
-				},
+		for _, app := range u.apps {
+			app.desiredPod.Spec.HostAliases = hostAliases
+			_, err := u.k8sPodClient.Create(app.desiredPod)
+			if err != nil {
+				return err
 			}
-			initObjectMeta(&service.ObjectMeta, name)
-			err = o.addResource("Service", name, &service)
+			err = u.writeResourceDebugFile("Pod", app.nameEncoded, app.desiredPod)
 			if err != nil {
 				return err
 			}
 		}
 	}
+
+	// TODO depends_on???
+
 	return nil
+}
+
+// Run runs an operation similar docker-compose up against a Kubernetes cluster.
+func Run(cfg *config.Config) error {
+	u := &upRunner{
+		cfg: cfg,
+	}
+	err := u.initOutputDir()
+	if err != nil {
+		return err
+	}
+	err = u.initApps()
+	if err != nil {
+		return err
+	}
+	err = u.initKubernetesClientset()
+	if err != nil {
+		return err
+	}
+
+	return u.run()
 }

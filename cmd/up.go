@@ -9,13 +9,16 @@ import (
 
 func NewCommand() cli.Command {
 	return cli.Command{
-		Name: "up",
+		Name:  "up",
 		Usage: "Create and start containers",
-		Action: func (c *cli.Context) error {
+		Action: func(c *cli.Context) error {
 			cfg, err := config.New()
 			if err != nil {
 				return err
 			}
+			cfg.EnvironmentID = "test123"
+			cfg.EnvironmentLabel = "environment-instance"
+			cfg.Namespace = "default"
 			return up.Run(cfg)
 		},
 	}

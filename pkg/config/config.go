@@ -6,25 +6,30 @@ import (
 	"os"
 
 	"gopkg.in/yaml.v2"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 type DockerComposeFile struct {
 	Services map[string]Service
-	Version string
+	Version  string
 }
 
-type Service struct{
-	Environment map[string]string
-	Healthcheck *Healthcheck
+type Service struct {
+	Environment         map[string]string
+	Healthcheck         *Healthcheck
 	HealthcheckDisabled bool
-	Image string
-	Ports []Port
-	WorkingDir string
+	Image               string
+	Ports               []Port
+	WorkingDir          string
 }
 
-// https://github.com/docker/compose/blob/master/compose/config/config_schema_v2.1.json
 type Config struct {
 	DockerComposeFile DockerComposeFile
+	// All Kubernetes resources are named with "-"+EnvironmentID as a suffix, and have an additional label "env="+EnvironmentID so that
+	// namespaces can be shared.
+	EnvironmentID    string
+	EnvironmentLabel string
+	Namespace        string
 }
 
 func New() (*Config, error) {
@@ -38,7 +43,7 @@ func New() (*Config, error) {
 		}
 	}
 
-	var versionHolder struct{
+	var versionHolder struct {
 		Version string `yaml:"version"`
 	}
 	err = yaml.Unmarshal(data, &versionHolder)
@@ -46,7 +51,7 @@ func New() (*Config, error) {
 		return nil, err
 	}
 	if versionHolder.Version != "2.1" {
-		return nil, fmt.Errorf("Unsupported docker-compose version")	
+		return nil, fmt.Errorf("Unsupported docker-compose version")
 	}
 
 	var composeYAML composeYAML2_1
@@ -59,14 +64,23 @@ func New() (*Config, error) {
 		DockerComposeFile: DockerComposeFile{
 			Version: versionHolder.Version,
 		},
+		EnvironmentLabel: "env",
 	}
 	err = parseComposeYAML2_1(&composeYAML, &cfg.DockerComposeFile)
 	if err != nil {
 		return nil, err
 	}
+
+	for name := range cfg.DockerComposeFile.Services {
+		if errors := validation.IsDNS1123Subdomain(name); len(errors) > 0 {
+			return nil, fmt.Errorf("Sorry! We do not support the potentially valid docker-compose service named %s: %s\n", name, errors[0])
+		}
+	}
+
 	return cfg, nil
 }
 
+// https://github.com/docker/compose/blob/master/compose/config/config_schema_v2.1.json
 func parseComposeYAML2_1(composeYAML *composeYAML2_1, dockerComposeFile *DockerComposeFile) error {
 	n := len(composeYAML.Services)
 	if n > 0 {
@@ -82,11 +96,11 @@ func parseComposeYAML2_1(composeYAML *composeYAML2_1, dockerComposeFile *DockerC
 	return nil
 }
 
-func parseServiceYAML2_1 (serviceYAML *serviceYAML2_1) (Service, error) {
+func parseServiceYAML2_1(serviceYAML *serviceYAML2_1) (Service, error) {
 	service := Service{
 		Environment: serviceYAML.Environment,
-		Image: serviceYAML.Image,
-		WorkingDir: serviceYAML.WorkingDir,
+		Image:       serviceYAML.Image,
+		WorkingDir:  serviceYAML.WorkingDir,
 	}
 
 	ports, err := parsePorts(serviceYAML.Ports)
