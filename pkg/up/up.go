@@ -232,6 +232,8 @@ func (u *upRunner) createServicesAndSetPodHostAliases() error {
 	if desiredServiceCount > 0 {
 		waitForClusterIPChannel := make(chan error)
 		go func() {
+			// TOOD perform watch after create service so that ResourceVersion is used and better efficiency is achieved
+			// see https://stackoverflow.com/questions/52717497/correct-way-to-use-kubernetes-watches
 			defer close(waitForClusterIPChannel)
 			watch, err := u.k8sServiceClient.Watch(metav1.ListOptions{
 				LabelSelector: u.cfg.EnvironmentLabel + "=" + u.cfg.EnvironmentID,
