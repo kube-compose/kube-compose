@@ -222,14 +222,14 @@ func healthcheckToProbe(healthcheck *config.Healthcheck) *v1.Probe {
 	return probe
 }
 
-func (u *upRunner) run() error {
-	serviceCount := 0
+func (u *upRunner) createServicesAndSetPodHostAliases() error {
+	desiredServiceCount := 0
 	for _, app := range u.apps {
 		if app.desiredService != nil {
-			serviceCount++
+			desiredServiceCount++
 		}
 	}
-	if serviceCount > 0 {
+	if desiredServiceCount > 0 {
 		waitForClusterIPChannel := make(chan error)
 		go func() {
 			defer close(waitForClusterIPChannel)
@@ -243,7 +243,7 @@ func (u *upRunner) run() error {
 			}
 			defer watch.Stop()
 			eventChannel := watch.ResultChan()
-			remaining := serviceCount
+			remaining := desiredServiceCount
 			for {
 				event, ok := <-eventChannel
 				if !ok {
@@ -284,7 +284,7 @@ func (u *upRunner) run() error {
 		if ok {
 			return err
 		}
-		hostAliases := make([]v1.HostAlias, serviceCount)
+		hostAliases := make([]v1.HostAlias, desiredServiceCount)
 		i := 0
 		for name, app := range u.apps {
 			if app.desiredService != nil {
@@ -299,19 +299,27 @@ func (u *upRunner) run() error {
 		}
 		for _, app := range u.apps {
 			app.desiredPod.Spec.HostAliases = hostAliases
-			_, err := u.k8sPodClient.Create(app.desiredPod)
-			if err != nil {
-				return err
-			}
-			err = u.writeResourceDebugFile("Pod", app.nameEncoded, app.desiredPod)
-			if err != nil {
-				return err
-			}
 		}
 	}
+	return nil
+}
 
+func (u *upRunner) run() error {
+	err := u.createServicesAndSetPodHostAliases()
+	if err != nil {
+		return err
+	}
 	// TODO depends_on???
-
+	for _, app := range u.apps {
+		_, err := u.k8sPodClient.Create(app.desiredPod)
+		if err != nil {
+			return err
+		}
+		err = u.writeResourceDebugFile("Pod", app.nameEncoded, app.desiredPod)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

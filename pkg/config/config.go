@@ -10,17 +10,23 @@ import (
 )
 
 type DockerComposeFile struct {
-	Services map[string]Service
+	Services map[string]*Service
 	Version  string
 }
 
 type Service struct {
+	DependsOn           map[*Service]ServiceHealthiness
 	Environment         map[string]string
 	Healthcheck         *Healthcheck
 	HealthcheckDisabled bool
 	Image               string
 	Ports               []Port
+	ServiceName         string
 	WorkingDir          string
+
+	// helpers for ensureNoDependsOnCycle
+	recStack bool
+	visited  bool
 }
 
 type Config struct {
@@ -51,7 +57,7 @@ func New() (*Config, error) {
 		return nil, err
 	}
 	if versionHolder.Version != "2.1" {
-		return nil, fmt.Errorf("Unsupported docker-compose version")
+		return nil, fmt.Errorf("unsupported docker-compose version")
 	}
 
 	var composeYAML composeYAML2_1
@@ -73,31 +79,81 @@ func New() (*Config, error) {
 
 	for name := range cfg.DockerComposeFile.Services {
 		if errors := validation.IsDNS1123Subdomain(name); len(errors) > 0 {
-			return nil, fmt.Errorf("Sorry! We do not support the potentially valid docker-compose service named %s: %s\n", name, errors[0])
+			return nil, fmt.Errorf("sorry, we do not support the potentially valid docker-compose service named %s: %s", name, errors[0])
 		}
 	}
 
 	return cfg, nil
 }
 
-// https://github.com/docker/compose/blob/master/compose/config/config_schema_v2.1.json
-func parseComposeYAML2_1(composeYAML *composeYAML2_1, dockerComposeFile *DockerComposeFile) error {
-	n := len(composeYAML.Services)
-	if n > 0 {
-		dockerComposeFile.Services = make(map[string]Service, n)
-		for name, serviceYAML := range composeYAML.Services {
-			service, err := parseServiceYAML2_1(&serviceYAML)
+// helper for defer in ensureNoDependsOnCycle
+func (service *Service) clearRecStack() {
+	service.recStack = false
+}
+
+// https://www.geeksforgeeks.org/detect-cycle-in-a-graph/
+func ensureNoDependsOnCycle(service *Service) error {
+	service.visited = true
+	service.recStack = true
+	defer service.clearRecStack()
+	for dep := range service.DependsOn {
+		if !dep.visited {
+			err := ensureNoDependsOnCycle(dep)
 			if err != nil {
 				return err
 			}
-			dockerComposeFile.Services[name] = service
+		} else if dep.recStack {
+			return fmt.Errorf("service %s depends on %s, but this means there is a cyclic dependency, aborting", service.ServiceName, dep.ServiceName)
 		}
 	}
 	return nil
 }
 
-func parseServiceYAML2_1(serviceYAML *serviceYAML2_1) (Service, error) {
-	service := Service{
+// https://github.com/docker/compose/blob/master/compose/config/config_schema_v2.1.json
+func parseComposeYAML2_1(composeYAML *composeYAML2_1, dockerComposeFile *DockerComposeFile) error {
+	n := len(composeYAML.Services)
+	if n > 0 {
+		dockerComposeFile.Services = make(map[string]*Service, n)
+		for name, serviceYAML := range composeYAML.Services {
+			service, err := parseServiceYAML2_1(&serviceYAML)
+			if err != nil {
+				return err
+			}
+			service.ServiceName = name
+			dockerComposeFile.Services[name] = service
+			for dependsOnService := range serviceYAML.DependsOn.Values {
+				if _, ok := composeYAML.Services[dependsOnService]; !ok {
+					return fmt.Errorf("service %s refers to a non-existing service in depends_on: %s", name, dependsOnService)
+				}
+			}
+		}
+		for name1, serviceYAML := range composeYAML.Services {
+			service1 := dockerComposeFile.Services[name1]
+			service1.DependsOn = map[*Service]ServiceHealthiness{}
+			for name2, serviceHealthiness := range serviceYAML.DependsOn.Values {
+				service2 := dockerComposeFile.Services[name2]
+				service1.DependsOn[service2] = serviceHealthiness
+			}
+		}
+		for _, service := range dockerComposeFile.Services {
+
+			// Reset the visisted marker on each service. This is a precondition of ensureNoDependsOnCycle.
+			for _, service := range dockerComposeFile.Services {
+				service.visited = false
+			}
+
+			// Run the cycle detection algorithm...
+			err := ensureNoDependsOnCycle(service)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func parseServiceYAML2_1(serviceYAML *serviceYAML2_1) (*Service, error) {
+	service := &Service{
 		Environment: serviceYAML.Environment,
 		Image:       serviceYAML.Image,
 		WorkingDir:  serviceYAML.WorkingDir,
