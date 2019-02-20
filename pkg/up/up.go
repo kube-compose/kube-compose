@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/jbrekelmans/k8s-docker-compose/pkg/config"
 	k8sUtil "github.com/jbrekelmans/k8s-docker-compose/pkg/k8s"
@@ -21,16 +22,41 @@ import (
 
 const annotationName = "k8s-docker-compose/service"
 
+func errorResourcesModifiedExternally() error {
+	return fmt.Errorf("one or more resources appear to have been modified by an external process, aborting")
+}
+
+type podStatus int
+
+const (
+	podStatusReady   podStatus = 2
+	podStatusStarted podStatus = 1
+	podStatusOther   podStatus = 0
+)
+
+func (podStatus *podStatus) String() string {
+	switch *podStatus {
+	case podStatusReady:
+		return "ready"
+	case podStatusStarted:
+		return "started"
+	}
+	return "other"
+}
+
 type app struct {
-	clusterIP      string
-	nameEncoded    string
-	desiredPod     *v1.Pod
-	desiredService *v1.Service
+	clusterIP            string
+	maxObservedPodStatus podStatus
+	name                 string
+	nameEncoded          string
+	desiredPod           *v1.Pod
+	desiredService       *v1.Service
 }
 
 type upRunner struct {
-	cfg              *config.Config
 	apps             map[string]*app
+	appsWithoutPods  map[*app]bool
+	cfg              *config.Config
 	k8sClientset     *kubernetes.Clientset
 	k8sServiceClient clientV1.ServiceInterface
 	k8sPodClient     clientV1.PodInterface
@@ -72,10 +98,13 @@ func (u *upRunner) initOutputDir() error {
 
 func (u *upRunner) initApps() error {
 	u.apps = make(map[string]*app, len(u.cfg.DockerComposeFile.Services))
+	u.appsWithoutPods = make(map[*app]bool, len(u.cfg.DockerComposeFile.Services))
 	for name, service := range u.cfg.DockerComposeFile.Services {
 		app := &app{
+			name:        name,
 			nameEncoded: k8sUtil.EncodeName(name),
 		}
+		u.appsWithoutPods[app] = true
 		var containerPorts []v1.ContainerPort
 		var servicePorts []v1.ServicePort
 		ports := service.Ports
@@ -112,23 +141,26 @@ func (u *upRunner) initApps() error {
 		// TODO use HEALTHCHECK from docker image, unless service.HealthcheckDisabled is true
 		readinessProbe := healthcheckToProbe(service.Healthcheck)
 
+		entrypoint := service.Entrypoint
+
 		app.desiredPod = &v1.Pod{
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{
 					v1.Container{
-						Env:   envVars,
-						Image: service.Image,
-						// TODO set ImagePullPolicy based on the image we have here...
-
+						Command:        entrypoint,
+						Env:            envVars,
+						Image:          service.Image, // TODO set ImagePullPolicy based on the image we have here...
 						Name:           app.nameEncoded,
 						Ports:          containerPorts,
 						ReadinessProbe: readinessProbe,
 						WorkingDir:     service.WorkingDir,
 					},
 				},
+				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
 		u.initResourceObjectMeta(&app.desiredPod.ObjectMeta, app.nameEncoded, name)
+		u.writeResourceDebugFile("Pod", app.nameEncoded, app.desiredPod)
 		if len(servicePorts) > 0 {
 			app.desiredService = &v1.Service{
 				Spec: v1.ServiceSpec{
@@ -142,6 +174,10 @@ func (u *upRunner) initApps() error {
 				},
 			}
 			u.initResourceObjectMeta(&app.desiredService.ObjectMeta, app.nameEncoded, name)
+			err := u.writeResourceDebugFile("Service", app.nameEncoded, app.desiredService)
+			if err != nil {
+				return err
+			}
 		}
 		u.apps[name] = app
 	}
@@ -222,6 +258,113 @@ func healthcheckToProbe(healthcheck *config.Healthcheck) *v1.Probe {
 	return probe
 }
 
+func (u *upRunner) findAppFromResourceObjectMeta(objectMeta *metav1.ObjectMeta) (*app, error) {
+	if objectMeta.Annotations != nil {
+		if name, ok := objectMeta.Annotations[annotationName]; ok {
+			if app, ok := u.apps[name]; ok {
+				return app, nil
+			}
+		}
+	}
+	nameEncoded := objectMeta.Name
+	for _, app := range u.apps {
+		if app.nameEncoded == nameEncoded {
+			return nil, errorResourcesModifiedExternally()
+		}
+	}
+	return nil, nil
+}
+
+func (u *upRunner) waitForServiceClusterIPUpdate(service *v1.Service) (*app, error) {
+	app, err := u.findAppFromResourceObjectMeta(&service.ObjectMeta)
+	if err != nil || app == nil {
+		return app, err
+	}
+	if service.Spec.Type != "ClusterIP" {
+		return app, errorResourcesModifiedExternally()
+	}
+	app.clusterIP = service.Spec.ClusterIP
+	return app, nil
+}
+
+func (u *upRunner) waitForServiceClusterIPCountRemaining() int {
+	remaining := 0
+	for _, app := range u.apps {
+		if app.desiredService != nil && len(app.clusterIP) == 0 {
+			remaining++
+		}
+	}
+	return remaining
+}
+
+func (u *upRunner) waitForServiceClusterIP(expected int) error {
+	listOptions := metav1.ListOptions{
+		LabelSelector: u.cfg.EnvironmentLabel + "=" + u.cfg.EnvironmentID,
+	}
+	serviceList, err := u.k8sServiceClient.List(listOptions)
+	if err != nil {
+		return err
+	}
+	if len(serviceList.Items) < expected {
+		return errorResourcesModifiedExternally()
+	}
+	for _, service := range serviceList.Items {
+		_, err = u.waitForServiceClusterIPUpdate(&service)
+		if err != nil {
+			return err
+		}
+	}
+	remaining := u.waitForServiceClusterIPCountRemaining()
+	if remaining == 0 {
+		fmt.Printf("waiting for cluster IP assignment (%d/%d)\n", expected, expected)
+		return nil
+	}
+	fmt.Printf("waiting for cluster IP assignment (%d/%d)\n", expected-remaining, expected)
+	listOptions.ResourceVersion = serviceList.ResourceVersion
+	listOptions.Watch = true
+	watch, err := u.k8sServiceClient.Watch(listOptions)
+	if err != nil {
+		return err
+	}
+	defer watch.Stop()
+	eventChannel := watch.ResultChan()
+	for {
+		event, ok := <-eventChannel
+		if !ok {
+			return fmt.Errorf("channel unexpectedly closed")
+		}
+		if event.Type == "ADDED" || event.Type == "MODIFIED" {
+			service := event.Object.(*v1.Service)
+			_, err := u.waitForServiceClusterIPUpdate(service)
+			if err != nil {
+				return err
+			}
+		} else if event.Type == "DELETED" {
+			service := event.Object.(*v1.Service)
+			app, err := u.findAppFromResourceObjectMeta(&service.ObjectMeta)
+			if err != nil {
+				return err
+			}
+			if app != nil {
+				return errorResourcesModifiedExternally()
+			}
+		} else {
+			fmt.Printf("got unexpected error event from channel: ")
+			fmt.Println(event.Object)
+			return fmt.Errorf("got unexpected error event from channel")
+		}
+		remainingNew := u.waitForServiceClusterIPCountRemaining()
+		if remainingNew != remaining {
+			remaining = remainingNew
+			fmt.Printf("waiting for cluster IP assignment (%d/%d)\n", expected-remaining, expected)
+			if remaining == 0 {
+				break
+			}
+		}
+	}
+	return nil
+}
+
 func (u *upRunner) createServicesAndSetPodHostAliases() error {
 	desiredServiceCount := 0
 	for _, app := range u.apps {
@@ -229,107 +372,150 @@ func (u *upRunner) createServicesAndSetPodHostAliases() error {
 			desiredServiceCount++
 		}
 	}
-	if desiredServiceCount > 0 {
-		waitForClusterIPChannel := make(chan error)
-		go func() {
-			// TOOD perform watch after create service so that ResourceVersion is used and better efficiency is achieved
-			// see https://stackoverflow.com/questions/52717497/correct-way-to-use-kubernetes-watches
-			defer close(waitForClusterIPChannel)
-			watch, err := u.k8sServiceClient.Watch(metav1.ListOptions{
-				LabelSelector: u.cfg.EnvironmentLabel + "=" + u.cfg.EnvironmentID,
-				Watch:         true,
-			})
+	if desiredServiceCount == 0 {
+		return nil
+	}
+	for _, app := range u.apps {
+		if app.desiredService != nil {
+			_, err := u.k8sServiceClient.Create(app.desiredService)
 			if err != nil {
-				waitForClusterIPChannel <- err
-				return
+				return err
 			}
-			defer watch.Stop()
-			eventChannel := watch.ResultChan()
-			remaining := desiredServiceCount
-			for {
-				event, ok := <-eventChannel
-				if !ok {
-					waitForClusterIPChannel <- fmt.Errorf("Channel unexpectedly closed")
-					break
-				}
-				if event.Type == "ADDED" || event.Type == "MODIFIED" {
-					service := event.Object.(*v1.Service)
-					if len(service.Spec.ClusterIP) > 0 && service.Spec.Type == "ClusterIP" && service.ObjectMeta.Annotations != nil {
-						if name, ok := service.ObjectMeta.Annotations[annotationName]; ok {
-							if app, ok := u.apps[name]; ok && len(app.clusterIP) == 0 {
-								app.clusterIP = service.Spec.ClusterIP
-								remaining--
-								if remaining == 0 {
-									break
-								}
-							}
-						}
-					}
-				} else if event.Type != "DELETED" {
-					fmt.Println(event.Object)
-				}
+			fmt.Printf("app %s: created service %s\n", app.name, app.desiredService.ObjectMeta.Name)
+		}
+	}
+	err := u.waitForServiceClusterIP(desiredServiceCount)
+	if err != nil {
+		return err
+	}
+	hostAliases := make([]v1.HostAlias, desiredServiceCount)
+	i := 0
+	for _, app := range u.apps {
+		if app.desiredService != nil {
+			hostAliases[i] = v1.HostAlias{
+				IP: app.clusterIP,
+				Hostnames: []string{
+					app.name,
+				},
 			}
-		}()
-		for _, app := range u.apps {
-			if app.desiredService != nil {
-				_, err := u.k8sServiceClient.Create(app.desiredService)
-				if err != nil {
-					return err
+			i++
+		}
+	}
+	for _, app := range u.apps {
+		app.desiredPod.Spec.HostAliases = hostAliases
+	}
+	return nil
+}
+
+func (u *upRunner) createAppPod(app *app, reason string) error {
+	_, err := u.k8sPodClient.Create(app.desiredPod)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("app %s: created pod %s because %s\n", app.name, app.desiredPod.ObjectMeta.Name, reason)
+	return nil
+}
+
+func parsePodStatus(pod *v1.Pod) (podStatus, error) {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == v1.PodReady && condition.Status == v1.ConditionTrue {
+			return podStatusReady, nil
+		}
+	}
+	runningCount := 0
+	for _, containerStatus := range pod.Status.ContainerStatuses {
+		t := containerStatus.State.Terminated
+		if t != nil {
+			return podStatusOther, fmt.Errorf("aborting because container %s of pod %s terminated (code=%d,signal=%d,reason=%s): %s",
+				containerStatus.Name,
+				pod.ObjectMeta.Name,
+				t.ExitCode,
+				t.Signal,
+				t.Reason,
+				t.Message,
+			)
+		}
+
+		if w := containerStatus.State.Waiting; w != nil && w.Reason == "ErrImagePull" {
+			return podStatusOther, fmt.Errorf("aborting because container %s of pod %s could not pull image: %s",
+				containerStatus.Name,
+				pod.ObjectMeta.Name,
+				w.Message,
+			)
+		}
+		if containerStatus.State.Running != nil {
+			runningCount++
+		}
+	}
+	if runningCount == len(pod.Status.ContainerStatuses) {
+		return podStatusStarted, nil
+	}
+	return podStatusOther, nil
+}
+
+func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
+	app, err := u.findAppFromResourceObjectMeta(&pod.ObjectMeta)
+	if err != nil {
+		return err
+	}
+	if app == nil {
+		return nil
+	}
+	podStatus, err := parsePodStatus(pod)
+	if err != nil {
+		return err
+	}
+	if podStatus > app.maxObservedPodStatus {
+		app.maxObservedPodStatus = podStatus
+		fmt.Printf("app %s: pod status %s (healthiest observed)\n", app.name, &app.maxObservedPodStatus)
+	}
+	return nil
+}
+
+func (u *upRunner) createAppPodsIfNeeded() error {
+	for app1 := range u.appsWithoutPods {
+		dependsOn := u.cfg.DockerComposeFile.Services[app1.name].DependsOn
+		createAppPod := true
+		for service, healthiness := range dependsOn {
+			app2 := u.apps[service.ServiceName]
+			if healthiness == config.ServiceHealthy {
+				if app2.maxObservedPodStatus != podStatusReady {
+					createAppPod = false
 				}
-				err = u.writeResourceDebugFile("Service", app.nameEncoded, app.desiredService)
-				if err != nil {
-					return err
+			} else {
+				if app2.maxObservedPodStatus != podStatusStarted {
+					createAppPod = false
 				}
 			}
 		}
-		err, ok := <-waitForClusterIPChannel
-		if ok {
-			return err
-		}
-		hostAliases := make([]v1.HostAlias, desiredServiceCount)
-		i := 0
-		for name, app := range u.apps {
-			if app.desiredService != nil {
-				hostAliases[i] = v1.HostAlias{
-					IP: app.clusterIP,
-					Hostnames: []string{
-						name,
-					},
+		if createAppPod {
+			reason := strings.Builder{}
+			reason.WriteString("its dependency conditions are met (")
+			comma := false
+			for service, healthiness := range dependsOn {
+				if comma {
+					reason.WriteString(", ")
 				}
-				i++
+				reason.WriteString(service.ServiceName)
+				if healthiness == config.ServiceHealthy {
+					reason.WriteString(": healthy/ready")
+				} else {
+					reason.WriteString(": started")
+				}
+				comma = true
 			}
-		}
-		for _, app := range u.apps {
-			app.desiredPod.Spec.HostAliases = hostAliases
+			reason.WriteString(")")
+			err := u.createAppPod(app1, reason.String())
+			if err != nil {
+				return err
+			}
+			delete(u.appsWithoutPods, app1)
 		}
 	}
 	return nil
 }
 
 func (u *upRunner) run() error {
-	err := u.createServicesAndSetPodHostAliases()
-	if err != nil {
-		return err
-	}
-	// TODO depends_on???
-	for _, app := range u.apps {
-		_, err := u.k8sPodClient.Create(app.desiredPod)
-		if err != nil {
-			return err
-		}
-		err = u.writeResourceDebugFile("Pod", app.nameEncoded, app.desiredPod)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// Run runs an operation similar docker-compose up against a Kubernetes cluster.
-func Run(cfg *config.Config) error {
-	u := &upRunner{
-		cfg: cfg,
-	}
 	err := u.initOutputDir()
 	if err != nil {
 		return err
@@ -342,6 +528,91 @@ func Run(cfg *config.Config) error {
 	if err != nil {
 		return err
 	}
+	err = u.createServicesAndSetPodHostAliases()
+	if err != nil {
+		return err
+	}
 
+	for _, app := range u.apps {
+		if len(u.cfg.DockerComposeFile.Services[app.name].DependsOn) == 0 {
+			u.createAppPod(app, "no dependencies")
+			delete(u.appsWithoutPods, app)
+		}
+	}
+
+	listOptions := metav1.ListOptions{
+		LabelSelector: u.cfg.EnvironmentLabel + "=" + u.cfg.EnvironmentID,
+	}
+	podList, err := u.k8sPodClient.List(listOptions)
+	if err != nil {
+		return err
+	}
+	for _, pod := range podList.Items {
+		err = u.updateAppMaxObservedPodStatus(&pod)
+		if err != nil {
+			return err
+		}
+	}
+	err = u.createAppPodsIfNeeded()
+	if err != nil {
+		return err
+	}
+	listOptions.ResourceVersion = podList.ResourceVersion
+	listOptions.Watch = true
+	watch, err := u.k8sPodClient.Watch(listOptions)
+	if err != nil {
+		return err
+	}
+	defer watch.Stop()
+	eventChannel := watch.ResultChan()
+	for {
+		event, ok := <-eventChannel
+		if !ok {
+			return fmt.Errorf("channel unexpectedly closed")
+		}
+		if event.Type == "ADDED" || event.Type == "MODIFIED" {
+			pod := event.Object.(*v1.Pod)
+			err = u.updateAppMaxObservedPodStatus(pod)
+			if err != nil {
+				return err
+			}
+		} else if event.Type == "DELETED" {
+			pod := event.Object.(*v1.Pod)
+			app, err := u.findAppFromResourceObjectMeta(&pod.ObjectMeta)
+			if err != nil {
+				return err
+			}
+			if app != nil {
+				return errorResourcesModifiedExternally()
+			}
+		} else {
+			fmt.Printf("got unexpected error event from channel: ")
+			fmt.Println(event.Object)
+			return fmt.Errorf("got unexpected error event from channel")
+		}
+		err = u.createAppPodsIfNeeded()
+		if err != nil {
+			return err
+		}
+		allPodsReady := true
+		for _, app := range u.apps {
+			if app.maxObservedPodStatus != podStatusReady {
+				allPodsReady = false
+			}
+		}
+		if allPodsReady {
+			break
+		}
+	}
+	fmt.Printf("pods ready (%d/%d)\n", len(u.apps), len(u.apps))
+	fmt.Println("done")
+	return nil
+}
+
+// Run runs an operation similar docker-compose up against a Kubernetes cluster.
+func Run(cfg *config.Config) error {
+	u := &upRunner{
+		cfg: cfg,
+	}
 	return u.run()
 }

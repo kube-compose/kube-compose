@@ -13,6 +13,33 @@ const (
 	ServiceHealthy ServiceHealthiness = 1
 )
 
+func (s *ServiceHealthiness) String() string {
+	switch *s {
+	case ServiceHealthy:
+		return "serviceHealthy"
+	case ServiceStarted:
+		return "serviceStarted"
+	}
+	return ""
+}
+
+type stringOrStringSlice struct {
+	Values []string
+}
+
+func (t *stringOrStringSlice) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	err := unmarshal(&t.Values)
+	if err != nil {
+		var str string
+		err = unmarshal(&str)
+		if err != nil {
+			return err
+		}
+		t.Values = []string{str}
+	}
+	return nil
+}
+
 type healthcheckTest struct {
 	Values []string
 }
@@ -92,6 +119,7 @@ type serviceYAML2_1 struct {
 		Dockerfile string `yaml:"dockerfile"`
 	} `yaml:"build"`
 	DependsOn   dependsOnYAML2_1       `yaml:"depends_on"`
+	Entrypoint  stringOrStringSlice    `yaml:"entrypoint"`
 	Environment map[string]string      `yaml:"environment"`
 	Healthcheck *healthcheckCompose2_1 `yaml:"healthcheck"`
 	Image       string                 `yaml:"image"`

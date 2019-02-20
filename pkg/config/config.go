@@ -16,6 +16,7 @@ type DockerComposeFile struct {
 
 type Service struct {
 	DependsOn           map[*Service]ServiceHealthiness
+	Entrypoint          []string
 	Environment         map[string]string
 	Healthcheck         *Healthcheck
 	HealthcheckDisabled bool
@@ -154,6 +155,7 @@ func parseComposeYAML2_1(composeYAML *composeYAML2_1, dockerComposeFile *DockerC
 
 func parseServiceYAML2_1(serviceYAML *serviceYAML2_1) (*Service, error) {
 	service := &Service{
+		Entrypoint:  serviceYAML.Entrypoint.Values,
 		Environment: serviceYAML.Environment,
 		Image:       serviceYAML.Image,
 		WorkingDir:  serviceYAML.WorkingDir,

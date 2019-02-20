@@ -1,7 +1,8 @@
 version: "2.1"
 services:
   authentication-service:
-    image: authentication-service:latest
+    entrypoint: ["/bin/bash", "-c", "while :; do sleep 1; done"]
+    image: ubuntu:latest
     depends_on:
       db:
         condition: service_healthy
@@ -11,7 +12,8 @@ services:
     - "8080"
     working_dir: /app/test
   permission-service:
-    image: permission-service:latest
+    entrypoint: ["/bin/bash", "-c", "while :; do sleep 1; done"]
+    image: ubuntu:latest
     healthcheck:
       disable: true
     ports:
