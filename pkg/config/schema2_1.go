@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 )
 
 // https://github.com/docker/compose/blob/master/compose/config/config_schema_v2.1.json
@@ -60,24 +61,24 @@ func (t *healthcheckTest) UnmarshalYAML(unmarshal func(interface{}) error) error
 	return nil
 }
 
-type healthcheckCompose2_1 struct {
-	Disable  bool   `yaml:"disable"`
-	Interval string `yaml:"interval"`
-	Retries  uint   `yaml:"retries"`
+type serviceHealthcheck2_1 struct {
+	Disable  bool            `yaml:"disable"`
+	Interval string          `yaml:"interval"`
+	Retries  uint            `yaml:"retries"`
+	Test     healthcheckTest `yaml:"test"`
+	Timeout  string          `yaml:"timeout"`
 	// start_period is only available in docker-compose 2.3 or higher
-	Test    healthcheckTest `yaml:"test"`
-	Timeout string          `yaml:"timeout"`
 }
 
-func (h *healthcheckCompose2_1) GetTest() []string {
+func (h *serviceHealthcheck2_1) GetTest() []string {
 	return h.Test.Values
 }
 
-type dependsOnYAML2_1 struct {
+type dependsOn2_1 struct {
 	Values map[string]ServiceHealthiness
 }
 
-func (t *dependsOnYAML2_1) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (t *dependsOn2_1) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var strMap map[string]struct {
 		Condition string `yaml:"condition"`
 	}
@@ -113,15 +114,56 @@ func (t *dependsOnYAML2_1) UnmarshalYAML(unmarshal func(interface{}) error) erro
 	return nil
 }
 
+type environmentNameValuePair struct {
+	Name  string
+	Value *string
+}
+
+type environment2_1 struct {
+	Values []environmentNameValuePair
+}
+
+func (t *environment2_1) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var strMap map[string]string
+	err := unmarshal(&strMap)
+	if err == nil {
+		i := 0
+		t.Values = make([]environmentNameValuePair, len(strMap))
+		for name, value := range strMap {
+			t.Values[i].Name = name
+			t.Values[i].Value = &value
+			i++
+		}
+		return nil
+	}
+	var strSlice []string
+	err = unmarshal(&strSlice)
+	if err == nil {
+		t.Values = make([]environmentNameValuePair, len(strSlice))
+		for i, nameValuePair := range strSlice {
+			j := strings.IndexByte(nameValuePair, '=')
+			if j < 0 {
+				t.Values[i].Name = nameValuePair
+				t.Values[i].Value = nil
+			} else {
+				t.Values[i].Name = nameValuePair[:j]
+				value := nameValuePair[j+1:]
+				t.Values[i].Value = &value
+			}
+		}
+	}
+	return err
+}
+
 type serviceYAML2_1 struct {
 	Build struct {
 		Context    string `yaml:"context"`
 		Dockerfile string `yaml:"dockerfile"`
 	} `yaml:"build"`
-	DependsOn   dependsOnYAML2_1       `yaml:"depends_on"`
+	DependsOn   dependsOn2_1           `yaml:"depends_on"`
 	Entrypoint  stringOrStringSlice    `yaml:"entrypoint"`
-	Environment map[string]string      `yaml:"environment"`
-	Healthcheck *healthcheckCompose2_1 `yaml:"healthcheck"`
+	Environment environment2_1         `yaml:"environment"`
+	Healthcheck *serviceHealthcheck2_1 `yaml:"healthcheck"`
 	Image       string                 `yaml:"image"`
 	Ports       []string               `yaml:"ports"`
 	Volumes     []string               `yaml:"volumes"`

@@ -31,10 +31,6 @@ services:
       retries: 5
       
 x-k8s-docker-compose:
-  api_base_url: https://my-k8s-cluster.example.com
-  namespace: mynamespace
-  rewrite_images:
+  docker_registry:
     host: docker-registry-default.apps.my-k8s-cluster.example.com
-    user: unused
-    password: ${TOKEN}
-    style: openshift
+    type: openshift

@@ -1,0 +1,25 @@
+{
+  "metadata": {
+    "name": "k8s9bjdocker9bjcompose-test123",
+    "creationTimestamp": null,
+    "labels": {
+      "app": "k8s9bjdocker9bjcompose",
+      "environment-instance": "test123"
+    },
+    "annotations": {
+      "k8s-docker-compose/service": "k8s-docker-compose"
+    }
+  },
+  "spec": {
+    "containers": [
+      {
+        "name": "k8s9bjdocker9bjcompose",
+        "image": "k8s-docker-compose:latest",
+        "workingDir": "/app/test",
+        "resources": {}
+      }
+    ],
+    "restartPolicy": "Never"
+  },
+  "status": {}
+}

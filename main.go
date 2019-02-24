@@ -9,10 +9,11 @@ import (
 	"github.com/jbrekelmans/k8s-docker-compose/cmd"
 )
 
-func main () {
+func main() {
 	app := cli.NewApp()
 	app.Commands = []cli.Command{
-		cmd.NewCommand(),
+		cmd.NewDownCommand(),
+		cmd.NewUpCommand(),
 	}
 	err := app.Run(os.Args)
 	if err != nil {

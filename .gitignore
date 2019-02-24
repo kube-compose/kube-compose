@@ -1,2 +1,2 @@
-pkg/up/test.go
+cmd/test_secrets.go
 test/output

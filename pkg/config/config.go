@@ -7,9 +7,10 @@ import (
 
 	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/client-go/rest"
 )
 
-type DockerComposeFile struct {
+type CanonicalComposeFile struct {
 	Services map[string]*Service
 	Version  string
 }
@@ -31,12 +32,11 @@ type Service struct {
 }
 
 type Config struct {
-	DockerComposeFile DockerComposeFile
-	// All Kubernetes resources are named with "-"+EnvironmentID as a suffix, and have an additional label "env="+EnvironmentID so that
-	// namespaces can be shared.
-	EnvironmentID    string
-	EnvironmentLabel string
-	Namespace        string
+	CanonicalComposeFile CanonicalComposeFile
+	KubeConfig           *rest.Config
+	EnvironmentID        string // All Kubernetes resources are named with "-"+EnvironmentID as a suffix, and have an additional label "env="+EnvironmentID so that namespaces can be shared.
+	EnvironmentLabel     string
+	Namespace            string
 }
 
 func New() (*Config, error) {
@@ -68,17 +68,17 @@ func New() (*Config, error) {
 	}
 
 	cfg := &Config{
-		DockerComposeFile: DockerComposeFile{
+		CanonicalComposeFile: CanonicalComposeFile{
 			Version: versionHolder.Version,
 		},
 		EnvironmentLabel: "env",
 	}
-	err = parseComposeYAML2_1(&composeYAML, &cfg.DockerComposeFile)
+	err = parseComposeYAML2_1(&composeYAML, &cfg.CanonicalComposeFile)
 	if err != nil {
 		return nil, err
 	}
 
-	for name := range cfg.DockerComposeFile.Services {
+	for name := range cfg.CanonicalComposeFile.Services {
 		if errors := validation.IsDNS1123Subdomain(name); len(errors) > 0 {
 			return nil, fmt.Errorf("sorry, we do not support the potentially valid docker-compose service named %s: %s", name, errors[0])
 		}
@@ -111,7 +111,7 @@ func ensureNoDependsOnCycle(service *Service) error {
 }
 
 // https://github.com/docker/compose/blob/master/compose/config/config_schema_v2.1.json
-func parseComposeYAML2_1(composeYAML *composeYAML2_1, dockerComposeFile *DockerComposeFile) error {
+func parseComposeYAML2_1(composeYAML *composeYAML2_1, dockerComposeFile *CanonicalComposeFile) error {
 	n := len(composeYAML.Services)
 	if n > 0 {
 		dockerComposeFile.Services = make(map[string]*Service, n)
@@ -155,10 +155,9 @@ func parseComposeYAML2_1(composeYAML *composeYAML2_1, dockerComposeFile *DockerC
 
 func parseServiceYAML2_1(serviceYAML *serviceYAML2_1) (*Service, error) {
 	service := &Service{
-		Entrypoint:  serviceYAML.Entrypoint.Values,
-		Environment: serviceYAML.Environment,
-		Image:       serviceYAML.Image,
-		WorkingDir:  serviceYAML.WorkingDir,
+		Entrypoint: serviceYAML.Entrypoint.Values,
+		Image:      serviceYAML.Image,
+		WorkingDir: serviceYAML.WorkingDir,
 	}
 
 	ports, err := parsePorts(serviceYAML.Ports)
@@ -173,6 +172,21 @@ func parseServiceYAML2_1(serviceYAML *serviceYAML2_1) (*Service, error) {
 	}
 	service.Healthcheck = healthcheck
 	service.HealthcheckDisabled = healthcheckDisabled
+
+	service.Environment = make(map[string]string, len(serviceYAML.Environment.Values))
+	for _, pair := range serviceYAML.Environment.Values {
+		var value string
+		if pair.Value == nil {
+			var ok bool
+			value, ok = os.LookupEnv(pair.Name)
+			if !ok {
+				continue
+			}
+		} else {
+			value = *pair.Value
+		}
+		service.Environment[pair.Name] = value
+	}
 
 	return service, nil
 }

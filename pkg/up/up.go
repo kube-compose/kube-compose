@@ -17,7 +17,6 @@ import (
 
 	"k8s.io/client-go/kubernetes"
 	clientV1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/rest"
 )
 
 const annotationName = "k8s-docker-compose/service"
@@ -64,16 +63,7 @@ type upRunner struct {
 }
 
 func (u *upRunner) initKubernetesClientset() error {
-	k8sConfig := &rest.Config{
-		Host: "https://192.168.64.2:8443",
-		TLSClientConfig: rest.TLSClientConfig{
-			ServerName: "localhost",
-			CertData:   clientCertData,
-			KeyData:    clientKeyData,
-			CAData:     caData,
-		},
-	}
-	k8sClientset, err := kubernetes.NewForConfig(k8sConfig)
+	k8sClientset, err := kubernetes.NewForConfig(u.cfg.KubeConfig)
 	if err != nil {
 		return err
 	}
@@ -97,9 +87,9 @@ func (u *upRunner) initOutputDir() error {
 }
 
 func (u *upRunner) initApps() error {
-	u.apps = make(map[string]*app, len(u.cfg.DockerComposeFile.Services))
-	u.appsWithoutPods = make(map[*app]bool, len(u.cfg.DockerComposeFile.Services))
-	for name, service := range u.cfg.DockerComposeFile.Services {
+	u.apps = make(map[string]*app, len(u.cfg.CanonicalComposeFile.Services))
+	u.appsWithoutPods = make(map[*app]bool, len(u.cfg.CanonicalComposeFile.Services))
+	for name, service := range u.cfg.CanonicalComposeFile.Services {
 		app := &app{
 			name:        name,
 			nameEncoded: k8sUtil.EncodeName(name),
@@ -467,14 +457,14 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 	}
 	if podStatus > app.maxObservedPodStatus {
 		app.maxObservedPodStatus = podStatus
-		fmt.Printf("app %s: pod status %s (healthiest observed)\n", app.name, &app.maxObservedPodStatus)
+		fmt.Printf("app %s: pod status %s\n", app.name, &app.maxObservedPodStatus)
 	}
 	return nil
 }
 
 func (u *upRunner) createAppPodsIfNeeded() error {
 	for app1 := range u.appsWithoutPods {
-		dependsOn := u.cfg.DockerComposeFile.Services[app1.name].DependsOn
+		dependsOn := u.cfg.CanonicalComposeFile.Services[app1.name].DependsOn
 		createAppPod := true
 		for service, healthiness := range dependsOn {
 			app2 := u.apps[service.ServiceName]
@@ -534,7 +524,7 @@ func (u *upRunner) run() error {
 	}
 
 	for _, app := range u.apps {
-		if len(u.cfg.DockerComposeFile.Services[app.name].DependsOn) == 0 {
+		if len(u.cfg.CanonicalComposeFile.Services[app.name].DependsOn) == 0 {
 			u.createAppPod(app, "no dependencies")
 			delete(u.appsWithoutPods, app)
 		}
@@ -605,7 +595,6 @@ func (u *upRunner) run() error {
 		}
 	}
 	fmt.Printf("pods ready (%d/%d)\n", len(u.apps), len(u.apps))
-	fmt.Println("done")
 	return nil
 }
 
