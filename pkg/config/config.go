@@ -185,7 +185,7 @@ func parseServiceYAML2_1(serviceYAML *serviceYAML2_1) (*Service, error) {
 	}
 	service.Ports = ports
 
-	healthcheck, healthcheckDisabled, err := parseHealthcheck(serviceYAML.Healthcheck)
+	healthcheck, healthcheckDisabled, err := ParseHealthcheck(serviceYAML.Healthcheck)
 	if err != nil {
 		return service, err
 	}

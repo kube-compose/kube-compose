@@ -14,7 +14,7 @@ func PullImage(ctx context.Context, dockerClient *dockerClient.Client, image str
 		return "", err
 	}
 	defer readCloser.Close()
-	pull := NewPullOrPush(readCloser)
+	pull := NewPull(readCloser)
 	return pull.Wait(onUpdate)
 }
 
@@ -27,6 +27,6 @@ func PushImage(ctx context.Context, dockerClient *dockerClient.Client, image str
 		return "", err
 	}
 	defer readCloser.Close()
-	push := NewPullOrPush(readCloser)
+	push := NewPush(readCloser)
 	return push.Wait(onUpdate)
 }

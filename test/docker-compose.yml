@@ -2,54 +2,34 @@ version: "2.1"
 services:
   authentication-service:
     entrypoint: ["/bin/bash", "-c", "STOP=0; trap 'STOP=1' INT; while [[ $STOP -eq 0 ]]; do sleep 1; done"]
-    image: ubuntu:latest
-    depends_on:
-      db:
-        condition: service_healthy
+    image: test:bla
+    # depends_on:
+    #   db:
+    #     condition: service_healthy
     environment:
       DB_URL: postgresql://db:5432
     ports:
     - "8080"
     working_dir: /app/test
-  permission-service:
-    entrypoint: ["/bin/bash", "-c", "STOP=0; trap 'STOP=1' INT; while [[ $STOP -eq 0 ]]; do sleep 1; done"]
-    image: ubuntu:latest
-    healthcheck:
-      disable: true
-    ports:
-    - "8080"
-    working_dir: /app/test
-  db:
-    image: postgres:latest
-    healthcheck:
-      test:
-      - CMD-SHELL
-      # We have to convert non-zero exit codes to one as per https://docs.docker.com/engine/reference/builder/#healthcheck
-      - 'pg_isready -U postgres || exit 1'
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # permission-service:
+  #   entrypoint: ["/bin/bash", "-c", "STOP=0; trap 'STOP=1' INT; while [[ $STOP -eq 0 ]]; do sleep 1; done"]
+  #   image: ubuntu:latest
+  #   healthcheck:
+  #     disable: true
+  #   ports:
+  #   - "8080"
+  #   working_dir: /app/test
+  # db:
+  #   image: postgres:latest
+  #   healthcheck:
+  #     test:
+  #     - CMD-SHELL
+  #     # We have to convert non-zero exit codes to one as per https://docs.docker.com/engine/reference/builder/#healthcheck
+  #     - 'pg_isready -U postgres || exit 1'
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
       
 x-k8s-docker-compose:
   push_images:
-    docker_registry:
-      host: '192.168.64.2:2376'
-      ca: |
-        -----BEGIN CERTIFICATE-----
-        MIIC2TCCAcGgAwIBAgIQB0lm+VRcM92oaYp+4MmJxTANBgkqhkiG9w0BAQsFADAW
-        MRQwEgYDVQQKEwtqYnJla2VsbWFuczAeFw0xOTAyMTkwODIzMDBaFw0yMjAyMDMw
-        ODIzMDBaMBYxFDASBgNVBAoTC2picmVrZWxtYW5zMIIBIjANBgkqhkiG9w0BAQEF
-        AAOCAQ8AMIIBCgKCAQEAvdMqgeSF5VKW2pR+GW/fQbrJQe3Td8yVGXCS9GFSIhwZ
-        dZuXv7IXcYwxb1VBKm+mOXiLOUIgeAEg0I1pIdKeKSXWPvgIyAsVZSTsLhtuXPxd
-        xo2T6CMDnk9atOeFW6Vc70VkTx8r1v0Uyv/wmdDVjrfvKq4zUkD4sf3biaO3TrJ3
-        ysmERrMa8/J2e2GKwO7LF+5w4QlzE88sl+bk6wA6yKBNQvMpdkSbvrVxDaJVWfJo
-        AEV4CNaCWSuqlAoUJnuIGLFOQiAQH0G4lry2ZMLwXdWR/T9nxH+Cwbv4R1tA9pcS
-        JF1oSs3WNYadhUx9OZHHLCzJaVESwGOj3FHzKn6dGQIDAQABoyMwITAOBgNVHQ8B
-        Af8EBAMCAqwwDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEAb2Ev
-        PXbyyCim8m6S4La2RbMJPnMoe/KacBfumf7bqWsA2rK6Xt/xPFbLQw2mGWpfl8Mn
-        Gi0ZjzcE9CTo3IGGGXZcHFjJjzMFxEXLbuDYN3GyhMaPZAEBaeXeCQjLESWi+hW5
-        2dpJpY58ebuY/btLNkBrYdkpF079D1OPqjMP1/MIMjgb9Il2MbjptGL0LW2JJzIS
-        py9FVdYSxE6Jj0OYA4cp/q+s8SSrPfqtyGPB25Tb1ez9V1XQ0Xv/4YriKbHTIvXp
-        j/W5zhH8FU8q1nqm5m8yH3h1vYUDNgL3BbsJkFTKa+xpE1h3Mvrsk2cSARym0tJR
-        BeQ2/4YnZH4ninrnsw==
-        -----END CERTIFICATE-----
+    docker_registry: 'localhost:5000'

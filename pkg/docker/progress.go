@@ -10,69 +10,103 @@ import (
 )
 
 type staticStatusInfo struct {
-	label        string
+	labels       []string
 	weight       float64
 	weightBefore float64
 }
 
-const digestPrefix = "Digest: "
-
 var (
-	digestRegExp          = regexp.MustCompile("^" + regexp.QuoteMeta(digestPrefix) + "sha256:[a-f0-9A-F]{64}$")
-	staticStatusInfoSlice = []*staticStatusInfo{
+	digestRegExp              = regexp.MustCompile("sha256:[a-fA-F0-9]{64}(?:[^a-fA-F0-9]|$)")
+	maxPullWeight             float64
+	maxPushWeight             float64
+	staticPullStatusInfoSlice = []*staticStatusInfo{
 		&staticStatusInfo{
-			label:  "Waiting",
+			labels: []string{"Waiting"},
 			weight: 1,
 		},
 		&staticStatusInfo{
-			label:  "Pulling fs layer",
+			labels: []string{"Pulling fs layer"},
 			weight: 1,
 		},
 		&staticStatusInfo{
-			label:  "Downloading",
+			labels: []string{"Downloading"},
 			weight: 20,
 		},
 		&staticStatusInfo{
-			label:  "Download complete",
+			labels: []string{"Verifying checksum"},
 			weight: 1,
 		},
 		&staticStatusInfo{
-			label:  "Verifying checksum",
+			labels: []string{"Download complete"},
 			weight: 1,
 		},
 		&staticStatusInfo{
-			label:  "Extracting",
+			labels: []string{"Extracting"},
 			weight: 5,
 		},
 		&staticStatusInfo{
-			label:  "Pull complete",
+			labels: []string{"Pull complete", "Already exists"},
 			weight: 1,
 		},
 	}
-	statusInfoFromLabel map[string]*staticStatusInfo
-	maxWeight           float64
+	staticPushStatusInfoSlice = []*staticStatusInfo{
+		&staticStatusInfo{
+			labels: []string{"Waiting"},
+			weight: 1,
+		},
+		&staticStatusInfo{
+			labels: []string{"Preparing"},
+			weight: 1,
+		},
+		&staticStatusInfo{
+			labels: []string{"Pushing"},
+			weight: 20,
+		},
+		&staticStatusInfo{
+			labels: []string{"Layer already exists", "Pushed"},
+			weight: 1,
+		},
+	}
+	staticPullStatusInfoFromLabel map[string]*staticStatusInfo
+	staticPushStatusInfoFromLabel map[string]*staticStatusInfo
 )
 
 // Special init function for this package
 func init() {
-	n := len(staticStatusInfoSlice)
-	statusInfoFromLabel = make(map[string]*staticStatusInfo, n)
-	if n == 0 {
-		return
+	n := len(staticPullStatusInfoSlice)
+	staticPullStatusInfoFromLabel = make(map[string]*staticStatusInfo, n)
+	if n > 0 {
+		for i := 1; i < n; i++ {
+			staticPullStatusInfoSlice[i].weightBefore = staticPullStatusInfoSlice[i-1].weightBefore + staticPullStatusInfoSlice[i-1].weight
+		}
+		maxPullWeight = staticPullStatusInfoSlice[n-1].weightBefore + staticPullStatusInfoSlice[n-1].weight
+		for _, item := range staticPullStatusInfoSlice {
+			for _, label := range item.labels {
+				staticPullStatusInfoFromLabel[label] = item
+			}
+		}
 	}
-	for i := 1; i < n; i++ {
-		staticStatusInfoSlice[i].weightBefore = staticStatusInfoSlice[i-1].weightBefore + staticStatusInfoSlice[i-1].weight
-	}
-	maxWeight = staticStatusInfoSlice[n-1].weightBefore + staticStatusInfoSlice[n-1].weight
-
-	for _, item := range staticStatusInfoSlice {
-		statusInfoFromLabel[item.label] = item
+	n = len(staticPushStatusInfoSlice)
+	staticPushStatusInfoFromLabel = make(map[string]*staticStatusInfo, n)
+	if n > 0 {
+		for i := 1; i < n; i++ {
+			staticPushStatusInfoSlice[i].weightBefore = staticPushStatusInfoSlice[i-1].weightBefore + staticPushStatusInfoSlice[i-1].weight
+		}
+		maxPushWeight = staticPushStatusInfoSlice[n-1].weightBefore + staticPushStatusInfoSlice[n-1].weight
+		for _, item := range staticPushStatusInfoSlice {
+			for _, label := range item.labels {
+				staticPushStatusInfoFromLabel[label] = item
+			}
+		}
 	}
 }
 
 type PullOrPush struct {
-	reader          io.Reader
-	statusFromLayer map[string]*status
+	isPull                    bool
+	maxWeight                 float64
+	reader                    io.Reader
+	staticStatusInfoFromLabel map[string]*staticStatusInfo
+	statusFromLayer           map[string]*status
 }
 
 type status struct {
@@ -80,14 +114,26 @@ type status struct {
 	progress   *jsonmessage.JSONProgress
 }
 
-func NewPullOrPush(r io.Reader) *PullOrPush {
+func NewPull(r io.Reader) *PullOrPush {
 	return &PullOrPush{
-		reader:          r,
-		statusFromLayer: map[string]*status{},
+		isPull:                    true,
+		maxWeight:                 maxPullWeight,
+		staticStatusInfoFromLabel: staticPullStatusInfoFromLabel,
+		statusFromLayer:           map[string]*status{},
+		reader:                    r,
 	}
 }
 
-func (d *PullOrPush) GetProgress() float64 {
+func NewPush(r io.Reader) *PullOrPush {
+	return &PullOrPush{
+		maxWeight:                 maxPushWeight,
+		staticStatusInfoFromLabel: staticPushStatusInfoFromLabel,
+		statusFromLayer:           map[string]*status{},
+		reader:                    r,
+	}
+}
+
+func (d *PullOrPush) Progress() float64 {
 	if len(d.statusFromLayer) == 0 {
 		return 0
 	}
@@ -101,7 +147,7 @@ func (d *PullOrPush) GetProgress() float64 {
 				statusProgress := float64(status.progress.Current) / float64(status.progress.Total)
 				weight = weight + (statusProgress * status.statusEnum.weight)
 			}
-			layerProgress = weight / maxWeight
+			layerProgress = weight / d.maxWeight
 		}
 		sum = sum + layerProgress
 		count = count + 1
@@ -112,6 +158,7 @@ func (d *PullOrPush) GetProgress() float64 {
 func (d *PullOrPush) Wait(onUpdate func(*PullOrPush)) (string, error) {
 	decoder := json.NewDecoder(d.reader)
 	digest := ""
+	var lastError string
 	for {
 		var msg jsonmessage.JSONMessage
 		err := decoder.Decode(&msg)
@@ -121,8 +168,7 @@ func (d *PullOrPush) Wait(onUpdate func(*PullOrPush)) (string, error) {
 			}
 			return "", err
 		}
-		statusEnum := statusInfoFromLabel[msg.Status]
-		fmt.Printf("%+v\n", msg)
+		statusEnum := d.staticStatusInfoFromLabel[msg.Status]
 		if statusEnum != nil {
 			s := d.statusFromLayer[msg.ID]
 			if s == nil {
@@ -132,9 +178,19 @@ func (d *PullOrPush) Wait(onUpdate func(*PullOrPush)) (string, error) {
 			s.statusEnum = statusEnum
 			s.progress = msg.Progress
 			onUpdate(d)
-		} else if digestRegExp.MatchString(msg.Status) {
-			digest = msg.Status[len(digestPrefix):]
+		} else if loc := digestRegExp.FindStringIndex(msg.Status); loc != nil {
+			// 71 = 64 + 7 = 64 hex chars + len("sha256:")
+			digest = msg.Status[loc[0] : loc[0]+71]
+		} else if msg.Error != nil && len(msg.Error.Message) > 0 {
+			lastError = msg.Error.Message
 		}
+	}
+	if len(digest) == 0 {
+		verb := "pushing"
+		if d.isPull {
+			verb = "pulling"
+		}
+		return "", fmt.Errorf("error while %s image: %s", verb, lastError)
 	}
 	return digest, nil
 }

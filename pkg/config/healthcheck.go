@@ -6,7 +6,12 @@ import (
 )
 
 const (
-	healthcheckCommandShell = "CMD-SHELL"
+	HealthcheckCommandShell    = "CMD-SHELL"
+	HealthcheckCommandCmd      = "CMD"
+	HealthcheckCommandNone     = "NONE"
+	HealthcheckDefaultInterval = 30 * time.Second
+	HealthcheckDefaultTimeout  = 30 * time.Second
+	HealthcheckDefaultRetries  = 3
 )
 
 type Healthcheck struct {
@@ -18,7 +23,7 @@ type Healthcheck struct {
 	Timeout     time.Duration
 }
 
-func parseHealthcheck(healthcheckYAML *serviceHealthcheck2_1) (*Healthcheck, bool, error) {
+func ParseHealthcheck(healthcheckYAML *ServiceHealthcheck2_1) (*Healthcheck, bool, error) {
 	if healthcheckYAML == nil {
 		return nil, false, nil
 	}
@@ -30,22 +35,22 @@ func parseHealthcheck(healthcheckYAML *serviceHealthcheck2_1) (*Healthcheck, boo
 	// Parse Test
 	test := healthcheckYAML.GetTest()
 	if len(test) == 0 {
-		return nil, false, fmt.Errorf("Field \"test\" of Healthcheck must not be an empty array")
+		return nil, false, fmt.Errorf("field \"test\" of Healthcheck must not be an empty array")
 	}
 	healthcheck := &Healthcheck{}
 	switch test[0] {
-	case "NONE":
-	case "CMD":
-	case healthcheckCommandShell:
+	case HealthcheckCommandNone:
+	case HealthcheckCommandCmd:
+	case HealthcheckCommandShell:
 		healthcheck.IsShell = true
 	default:
-		return nil, false, fmt.Errorf("Field \"test\" of Healthcheck must have a first element that is one of \"NONE\", \"CMD\" and \"%s\"\n", healthcheckCommandShell)
+		return nil, false, fmt.Errorf("field \"test\" of Healthcheck must have a first element that is one of \"NONE\", \"CMD\" and \"%s\"", HealthcheckCommandShell)
 	}
-	if test[0] == "NONE" {
+	if test[0] == HealthcheckCommandNone {
 		return nil, true, nil
 	}
 	if len(test) == 1 {
-		return nil, false, fmt.Errorf("Field \"test\" of Healthcheck must have size at least 2 of its first element is not \"NONE\"")
+		return nil, false, fmt.Errorf("field \"test\" of Healthcheck must have size at least 2 of its first element is not \"NONE\"")
 	}
 	healthcheck.Test = test[1:]
 
@@ -55,26 +60,37 @@ func parseHealthcheck(healthcheckYAML *serviceHealthcheck2_1) (*Healthcheck, boo
 	// time.ParseDuration supports a superset of duration compared to docker-compose:
 	// https://golang.org/pkg/time/#Duration
 	// https://docs.docker.com/compose/compose-file/compose-file-v2/#specifying-durations
+	if healthcheckYAML.Interval != nil {
+		interval, err := time.ParseDuration(*healthcheckYAML.Interval)
+		if err != nil {
+			return nil, false, err
+		}
+		if interval <= 0 {
+			return nil, false, fmt.Errorf("field \"interval\" of Healthcheck must not be negative")
+		}
+		healthcheck.Interval = interval
+	} else {
+		healthcheck.Interval = HealthcheckDefaultInterval
+	}
 
-	interval, err := time.ParseDuration(healthcheckYAML.Interval)
-	if err != nil {
-		return nil, false, err
+	if healthcheckYAML.Timeout != nil {
+		timeout, err := time.ParseDuration(*healthcheckYAML.Timeout)
+		if err != nil {
+			return nil, false, err
+		}
+		if timeout <= 0 {
+			return nil, false, fmt.Errorf("field \"timeout\" of Healthcheck must not be negative")
+		}
+		healthcheck.Timeout = timeout
+	} else {
+		healthcheck.Timeout = HealthcheckDefaultTimeout
 	}
-	if interval <= 0 {
-		return nil, false, fmt.Errorf("Field \"interval\" of Healthcheck must not be negative")
-	}
-	healthcheck.Interval = interval
 
-	timeout, err := time.ParseDuration(healthcheckYAML.Interval)
-	if err != nil {
-		return nil, false, err
+	if healthcheckYAML.Retries != nil {
+		healthcheck.Retries = *healthcheckYAML.Retries
+	} else {
+		healthcheck.Retries = HealthcheckDefaultRetries
 	}
-	if interval <= 0 {
-		return nil, false, fmt.Errorf("Field \"timeout\" of Healthcheck must not be negative")
-	}
-	healthcheck.Timeout = timeout
-
-	healthcheck.Retries = healthcheckYAML.Retries
 
 	return healthcheck, false, nil
 }

@@ -41,11 +41,11 @@ func (t *stringOrStringSlice) UnmarshalYAML(unmarshal func(interface{}) error) e
 	return nil
 }
 
-type healthcheckTest struct {
+type HealthcheckTest struct {
 	Values []string
 }
 
-func (t *healthcheckTest) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (t *HealthcheckTest) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	err := unmarshal(&t.Values)
 	if err != nil {
 		var str string
@@ -54,23 +54,23 @@ func (t *healthcheckTest) UnmarshalYAML(unmarshal func(interface{}) error) error
 			return err
 		}
 		t.Values = []string{
-			healthcheckCommandShell,
+			HealthcheckCommandShell,
 			str,
 		}
 	}
 	return nil
 }
 
-type serviceHealthcheck2_1 struct {
+type ServiceHealthcheck2_1 struct {
 	Disable  bool            `yaml:"disable"`
-	Interval string          `yaml:"interval"`
-	Retries  uint            `yaml:"retries"`
-	Test     healthcheckTest `yaml:"test"`
-	Timeout  string          `yaml:"timeout"`
+	Interval *string         `yaml:"interval"`
+	Retries  *uint           `yaml:"retries"`
+	Test     HealthcheckTest `yaml:"test"`
+	Timeout  *string         `yaml:"timeout"`
 	// start_period is only available in docker-compose 2.3 or higher
 }
 
-func (h *serviceHealthcheck2_1) GetTest() []string {
+func (h *ServiceHealthcheck2_1) GetTest() []string {
 	return h.Test.Values
 }
 
@@ -163,7 +163,7 @@ type serviceYAML2_1 struct {
 	DependsOn   dependsOn2_1           `yaml:"depends_on"`
 	Entrypoint  stringOrStringSlice    `yaml:"entrypoint"`
 	Environment environment2_1         `yaml:"environment"`
-	Healthcheck *serviceHealthcheck2_1 `yaml:"healthcheck"`
+	Healthcheck *ServiceHealthcheck2_1 `yaml:"healthcheck"`
 	Image       string                 `yaml:"image"`
 	Ports       []string               `yaml:"ports"`
 	Volumes     []string               `yaml:"volumes"`

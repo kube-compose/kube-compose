@@ -12,6 +12,8 @@ import (
 	"time"
 
 	dockerRef "github.com/docker/distribution/reference"
+	dockerTypes "github.com/docker/docker/api/types"
+	dockerFilters "github.com/docker/docker/api/types/filters"
 	dockerClient "github.com/docker/docker/client"
 	"github.com/jbrekelmans/k8s-docker-compose/pkg/config"
 	"github.com/jbrekelmans/k8s-docker-compose/pkg/docker"
@@ -53,6 +55,7 @@ type app struct {
 	desiredPod           *v1.Pod
 	desiredPodImage      string
 	desiredService       *v1.Service
+	imageHealthcheck     *config.Healthcheck
 	maxObservedPodStatus podStatus
 	name                 string
 	nameEncoded          string
@@ -135,22 +138,22 @@ func (u *upRunner) initApps() error {
 			}
 		}
 
-		// TODO use HEALTHCHECK from docker image, unless service.HealthcheckDisabled is true
-		readinessProbe := healthcheckToProbe(service.Healthcheck)
-
 		entrypoint := service.Entrypoint
+
+		// TODO move this to a utility
+		falseConst := false
 
 		app.desiredPod = &v1.Pod{
 			Spec: v1.PodSpec{
+				AutomountServiceAccountToken: &falseConst,
 				Containers: []v1.Container{
 					v1.Container{
-						Command:        entrypoint,
-						Env:            envVars,
-						Image:          service.Image,
-						Name:           app.nameEncoded,
-						Ports:          containerPorts,
-						ReadinessProbe: readinessProbe,
-						WorkingDir:     service.WorkingDir,
+						Command:    entrypoint,
+						Env:        envVars,
+						Image:      service.Image,
+						Name:       app.nameEncoded,
+						Ports:      containerPorts,
+						WorkingDir: service.WorkingDir,
 					},
 				},
 				RestartPolicy: v1.RestartPolicyNever,
@@ -194,60 +197,148 @@ func (u *upRunner) initResourceObjectMeta(objectMeta *metav1.ObjectMeta, nameEnc
 	objectMeta.Annotations[annotationName] = name
 }
 
-func (u *upRunner) pushImage(app *app) {
+func (u *upRunner) pushImage(ctx context.Context, app *app) error {
 	sourceImage := u.cfg.CanonicalComposeFile.Services[app.name].Image
 	if len(sourceImage) == 0 {
-		panic(fmt.Errorf("service %s has no image or image is the empty string", app.name))
+		return fmt.Errorf("service %s has no image or image is the empty string", app.name)
 	}
-	// ubuntu:latest => docker.io/library/ubuntu:latest
-	// ubuntu => docker.io/library/ubuntu:latest
 	sourceImageCanonical, err := dockerRef.ParseNormalizedNamed(sourceImage)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	destinationImage := fmt.Sprintf("%s/%s/%s", u.cfg.PushImages.DockerRegistry, u.cfg.Namespace, app.nameEncoded)
 	destinationImagePush := destinationImage + ":" + u.cfg.EnvironmentID
-	ctx := context.Background()
 	err = u.dockerClient.ImageTag(ctx, sourceImageCanonical.String(), destinationImagePush)
 	if err != nil {
 		message := fmt.Sprintf("%v", err)
 		if !strings.HasPrefix(message, "Error response from daemon: No such image: ") {
-			panic(err)
+			return err
 		}
 		lastLogTime := time.Now().Add(-2 * time.Second)
-		_, err = docker.PullImage(ctx, u.dockerClient, sourceImageCanonical.String(), func(pull *docker.PullOrPush) {
+		digest, err := docker.PullImage(ctx, u.dockerClient, sourceImageCanonical.String(), func(pull *docker.PullOrPush) {
 			t := time.Now()
 			elapsed := t.Sub(lastLogTime)
 			if elapsed >= 2*time.Second {
 				lastLogTime = t
-				progress := pull.GetProgress()
+				progress := pull.Progress()
 				fmt.Printf("app %s: pulling image %s (%.1f%%)\n", app.name, sourceImageCanonical, progress*100.0)
 			}
 		})
 		if err != nil {
-			panic(err)
+			return err
 		}
-		fmt.Printf("app %s: pulling image %s (%.1f%%)\n", app.name, sourceImageCanonical, 100.0)
+		fmt.Printf("app %s: pulling image %s (%.1f%%) @%s\n", app.name, sourceImageCanonical, 100.0, digest)
+		err = u.dockerClient.ImageTag(ctx, sourceImageCanonical.String(), destinationImagePush)
+		if err != nil {
+			return err
+		}
 	} else {
-		fmt.Printf("app %s: already have image %s\n", app.name, sourceImageCanonical)
+		fmt.Printf("app %s: already have image %s\n", app.name, sourceImage)
 	}
-	lastLogTime := time.Now().Add(-2 * time.Second)
-	digest, err := docker.PushImage(ctx, u.dockerClient, destinationImagePush, func(push *docker.PullOrPush) {
-		t := time.Now()
-		elapsed := t.Sub(lastLogTime)
-		if elapsed >= 2*time.Second {
-			lastLogTime = t
-			progress := push.GetProgress()
-			fmt.Printf("app %s: pushing image %s (%.1f%%)\n", app.name, destinationImagePush, progress*100.0)
+	if u.cfg.PushImages != nil {
+		lastLogTime := time.Now().Add(-2 * time.Second)
+		digest, err := docker.PushImage(ctx, u.dockerClient, destinationImagePush, func(push *docker.PullOrPush) {
+			t := time.Now()
+			elapsed := t.Sub(lastLogTime)
+			if elapsed >= 2*time.Second {
+				lastLogTime = t
+				progress := push.Progress()
+				fmt.Printf("app %s: pushing image %s (%.1f%%)\n", app.name, destinationImagePush, progress*100.0)
+			}
+		})
+		if err != nil {
+			return err
 		}
+		fmt.Printf("app %s: pushing image %s (%.1f%%) @%s\n", app.name, destinationImagePush, 100.0, digest)
+		app.desiredPod.Spec.Containers[0].Image = destinationImage + "@" + digest
+		app.desiredPod.Spec.Containers[0].ImagePullPolicy = v1.PullAlways
+	}
+	filters := dockerFilters.NewArgs()
+	filters.Add("reference", destinationImage)
+	imageList, err := u.dockerClient.ImageList(ctx, dockerTypes.ImageListOptions{
+		Filters: filters,
 	})
 	if err != nil {
-		panic(err)
+		return err
 	}
-	fmt.Printf("app %s: pushing image %s (%.1f%%)\n", app.name, destinationImagePush, 100.0)
-	fmt.Printf("app %s: image digest %s", app.name, digest)
-	app.desiredPod.Spec.Containers[0].Image = destinationImage + "@" + digest
-	app.desiredPod.Spec.Containers[0].ImagePullPolicy = v1.PullAlways
+	imageID := ""
+	for _, image := range imageList {
+		for _, repoTag := range image.RepoTags {
+			if repoTag == destinationImagePush {
+				imageID = image.ID
+				break
+			}
+		}
+		if len(imageID) > 0 {
+			break
+		}
+	}
+	if len(imageID) == 0 {
+		return fmt.Errorf("error while trying to inspect image %s", sourceImageCanonical)
+	}
+	_, inspectRaw, err := u.dockerClient.ImageInspectWithRaw(ctx, imageID)
+	if err != nil {
+		return err
+	}
+	var inspectInfo struct {
+		Config struct {
+			Healthcheck struct {
+				Test     []string `json:"Test"`
+				Timeout  *int64   `json:"Timeout"`
+				Interval *int64   `json:"Interval"`
+				Retries  *uint    `json:"Retries"`
+			} `json:"Healthcheck"`
+		} `json:"Config"`
+	}
+	err = json.Unmarshal(inspectRaw, &inspectInfo)
+	if err != nil {
+		return err
+	}
+	if inspectInfo.Config.Healthcheck.Test[0] != "NONE" {
+		healthcheck := &config.Healthcheck{
+			Interval: config.HealthcheckDefaultInterval,
+			Timeout:  config.HealthcheckDefaultTimeout,
+			Retries:  config.HealthcheckDefaultRetries,
+		}
+		if inspectInfo.Config.Healthcheck.Test[0] == config.HealthcheckCommandShell {
+			healthcheck.IsShell = true
+		}
+		healthcheck.Test = inspectInfo.Config.Healthcheck.Test[1:]
+		if inspectInfo.Config.Healthcheck.Timeout != nil {
+			healthcheck.Timeout = time.Duration(*inspectInfo.Config.Healthcheck.Timeout)
+		}
+		if inspectInfo.Config.Healthcheck.Interval != nil {
+			healthcheck.Interval = time.Duration(*inspectInfo.Config.Healthcheck.Interval)
+		}
+		if inspectInfo.Config.Healthcheck.Retries != nil {
+			healthcheck.Retries = *inspectInfo.Config.Healthcheck.Retries
+		}
+		app.imageHealthcheck = healthcheck
+	}
+	var readinessProbe *v1.Probe
+	service := u.cfg.CanonicalComposeFile.Services[app.name]
+	if !service.HealthcheckDisabled {
+		if service.Healthcheck != nil {
+			readinessProbe = healthcheckToProbe(service.Healthcheck)
+		} else if app.imageHealthcheck != nil {
+			readinessProbe = healthcheckToProbe(app.imageHealthcheck)
+		}
+	}
+	// TODO fix POD
+	app.desiredPod.Spec.Containers[0].ReadinessProbe = readinessProbe
+	return nil
+}
+
+func (u *upRunner) pushImageAsync(ctx context.Context, app *app) <-chan error {
+	chn := make(chan error, 1)
+	go func() {
+		defer close(chn)
+		err := u.pushImage(ctx, app)
+		if err != nil {
+			chn <- err
+		}
+	}()
+	return chn
 }
 
 func (u *upRunner) writeResourceDebugFile(kind, name string, r interface{}) error {
@@ -568,6 +659,31 @@ func (u *upRunner) createAppPodsIfNeeded() error {
 	return nil
 }
 
+func (u *upRunner) doImageLogic() error {
+	ctx := context.Background()
+	n := len(u.apps)
+	chnSlice := make([]<-chan error, n)
+	i := 0
+	for _, app := range u.apps {
+		chnSlice[i] = u.pushImageAsync(ctx, app)
+		i++
+	}
+	i = 0
+	var lastError error
+	for i < n {
+		err := <-chnSlice[i]
+		if err != nil {
+			if lastError == nil {
+				lastError = err
+			} else {
+				fmt.Println(err)
+			}
+		}
+		i++
+	}
+	return lastError
+}
+
 func (u *upRunner) run() error {
 	err := u.initOutputDir()
 	if err != nil {
@@ -581,18 +697,16 @@ func (u *upRunner) run() error {
 	if err != nil {
 		return err
 	}
+	// Initialize docker client
+	dockerClient, err := dockerClient.NewEnvClient()
+	if err != nil {
+		return err
+	}
+	u.dockerClient = dockerClient
 
-	// If we have configured a x-k8s-docker-compose.push_images in the docker-compose file then push images aswell.
-	if u.cfg.PushImages != nil {
-		// Initialize docker client
-		dockerClient, err := dockerClient.NewEnvClient()
-		if err != nil {
-			return err
-		}
-		u.dockerClient = dockerClient
-		for _, app := range u.apps {
-			u.pushImage(app)
-		}
+	err = u.doImageLogic()
+	if err != nil {
+		return err
 	}
 
 	// Start actual deployment...
