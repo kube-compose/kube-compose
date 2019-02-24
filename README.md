@@ -1,14 +1,28 @@
-# Building the application
+# Usage
+```
+oc login https://my-openshift-cluster.example.com/
+k8s-docker-compose up
+```
+
+# Building
+```
+go build -o k8s-docker-compose .
+```
+# Building (docker)
 ```
 docker-compose build
 ```
-# Running a test for up
+
+# Testing
+Use `kubectl` or `oc` to set the current Kubernetes cluster/namespace. `k8s-docker-compose` will target this context.
+
+Run `k8s-docker-compose` with the test docker-compose.yml:
 ```
-docker-compose run k8s-docker-compose up
+(cd test && ../k8s-docker-compose up)
 ```
-This writes to the directory `test/output` the Kubernetes representation of `test/docker-compose.yml`.
+This writes to the directory `test/output` the created Kubernetes resources.
 
 To clean up after the test:
 ```
-kubectl delete pod/db pod/permissions9cxservice pod/authentication9cxservice service/db service/permissions9cxservice service/authentication9cxservice 
+kubectl delete $(kubectl get all -lenv=test123 -oname)
 ```

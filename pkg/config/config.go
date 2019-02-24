@@ -31,12 +31,17 @@ type Service struct {
 	visited  bool
 }
 
+type PushImagesConfig struct {
+	DockerRegistry string `yaml:"docker_registry"`
+}
+
 type Config struct {
 	CanonicalComposeFile CanonicalComposeFile
-	KubeConfig           *rest.Config
 	EnvironmentID        string // All Kubernetes resources are named with "-"+EnvironmentID as a suffix, and have an additional label "env="+EnvironmentID so that namespaces can be shared.
 	EnvironmentLabel     string
+	KubeConfig           *rest.Config
 	Namespace            string
+	PushImages           *PushImagesConfig
 }
 
 func New() (*Config, error) {
@@ -67,6 +72,16 @@ func New() (*Config, error) {
 		return nil, err
 	}
 
+	var customYAML struct {
+		Custom struct {
+			PushImages *PushImagesConfig `yaml:"push_images"`
+		} `yaml:"x-k8s-docker-compose"`
+	}
+	err = yaml.Unmarshal(data, &customYAML)
+	if err != nil {
+		return nil, err
+	}
+
 	cfg := &Config{
 		CanonicalComposeFile: CanonicalComposeFile{
 			Version: versionHolder.Version,
@@ -82,6 +97,10 @@ func New() (*Config, error) {
 		if errors := validation.IsDNS1123Subdomain(name); len(errors) > 0 {
 			return nil, fmt.Errorf("sorry, we do not support the potentially valid docker-compose service named %s: %s", name, errors[0])
 		}
+	}
+
+	if customYAML.Custom.PushImages != nil {
+		cfg.PushImages = customYAML.Custom.PushImages
 	}
 
 	return cfg, nil

@@ -1,6 +1,7 @@
 package up
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -8,8 +9,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	dockerRef "github.com/docker/distribution/reference"
+	dockerClient "github.com/docker/docker/client"
 	"github.com/jbrekelmans/k8s-docker-compose/pkg/config"
+	"github.com/jbrekelmans/k8s-docker-compose/pkg/docker"
 	k8sUtil "github.com/jbrekelmans/k8s-docker-compose/pkg/k8s"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,17 +50,19 @@ func (podStatus *podStatus) String() string {
 
 type app struct {
 	clusterIP            string
+	desiredPod           *v1.Pod
+	desiredPodImage      string
+	desiredService       *v1.Service
 	maxObservedPodStatus podStatus
 	name                 string
 	nameEncoded          string
-	desiredPod           *v1.Pod
-	desiredService       *v1.Service
 }
 
 type upRunner struct {
 	apps             map[string]*app
 	appsWithoutPods  map[*app]bool
 	cfg              *config.Config
+	dockerClient     *dockerClient.Client
 	k8sClientset     *kubernetes.Clientset
 	k8sServiceClient clientV1.ServiceInterface
 	k8sPodClient     clientV1.PodInterface
@@ -139,7 +146,7 @@ func (u *upRunner) initApps() error {
 					v1.Container{
 						Command:        entrypoint,
 						Env:            envVars,
-						Image:          service.Image, // TODO set ImagePullPolicy based on the image we have here...
+						Image:          service.Image,
 						Name:           app.nameEncoded,
 						Ports:          containerPorts,
 						ReadinessProbe: readinessProbe,
@@ -185,6 +192,62 @@ func (u *upRunner) initResourceObjectMeta(objectMeta *metav1.ObjectMeta, nameEnc
 		objectMeta.Annotations = map[string]string{}
 	}
 	objectMeta.Annotations[annotationName] = name
+}
+
+func (u *upRunner) pushImage(app *app) {
+	sourceImage := u.cfg.CanonicalComposeFile.Services[app.name].Image
+	if len(sourceImage) == 0 {
+		panic(fmt.Errorf("service %s has no image or image is the empty string", app.name))
+	}
+	// ubuntu:latest => docker.io/library/ubuntu:latest
+	// ubuntu => docker.io/library/ubuntu:latest
+	sourceImageCanonical, err := dockerRef.ParseNormalizedNamed(sourceImage)
+	if err != nil {
+		panic(err)
+	}
+	destinationImage := fmt.Sprintf("%s/%s/%s", u.cfg.PushImages.DockerRegistry, u.cfg.Namespace, app.nameEncoded)
+	destinationImagePush := destinationImage + ":" + u.cfg.EnvironmentID
+	ctx := context.Background()
+	err = u.dockerClient.ImageTag(ctx, sourceImageCanonical.String(), destinationImagePush)
+	if err != nil {
+		message := fmt.Sprintf("%v", err)
+		if !strings.HasPrefix(message, "Error response from daemon: No such image: ") {
+			panic(err)
+		}
+		lastLogTime := time.Now().Add(-2 * time.Second)
+		_, err = docker.PullImage(ctx, u.dockerClient, sourceImageCanonical.String(), func(pull *docker.PullOrPush) {
+			t := time.Now()
+			elapsed := t.Sub(lastLogTime)
+			if elapsed >= 2*time.Second {
+				lastLogTime = t
+				progress := pull.GetProgress()
+				fmt.Printf("app %s: pulling image %s (%.1f%%)\n", app.name, sourceImageCanonical, progress*100.0)
+			}
+		})
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("app %s: pulling image %s (%.1f%%)\n", app.name, sourceImageCanonical, 100.0)
+	} else {
+		fmt.Printf("app %s: already have image %s\n", app.name, sourceImageCanonical)
+	}
+	lastLogTime := time.Now().Add(-2 * time.Second)
+	digest, err := docker.PushImage(ctx, u.dockerClient, destinationImagePush, func(push *docker.PullOrPush) {
+		t := time.Now()
+		elapsed := t.Sub(lastLogTime)
+		if elapsed >= 2*time.Second {
+			lastLogTime = t
+			progress := push.GetProgress()
+			fmt.Printf("app %s: pushing image %s (%.1f%%)\n", app.name, destinationImagePush, progress*100.0)
+		}
+	})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("app %s: pushing image %s (%.1f%%)\n", app.name, destinationImagePush, 100.0)
+	fmt.Printf("app %s: image digest %s", app.name, digest)
+	app.desiredPod.Spec.Containers[0].Image = destinationImage + "@" + digest
+	app.desiredPod.Spec.Containers[0].ImagePullPolicy = v1.PullAlways
 }
 
 func (u *upRunner) writeResourceDebugFile(kind, name string, r interface{}) error {
@@ -518,6 +581,21 @@ func (u *upRunner) run() error {
 	if err != nil {
 		return err
 	}
+
+	// If we have configured a x-k8s-docker-compose.push_images in the docker-compose file then push images aswell.
+	if u.cfg.PushImages != nil {
+		// Initialize docker client
+		dockerClient, err := dockerClient.NewEnvClient()
+		if err != nil {
+			return err
+		}
+		u.dockerClient = dockerClient
+		for _, app := range u.apps {
+			u.pushImage(app)
+		}
+	}
+
+	// Start actual deployment...
 	err = u.createServicesAndSetPodHostAliases()
 	if err != nil {
 		return err

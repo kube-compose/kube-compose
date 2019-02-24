@@ -23,7 +23,6 @@ func NewConfig() (*config.Config, error) {
 	}
 	cfg.KubeConfig = kubeConfig
 	cfg.EnvironmentID = "test123"
-	cfg.EnvironmentLabel = "environment-instance"
 	cfg.Namespace = namespace
 	return cfg, nil
 }
