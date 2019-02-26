@@ -15,8 +15,17 @@ type staticStatusInfo struct {
 	weightBefore float64
 }
 
+const sha256Prefix = "sha256:"
+const sha256BitLength = 256
+
 var (
-	digestRegExp              = regexp.MustCompile("sha256:[a-fA-F0-9]{64}(?:[^a-fA-F0-9]|$)")
+	digestRegExp = regexp.MustCompile(
+		fmt.Sprintf(
+			"%s[a-fA-F0-9]{%d}(?:[^a-fA-F0-9]|$)",
+			regexp.QuoteMeta(sha256Prefix),
+			sha256BitLength/4,
+		),
+	)
 	maxPullWeight             float64
 	maxPushWeight             float64
 	staticPullStatusInfoSlice = []*staticStatusInfo{
@@ -178,9 +187,10 @@ func (d *PullOrPush) Wait(onUpdate func(*PullOrPush)) (string, error) {
 			s.statusEnum = statusEnum
 			s.progress = msg.Progress
 			onUpdate(d)
+			// TODO https://github.com/jbrekelmans/k8s-docker-compose/issues/5 support non-sha256 digests
 		} else if loc := digestRegExp.FindStringIndex(msg.Status); loc != nil {
-			// 71 = 64 + 7 = 64 hex chars + len("sha256:")
-			digest = msg.Status[loc[0] : loc[0]+71]
+			len := sha256BitLength/4 + len(sha256Prefix)
+			digest = msg.Status[loc[0] : loc[0]+len]
 		} else if msg.Error != nil && len(msg.Error.Message) > 0 {
 			lastError = msg.Error.Message
 		}
@@ -190,7 +200,10 @@ func (d *PullOrPush) Wait(onUpdate func(*PullOrPush)) (string, error) {
 		if d.isPull {
 			verb = "pulling"
 		}
-		return "", fmt.Errorf("error while %s image: %s", verb, lastError)
+		if len(lastError) > 0 {
+			return "", fmt.Errorf("error while %s image: %s", verb, lastError)
+		}
+		return "", fmt.Errorf("unknown error while %s image", verb)
 	}
 	return digest, nil
 }
