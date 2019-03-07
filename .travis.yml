@@ -11,7 +11,7 @@ go:
 
 # Skip the install step. Don't `go get` dependencies. Only build with the code	
 # in vendor/
-install: false
+install: true
 
 # # Anything in before_script that returns a nonzero exit code will flunk the	
 # # build and immediately stop. It's sorta like having set -e enabled in bash.	
