@@ -7,7 +7,7 @@ import (
 const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
 
 // EncodeName takes an arbitrary string and maps it bijectively to the grammar ^[a-z0-9]+$.
-// This is useful when creating kubernetes resources.
+// This is useful when creating Kubernetes resources.
 func EncodeName(input string) string {
 	n := len(input)
 	var sb strings.Builder

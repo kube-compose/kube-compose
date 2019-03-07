@@ -163,7 +163,7 @@ func resolveLocalImageID(ref dockerRef.Reference, localImageIDSet *digestset.Set
 func resolveLocalImageAfterPull(ctx context.Context, dockerClient *dockerClient.Client, named dockerRef.Named, digest string) (string, string, error) {
 	filters := dockerFilters.NewArgs()
 	familiarName := dockerRef.FamiliarName(named)
-	filters.Add("reference", "repo="+familiarName)
+	filters.Add("reference", familiarName)
 	imageSummaries, err := dockerClient.ImageList(ctx, dockerTypes.ImageListOptions{
 		All:     false,
 		Filters: filters,
@@ -192,7 +192,7 @@ func getTag(ref dockerRef.Reference) string {
 
 func pullImageWithLogging(ctx context.Context, dockerClient *dockerClient.Client, appName, image string) (string, error) {
 	lastLogTime := time.Now().Add(-2 * time.Second)
-	digest, err := docker.PullImage(ctx, dockerClient, image, func(pull *docker.PullOrPush) {
+	digest, err := docker.PullImage(ctx, dockerClient, image, "123", func(pull *docker.PullOrPush) {
 		t := time.Now()
 		elapsed := t.Sub(lastLogTime)
 		if elapsed >= 2*time.Second {
@@ -208,9 +208,13 @@ func pullImageWithLogging(ctx context.Context, dockerClient *dockerClient.Client
 	return digest, nil
 }
 
-func pushImageWithLogging(ctx context.Context, dockerClient *dockerClient.Client, appName, image string) (string, error) {
+func pushImageWithLogging(ctx context.Context, dockerClient *dockerClient.Client, appName, image, bearerToken string) (string, error) {
 	lastLogTime := time.Now().Add(-2 * time.Second)
-	digest, err := docker.PushImage(ctx, dockerClient, image, func(push *docker.PullOrPush) {
+	registryAuth, err := docker.EncodeRegistryAuth("unused", bearerToken)
+	if err != nil {
+		return "", err
+	}
+	digest, err := docker.PushImage(ctx, dockerClient, image, registryAuth, func(push *docker.PullOrPush) {
 		t := time.Now()
 		elapsed := t.Sub(lastLogTime)
 		if elapsed >= 2*time.Second {

@@ -149,7 +149,7 @@ func (u *upRunner) getAppImage(app *app) (*config.Healthcheck, string, error) {
 		if !sourceImageIsNamed {
 			return nil, "", fmt.Errorf("could not find image %s locally, and building images is not supported", sourceImage)
 		}
-		digest, err := pullImageWithLogging(u.ctx, u.dockerClient, app.name, sourceImage)
+		digest, err := pullImageWithLogging(u.ctx, u.dockerClient, app.name, sourceImageRef.String())
 		if err != nil {
 			return nil, "", err
 		}
@@ -173,7 +173,9 @@ func (u *upRunner) getAppImage(app *app) (*config.Healthcheck, string, error) {
 		if err != nil {
 			return nil, "", err
 		}
-		digest, err := pushImageWithLogging(u.ctx, u.dockerClient, app.name, destinationImagePush)
+		digest, err := pushImageWithLogging(u.ctx, u.dockerClient, app.name,
+			destinationImagePush,
+			u.cfg.KubeConfig.BearerToken)
 		if err != nil {
 			return nil, "", err
 		}
