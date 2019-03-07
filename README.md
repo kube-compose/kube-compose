@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.com/jbrekelmans/jompose.svg?branch=master)](https://travis-ci.com/jbrekelmans/jompose)
+
 # Introduction
 Jompose is a CI tool that can create and destroy environments in Kubernetes based on docker compose files.
 
