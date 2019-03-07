@@ -10,15 +10,14 @@ Although [kompose](https://github.com/kubernetes/kompose) can already convert do
 # Usage
 Jompose loads pod and services definitions implicitly defined in a docker compose file, and creates them in a target namespace via the following command:
 ```
-jompose up
+jompose -e mybuildid up
 ```
-
 
 The target namespace and service account token are loaded from the context set in `~/.kube/config`. This means that Openshift Origin Client Tools' `oc login` and `oc project` commands can be used to configure Jompose's target namespace and service account.
 
 If no `~/.kube/config` exists and Jompose is run inside a pod in Kubernetes, the pod's namespace becomes the target namespace, and the service account used to create pods and services is the pod's service account.
 
-The namespace can be overriden via the `--namespace` option, for example: `jompose --namespace ci up`.
+The namespace can be overriden via the `--namespace` option, for example: `jompose --namespace ci up`.¯
 
 # Advanced usage
 If you require that an application is not started until one of its dependencies is healthy, you can add `condition: service_healthy` to the `depends_on`, and give the dependency a [Docker healthchecks](https://docs.docker.com/engine/reference/builder#healthcheck).
