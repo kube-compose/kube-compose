@@ -15,6 +15,11 @@ Although [kompose](https://github.com/kubernetes/kompose) can already convert do
 # Installation
 Download the binary from https://github.com/jbrekelmans/kube-compose/releases, and place it on your `PATH`.
 
+# Installation
+Download the binary and place it on your `PATH`:
+1. Darwin: https://github.com/jbrekelmans/jompose/releases/download/1.0.0/jompose.darwin.tar.gz
+1. Linux: https://github.com/jbrekelmans/jompose/releases/download/1.0.0/jompose.linux.tar.gz
+
 # Usage
 kube-compose loads pod and services definitions implicitly defined in a docker compose file, and creates them in a target namespace via the following command:
 ```
