@@ -4,10 +4,11 @@
 Jompose is a CI tool that can create and destroy environments in Kubernetes based on docker compose files.
 
 # Why another tool?
-Although [kompose](https://github.com/kubernetes/kompose) can already convert docker compose files into Kubernetes resources, it does not address some valid CI use cases, and the author wanted to learn Go. The main use cases that Jompose addresses but kompose does not are:
-1. Kubernetes resource names and selectors are unique for each build to support shared namespaces and scaling to as many concurrent CI environments as you desire.
-1. Creates pods with `restartPolicy: Never` instead of deployments, so that failed pods can be inspected, no logs are lost due to pod restarts, and Kubernetes cluster resources are used more efficiently.
-1. Jompose addresses startup dependencies by respecting [docker compose](https://docs.docker.com/compose/compose-file/compose-file-v2#depends_on)'s `depends_on` field.
+Although [kompose](https://github.com/kubernetes/kompose) can already convert docker compose files into Kubernetes resources. The main differences between Jompose and Kompose are:
+1. Jompose generates Kubernetes resource names and selectors that are unique for each build to support shared namespaces and scaling to many concurrent CI environments.
+1. Jompose creates pods with `restartPolicy: Never` instead of deployments, so that failed pods can be inspected, no logs are lost due to pod restarts, and Kubernetes cluster resources are used more efficiently.
+1. Jompose allows startup dependencies to be specified by respecting [docker compose](https://docs.docker.com/compose/compose-file/compose-file-v2#depends_on)'s `depends_on` field.
+1. Jompose currently depends on the docker daemon to pull Docker images and extract their healthcheck.
 
 # Installation
 Download the binary and place it on your `PATH`:
