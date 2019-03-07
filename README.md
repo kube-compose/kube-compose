@@ -9,6 +9,11 @@ Although [kompose](https://github.com/kubernetes/kompose) can already convert do
 1. Creates pods with `restartPolicy: Never` instead of deployments, so that failed pods can be inspected, no logs are lost due to pod restarts, and Kubernetes cluster resources are used more efficiently.
 1. Jompose addresses startup dependencies by respecting [docker compose](https://docs.docker.com/compose/compose-file/compose-file-v2#depends_on)'s `depends_on` field.
 
+# Installation
+Download the binary and place it on your `PATH`:
+1. Darwin: https://github.com/jbrekelmans/jompose/releases/download/1.0.0/jompose.darwin.tar.gz
+1. Linux: https://github.com/jbrekelmans/jompose/releases/download/1.0.0/jompose.linux.tar.gz
+
 # Usage
 Jompose loads pod and services definitions implicitly defined in a docker compose file, and creates them in a target namespace via the following command:
 ```
