@@ -120,10 +120,12 @@ type environmentNameValuePair struct {
 }
 
 type environment2_1 struct {
-	Values []environmentNameValuePair
+	KeysMayHaveVariableSubstitutions bool
+	Values                           []environmentNameValuePair
 }
 
 func (t *environment2_1) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	t.KeysMayHaveVariableSubstitutions = false
 	var strMap map[string]string
 	err := unmarshal(&strMap)
 	if err == nil {
@@ -136,6 +138,7 @@ func (t *environment2_1) UnmarshalYAML(unmarshal func(interface{}) error) error 
 		}
 		return nil
 	}
+	t.KeysMayHaveVariableSubstitutions = true
 	var strSlice []string
 	err = unmarshal(&strSlice)
 	if err == nil {
