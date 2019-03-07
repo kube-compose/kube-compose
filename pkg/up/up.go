@@ -6,10 +6,13 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/docker/distribution/digestset"
 	dockerRef "github.com/docker/distribution/reference"
+	dockerTypes "github.com/docker/docker/api/types"
 	dockerClient "github.com/docker/docker/client"
-	"github.com/jbrekelmans/k8s-docker-compose/pkg/config"
-	k8sUtil "github.com/jbrekelmans/k8s-docker-compose/pkg/k8s"
+	"github.com/jbrekelmans/jompose/pkg/config"
+	k8sUtil "github.com/jbrekelmans/jompose/pkg/k8s"
+	digest "github.com/opencontainers/go-digest"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -25,7 +28,7 @@ func errorResourcesModifiedExternally() error {
 type podStatus int
 
 const (
-	annotationName             = "k8s-docker-compose/service"
+	annotationName             = "jompose/service"
 	podStatusReady   podStatus = 2
 	podStatusStarted podStatus = 1
 	podStatusOther   podStatus = 0
@@ -62,17 +65,25 @@ type hostAliasesOrError struct {
 	err error
 }
 
+type localImagesCacheOrError struct {
+	imageIDSet *digestset.Set
+	images     []dockerTypes.ImageSummary
+	err        error
+}
+
 type upRunner struct {
-	apps             map[string]*app
-	appsWithoutPods  map[*app]bool
-	cfg              *config.Config
-	ctx              context.Context
-	dockerClient     *dockerClient.Client
-	k8sClientset     *kubernetes.Clientset
-	k8sServiceClient clientV1.ServiceInterface
-	k8sPodClient     clientV1.PodInterface
-	hostAliasesOnce  *sync.Once
-	hostAliases      *hostAliasesOrError
+	apps                 map[string]*app
+	appsWithoutPods      map[*app]bool
+	cfg                  *config.Config
+	ctx                  context.Context
+	dockerClient         *dockerClient.Client
+	localImagesCache     localImagesCacheOrError
+	localImagesCacheOnce *sync.Once
+	k8sClientset         *kubernetes.Clientset
+	k8sServiceClient     clientV1.ServiceInterface
+	k8sPodClient         clientV1.PodInterface
+	hostAliasesOnce      *sync.Once
+	hostAliases          hostAliasesOrError
 }
 
 func (u *upRunner) initKubernetesClientset() error {
@@ -114,73 +125,65 @@ func (u *upRunner) initResourceObjectMeta(objectMeta *metav1.ObjectMeta, nameEnc
 	objectMeta.Annotations[annotationName] = name
 }
 
-// TODO https://github.com/jbrekelmans/k8s-docker-compose/issues/3 always refer to images by digest
-// TODO https://github.com/jbrekelmans/k8s-docker-compose/issues/4 support referring to images in docker-compose
-// by digest
 func (u *upRunner) getAppImage(app *app) (*config.Healthcheck, string, error) {
 	sourceImage := u.cfg.CanonicalComposeFile.Services[app.name].Image
 	if len(sourceImage) == 0 {
 		return nil, "", fmt.Errorf("docker compose service %s has no image or image is the empty string, and building images is not supported", app.name)
 	}
-	sourceImageCanonical, err := dockerRef.ParseNormalizedNamed(sourceImage)
+	localImageIDSet, err := u.getLocalImageIDSet()
 	if err != nil {
 		return nil, "", err
 	}
-	var destinationImage, destinationImagePush, podImage string
-	var inspectRaw []byte
-	pull := false
-	if u.cfg.PushImages != nil {
-		destinationImage = fmt.Sprintf("%s/%s/%s", u.cfg.PushImages.DockerRegistry, u.cfg.Namespace, app.nameEncoded)
-		destinationImagePush = destinationImage + ":" + u.cfg.EnvironmentID
-		err = u.dockerClient.ImageTag(u.ctx, sourceImageCanonical.String(), destinationImagePush)
-		if err != nil {
-			if !strings.HasPrefix(fmt.Sprintf("%v", err), "Error response from daemon: No such image: ") {
-				return nil, "", err
-			}
-			pull = true
+	// Use the same interpretation of images as docker-compose (use ParseAnyReferenceWithSet)
+	sourceImageRef, err := dockerRef.ParseAnyReferenceWithSet(sourceImage, localImageIDSet)
+	if err != nil {
+		return nil, "", err
+	}
+
+	// We need the image locally always, so we can parse its healthcheck
+	sourceImageNamed, sourceImageIsNamed := sourceImageRef.(dockerRef.Named)
+	sourceImageID := resolveLocalImageID(sourceImageRef, localImageIDSet, u.localImagesCache.images)
+
+	var podImage string
+	if len(sourceImageID) == 0 {
+		if !sourceImageIsNamed {
+			return nil, "", fmt.Errorf("could not find image %s locally, and building images is not supported", sourceImage)
 		}
-	} else {
-		// Need to check whether image exists...
-		inspectRaw, _, err = inspectImageRaw(u.ctx, u.dockerClient, sourceImage)
+		digest, err := pullImageWithLogging(u.ctx, u.dockerClient, app.name, sourceImage)
 		if err != nil {
 			return nil, "", err
 		}
-		if inspectRaw == nil {
-			pull = true
-		}
-	}
-	if pull {
-		_, err = pullImageWithLogging(u.ctx, u.dockerClient, app.name, sourceImageCanonical.String())
+		sourceImageID, podImage, err = resolveLocalImageAfterPull(u.ctx, u.dockerClient, sourceImageNamed, digest)
 		if err != nil {
 			return nil, "", err
 		}
-	} else {
-		fmt.Printf("app %s: already have image %s\n", app.name, sourceImage)
+		if len(sourceImageID) == 0 {
+			return nil, "", fmt.Errorf("could get id of pulled image %s, this is either a bug or images were removed by an external process (please try again)", sourceImage)
+		}
+		// len(podImage) > 0 by definition of resolveLocalImageAfterPull
 	}
-	// Push image if needed
+	_, inspectRaw, err := u.dockerClient.ImageInspectWithRaw(u.ctx, sourceImageID)
+	if err != nil {
+		return nil, "", err
+	}
 	if u.cfg.PushImages != nil {
+		destinationImage := fmt.Sprintf("%s/%s/%s", u.cfg.PushImages.DockerRegistry, u.cfg.Namespace, app.nameEncoded)
+		destinationImagePush := destinationImage + ":latest"
+		err = u.dockerClient.ImageTag(u.ctx, sourceImageID, destinationImagePush)
+		if err != nil {
+			return nil, "", err
+		}
 		digest, err := pushImageWithLogging(u.ctx, u.dockerClient, app.name, destinationImagePush)
 		if err != nil {
 			return nil, "", err
 		}
 		podImage = destinationImage + "@" + digest
-		if inspectRaw == nil {
-			inspectRaw, _, err = inspectImageRaw(u.ctx, u.dockerClient, destinationImagePush)
-			if err != nil {
-				return nil, "", err
-			}
+	} else if len(podImage) == 0 {
+		if !sourceImageIsNamed {
+			// TODO https://github.com/jbrekelmans/jompose/issues/6
+			return nil, "", fmt.Errorf("image reference %s is likely unstable, please enable pushing of images or use named image references to improve reliability", sourceImage)
 		}
-	} else if podImage = sourceImage; inspectRaw == nil {
-		// TODO https://github.com/jbrekelmans/k8s-docker-compose/issues/1 we cannot use the canonical name here because docker does not store the full repository of the image, but we do search on it.
-		// E.g. docker pull docker.io/library/ubuntu:bionic will simply create the repoTag ubuntu:bionic in the local docker registry.
-		// This breaks our search.
-		inspectRaw, _, err = inspectImageRaw(u.ctx, u.dockerClient, sourceImageCanonical.String())
-		if err != nil {
-			return nil, "", err
-		}
-	}
-	if len(inspectRaw) == 0 {
-		return nil, "", fmt.Errorf("image tag %s appears to be have been removed by another program, or you encountered bug https://github.com/jbrekelmans/k8s-docker-compose/issues/1", destinationImagePush)
+		podImage = sourceImage
 	}
 	imageHealthcheck, err := inspectImageRawParseHealthcheck(inspectRaw)
 	return imageHealthcheck, podImage, err
@@ -360,10 +363,47 @@ func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) 
 	return hostAliases, nil
 }
 
+func (u *upRunner) initLocalImages() error {
+	u.localImagesCacheOnce.Do(func() {
+		imageSummarySlice, err := u.dockerClient.ImageList(u.ctx, dockerTypes.ImageListOptions{
+			All: true,
+		})
+		var imageIDSet *digestset.Set
+		if err == nil {
+			imageIDSet = digestset.NewSet()
+			for _, imageSummary := range imageSummarySlice {
+				imageIDSet.Add(digest.Digest(imageSummary.ID))
+			}
+		}
+		u.localImagesCache = localImagesCacheOrError{
+			imageIDSet: imageIDSet,
+			images:     imageSummarySlice,
+			err:        err,
+		}
+	})
+	return u.localImagesCache.err
+}
+
+func (u *upRunner) getLocalImageIDSet() (*digestset.Set, error) {
+	err := u.initLocalImages()
+	if err != nil {
+		return nil, err
+	}
+	return u.localImagesCache.imageIDSet, nil
+}
+
+func (u *upRunner) dockerImageListCached() ([]dockerTypes.ImageSummary, error) {
+	err := u.initLocalImages()
+	if err != nil {
+		return nil, err
+	}
+	return u.localImagesCache.images, nil
+}
+
 func (u *upRunner) createServicesAndGetPodHostAliasesOnce() ([]v1.HostAlias, error) {
 	u.hostAliasesOnce.Do(func() {
 		hostAliases, err := u.createServicesAndGetPodHostAliases()
-		u.hostAliases = &hostAliasesOrError{
+		u.hostAliases = hostAliasesOrError{
 			v:   hostAliases,
 			err: err,
 		}
@@ -628,9 +668,7 @@ func (u *upRunner) run() error {
 				return errorResourcesModifiedExternally()
 			}
 		} else {
-			fmt.Printf("got unexpected error event from channel: ")
-			fmt.Println(event.Object)
-			return fmt.Errorf("got unexpected error event from channel")
+			return fmt.Errorf("got unexpected error event from channel: %+v", event.Object)
 		}
 		err = u.createPodsIfNeeded()
 		if err != nil {
@@ -652,10 +690,12 @@ func (u *upRunner) run() error {
 
 // Run runs an operation similar docker-compose up against a Kubernetes cluster.
 func Run(cfg *config.Config) error {
+	// TODO https://github.com/jbrekelmans/jompose/issues/2 accept context as a parameter
 	u := &upRunner{
-		cfg: cfg,
-		// TODO https://github.com/jbrekelmans/k8s-docker-compose/issues/2 accept context as a parameter
-		ctx: context.Background(),
+		cfg:                  cfg,
+		ctx:                  context.Background(),
+		hostAliasesOnce:      &sync.Once{},
+		localImagesCacheOnce: &sync.Once{},
 	}
 	return u.run()
 }

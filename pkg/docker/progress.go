@@ -187,7 +187,7 @@ func (d *PullOrPush) Wait(onUpdate func(*PullOrPush)) (string, error) {
 			s.statusEnum = statusEnum
 			s.progress = msg.Progress
 			onUpdate(d)
-			// TODO https://github.com/jbrekelmans/k8s-docker-compose/issues/5 support non-sha256 digests
+			// TODO https://github.com/jbrekelmans/jompose/issues/5 support non-sha256 digests
 		} else if loc := digestRegExp.FindStringIndex(msg.Status); loc != nil {
 			len := sha256BitLength/4 + len(sha256Prefix)
 			digest = msg.Status[loc[0] : loc[0]+len]

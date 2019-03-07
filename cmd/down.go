@@ -3,15 +3,19 @@ package cmd
 import (
 	"github.com/urfave/cli"
 
-	"github.com/jbrekelmans/k8s-docker-compose/pkg/down"
+	"github.com/jbrekelmans/jompose/pkg/down"
 )
 
 func NewDownCommand() cli.Command {
 	return cli.Command{
 		Name:  "down",
-		Usage: "Stop and delete containers",
+		Usage: "deletes pods and services",
 		Action: func(c *cli.Context) error {
-			cfg, err := NewConfig()
+			cfg, err := newConfigFromEnv()
+			if err != nil {
+				return err
+			}
+			err = updateConfigFromCli(cfg, c)
 			if err != nil {
 				return err
 			}

@@ -1,12 +1,12 @@
 # Usage
 ```
 oc login https://my-openshift-cluster.example.com/
-k8s-docker-compose up
+jompose up
 ```
 
 # Building
 ```
-go build -o k8s-docker-compose .
+go build -o jompose .
 ```
 # Building (docker)
 ```
@@ -14,11 +14,11 @@ docker-compose build
 ```
 
 # Testing
-Use `kubectl` or `oc` to set the current Kubernetes cluster/namespace. `k8s-docker-compose` will target this context.
+Use `kubectl` or `oc` to set the current Kubernetes cluster/namespace. `jompose` will target this context.
 
-Run `k8s-docker-compose` with the test docker-compose.yml:
+Run `jompose` with the test docker-compose.yml:
 ```
-(cd test && ../k8s-docker-compose up)
+(cd test && ../jompose --env-id test123 up)
 ```
 This writes to the directory `test/output` the created Kubernetes resources.
 

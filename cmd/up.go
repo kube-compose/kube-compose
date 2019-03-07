@@ -3,15 +3,19 @@ package cmd
 import (
 	"github.com/urfave/cli"
 
-	"github.com/jbrekelmans/k8s-docker-compose/pkg/up"
+	"github.com/jbrekelmans/jompose/pkg/up"
 )
 
 func NewUpCommand() cli.Command {
 	return cli.Command{
 		Name:  "up",
-		Usage: "Create and start containers",
+		Usage: "creates pods and services in an order that respects depends_on in the docker compose file",
 		Action: func(c *cli.Context) error {
-			cfg, err := NewConfig()
+			cfg, err := newConfigFromEnv()
+			if err != nil {
+				return err
+			}
+			err = updateConfigFromCli(cfg, c)
 			if err != nil {
 				return err
 			}

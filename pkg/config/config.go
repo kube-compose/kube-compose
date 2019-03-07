@@ -75,7 +75,7 @@ func New() (*Config, error) {
 	var customYAML struct {
 		Custom struct {
 			PushImages *PushImagesConfig `yaml:"push_images"`
-		} `yaml:"x-k8s-docker-compose"`
+		} `yaml:"x-jompose"`
 	}
 	err = yaml.Unmarshal(data, &customYAML)
 	if err != nil {

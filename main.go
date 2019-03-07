@@ -6,11 +6,12 @@ import (
 
 	"github.com/urfave/cli"
 
-	"github.com/jbrekelmans/k8s-docker-compose/cmd"
+	"github.com/jbrekelmans/jompose/cmd"
 )
 
 func main() {
 	app := cli.NewApp()
+	app.Flags = cmd.GlobalFlags()
 	app.Commands = []cli.Command{
 		cmd.NewDownCommand(),
 		cmd.NewUpCommand(),

@@ -141,7 +141,7 @@ func (t *environment2_1) UnmarshalYAML(unmarshal func(interface{}) error) error 
 	if err == nil {
 		t.Values = make([]environmentNameValuePair, len(strSlice))
 		for i, nameValuePair := range strSlice {
-			j := strings.IndexByte(nameValuePair, '=')
+			j := strings.IndexRune(nameValuePair, '=')
 			if j < 0 {
 				t.Values[i].Name = nameValuePair
 				t.Values[i].Value = nil
