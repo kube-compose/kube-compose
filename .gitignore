@@ -1,4 +1,8 @@
 test/output
 coverage*
+<<<<<<< HEAD
 kube-compose
+=======
+jompose
+>>>>>>> b967615... partially add variable substitution support
 .vscode
