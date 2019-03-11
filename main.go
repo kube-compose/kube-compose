@@ -10,13 +10,15 @@ import (
 )
 
 func main() {
+	var err error
+
 	app := cli.NewApp()
 	app.Flags = cmd.GlobalFlags()
 	app.Commands = []cli.Command{
 		cmd.NewDownCommand(),
 		cmd.NewUpCommand(),
 	}
-	err := app.Run(os.Args)
+	err = app.Run(os.Args)
 	if err != nil {
 		log.Fatal(err)
 	}
