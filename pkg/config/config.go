@@ -10,6 +10,18 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+type version int
+
+const (
+	v1   version = 100000
+	v2   version = 200000
+	v2_1 version = 200100
+	v3   version = 300000
+	v3_1 version = 300100
+	v3_2 version = 300200
+	v3_3 version = 300300
+)
+
 type CanonicalComposeFile struct {
 	Services map[string]*Service
 	Version  string
@@ -53,6 +65,12 @@ func New() (*Config, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	var value interface{}
+	err = yaml.Unmarshal(data, &value)
+	if err != nil {
+		return nil, err
 	}
 
 	var versionHolder struct {

@@ -1,8 +1,36 @@
+[![Build Status](https://travis-ci.com/jbrekelmans/jompose.svg?branch=master)](https://travis-ci.com/jbrekelmans/jompose)
+
+# Introduction
+Jompose is a CI tool that can create and destroy environments in Kubernetes based on docker compose files.
+
+# Why another tool?
+Although [kompose](https://github.com/kubernetes/kompose) can already convert docker compose files into Kubernetes resources. The main differences between Jompose and Kompose are:
+1. Jompose generates Kubernetes resource names and selectors that are unique for each build to support shared namespaces and scaling to many concurrent CI environments.
+1. Jompose creates pods with `restartPolicy: Never` instead of deployments, so that failed pods can be inspected, no logs are lost due to pod restarts, and Kubernetes cluster resources are used more efficiently.
+1. Jompose allows startup dependencies to be specified by respecting [docker compose](https://docs.docker.com/compose/compose-file/compose-file-v2#depends_on)'s `depends_on` field.
+1. Jompose currently depends on the docker daemon to pull Docker images and extract their healthcheck.
+
+# Installation
+Download the binary and place it on your `PATH`:
+1. Darwin: https://github.com/jbrekelmans/jompose/releases/download/1.0.0/jompose.darwin.tar.gz
+1. Linux: https://github.com/jbrekelmans/jompose/releases/download/1.0.0/jompose.linux.tar.gz
+
 # Usage
+Jompose loads pod and services definitions implicitly defined in a docker compose file, and creates them in a target namespace via the following command:
 ```
-oc login https://my-openshift-cluster.example.com/
-jompose up
+jompose -e mybuildid up
 ```
+
+The target namespace and service account token are loaded from the context set in `~/.kube/config`. This means that Openshift Origin Client Tools' `oc login` and `oc project` commands can be used to configure Jompose's target namespace and service account.
+
+If no `~/.kube/config` exists and Jompose is run inside a pod in Kubernetes, the pod's namespace becomes the target namespace, and the service account used to create pods and services is the pod's service account.
+
+The namespace can be overriden via the `--namespace` option, for example: `jompose --namespace ci up`.¯
+
+# Advanced usage
+If you require that an application is not started until one of its dependencies is healthy, you can add `condition: service_healthy` to the `depends_on`, and give the dependency a [Docker healthchecks](https://docs.docker.com/engine/reference/builder#healthcheck).
+
+Docker healthchecks are converted into [Readiness Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/).
 
 # Building
 ```
@@ -14,9 +42,9 @@ docker-compose build
 ```
 
 # Testing
-Use `kubectl` or `oc` to set the current Kubernetes cluster/namespace. `jompose` will target this context.
+Use `kubectl` or `oc` to set the target Kubernetes namespace and the service account of Jompose.
 
-Run `jompose` with the test docker-compose.yml:
+Run `jompose` with the test [docker-compose.yml](test/docker-compose.yml):
 ```
 (cd test && ../jompose --env-id test123 up)
 ```
