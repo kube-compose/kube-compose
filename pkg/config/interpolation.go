@@ -3,51 +3,96 @@ package config
 import (
 	"fmt"
 	"strings"
+
+	"github.com/hashicorp/go-version"
 )
 
-type dict map[string]interface{}
 type ValueGetter func(name string) (string, bool)
 
-// process_config_section("services")
-
-// process_config_section("volumes")
-// process_config_section("networks")
-// process_config_section("secrets")
-// process_config_section("configs")
-
-// process_config_section(...)
-//   validate_config_section(...)
-//   interpolate_environment_variables(...)
-
 type configInterpolator struct {
-	config      dict
+	config      genericMap
+	errorList   []error
+	fileName    string
 	valueGetter ValueGetter
-	version     version
+	version     *version.Version
+}
+
+type stringOrInt struct {
+	str string
+	i   int
+}
+
+type path []stringOrInt
+
+func (p path) appendStr(str string) path {
+	if len(str) == 0 {
+		panic(fmt.Errorf("s must not be empty"))
+	}
+	return append(p, stringOrInt{
+		str: str,
+	})
+}
+
+func (p path) appendInt(i int) path {
+	return append(p, stringOrInt{
+		i: i,
+	})
+}
+
+func (p path) pop() path {
+	return p[:len(p)-1]
 }
 
 func (c *configInterpolator) run() error {
-	if c.version > v1 {
-
+	if !c.version.GreaterThan(v1) {
+		c.interpolateSection(c.config, path{})
+	} else {
+		c.interpolateSectionByName("services")
+		if !c.version.LessThan(v3_1) {
+			c.interpolateSectionByName("volumes")
+			c.interpolateSectionByName("networks")
+			if !c.version.LessThan(v3_3) {
+				c.interpolateSectionByName("secrets")
+				c.interpolateSectionByName("configs")
+			}
+		}
 	}
-	if c.version >= v3_1 {
-
-	}
-	if c.version >= v3_3 {
-
+	// Primitive error handling does not report all errors...
+	if len(c.errorList) > 0 {
+		return c.errorList[0]
 	}
 	return nil
 }
 
-func (c *configInterpolator) processSection(sectionName string) error {
-
-	return nil
+func (c *configInterpolator) interpolateSectionByName(name string) {
+	if sectionRaw, ok := c.config[name]; ok {
+		if section, ok := sectionRaw.(genericMap); ok {
+			c.interpolateSection(section, (path{}).appendStr(name))
+		}
+	}
 }
 
-// InterpolateConfig takes the root of a docker compose file as a generic structure,
-// and returns it after applying variable substitutions.
-func InterpolateConfig(config dict, valueGetter ValueGetter, version version) error {
+func (c *configInterpolator) interpolateSection(configDict genericMap, p path) {
+	for keyRaw, val := range configDict {
+		if key, ok := keyRaw.(string); ok {
+			childPath := p.appendStr(key)
+			val2 := c.interpolateRecursive(val, childPath)
+			configDict[key] = val2
+			childPath.pop()
+		}
+	}
+}
+
+func (c *configInterpolator) addError(err error, p path) {
+	c.errorList = append(c.errorList, err)
+}
+
+// InterpolateConfig takes the root of a docker compose file as a generic structure and substitutes variables in it.
+// The implementation substitutes exactly the same sections as docker compose: https://github.com/docker/compose/blob/master/compose/config/config.py.
+func InterpolateConfig(fileName string, config genericMap, valueGetter ValueGetter, version *version.Version) error {
 	c := &configInterpolator{
 		config:      config,
+		fileName:    fileName,
 		valueGetter: valueGetter,
 		version:     version,
 	}
@@ -168,30 +213,31 @@ func IsASCIIDigit(b byte) bool {
 	return byte('0') <= b && b <= byte('9')
 }
 
-func (c *configInterpolator) recursiveInterpolate(obj interface{}) (interface{}, error) {
+func (c *configInterpolator) interpolateRecursive(obj interface{}, p path) interface{} {
 	if str, ok := obj.(string); ok {
-		str2, err := Interpolate(str, c.valueGetter, c.version >= v2_1)
-		return str2, err
-	}
-	if m, ok := obj.(dict); ok {
-		for key, val := range m {
-			val2, err := c.recursiveInterpolate(val)
-			if err != nil {
-				return nil, err
-			}
-			m[key] = val2
+		str2, err := Interpolate(str, c.valueGetter, !c.version.LessThan(v2_1))
+		if err != nil {
+			c.addError(err, p)
 		}
-		return m, nil
+		return str2
+	}
+	if m, ok := obj.(genericMap); ok {
+		for keyRaw, val := range m {
+			if key, ok := keyRaw.(string); ok {
+				childPath := p.appendStr(key)
+				m[key] = c.interpolateRecursive(val, childPath)
+				childPath.pop()
+			}
+		}
+		return m
 	}
 	if slice, ok := obj.([]interface{}); ok {
 		for i, val := range slice {
-			val2, err := c.recursiveInterpolate(val)
-			if err != nil {
-				return nil, err
-			}
-			slice[i] = val2
+			childPath := p.appendInt(i)
+			slice[i] = c.interpolateRecursive(val, childPath)
+			childPath.pop()
 		}
-		return slice, nil
+		return slice
 	}
-	return obj, nil
+	return obj
 }
