@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/hashicorp/go-version"
@@ -89,6 +90,7 @@ func (c *configInterpolator) addError(err error, p path) {
 
 // InterpolateConfig takes the root of a docker compose file as a generic structure and substitutes variables in it.
 // The implementation substitutes exactly the same sections as docker compose: https://github.com/docker/compose/blob/master/compose/config/config.py.
+// TODO https://github.com/jbrekelmans/jompose/issues/11 support arbitrary map types instead of genericMap.
 func InterpolateConfig(fileName string, config genericMap, valueGetter ValueGetter, version *version.Version) error {
 	c := &configInterpolator{
 		config:      config,
@@ -231,13 +233,16 @@ func (c *configInterpolator) interpolateRecursive(obj interface{}, p path) inter
 		}
 		return m
 	}
-	if slice, ok := obj.([]interface{}); ok {
-		for i, val := range slice {
+	if reflect.TypeOf(obj).Kind() == reflect.Slice {
+		slicev := reflect.ValueOf(obj)
+		for i := 0; i < slicev.Len(); i++ {
+			iv := slicev.Index(i)
 			childPath := p.appendInt(i)
-			slice[i] = c.interpolateRecursive(val, childPath)
+			val := iv.Interface()
+			val2 := c.interpolateRecursive(val, childPath)
+			iv.Set(reflect.ValueOf(val2))
 			childPath.pop()
 		}
-		return slice
 	}
 	return obj
 }

@@ -23,6 +23,7 @@ var (
 	v3_3 = version.Must(version.NewVersion("3.3"))
 )
 
+// TODO https://github.com/jbrekelmans/jompose/issues/11 remove this type
 type genericMap map[interface{}]interface{}
 
 type CanonicalComposeFile struct {
@@ -88,7 +89,7 @@ func New() (*Config, error) {
 			return nil, fmt.Errorf("file %#v has an invalid version: %#v", fileName, verStr)
 		}
 	} else {
-		return nil, fmt.Errorf("file %#v has a version that is not a string")
+		return nil, fmt.Errorf("file %#v has a version that is not a string", fileName)
 	}
 
 	// Substitute variables with environment variables.
