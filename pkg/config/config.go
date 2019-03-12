@@ -5,14 +5,30 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
+	"github.com/uber-go/mapdecode"
 	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/rest"
 )
 
+var (
+	v1   = version.Must(version.NewVersion("1"))
+	v2   = version.Must(version.NewVersion("2"))
+	v2_1 = version.Must(version.NewVersion("2.1"))
+	v3   = version.Must(version.NewVersion("3"))
+	v3_1 = version.Must(version.NewVersion("3.1"))
+	v3_2 = version.Must(version.NewVersion("3.2"))
+	v3_3 = version.Must(version.NewVersion("3.3"))
+)
+
+// TODO https://github.com/jbrekelmans/jompose/issues/11 remove this type
+type genericMap map[interface{}]interface{}
+
 type CanonicalComposeFile struct {
 	Services map[string]*Service
-	Version  string
+	Version  *version.Version
 }
 
 type Service struct {
@@ -32,7 +48,7 @@ type Service struct {
 }
 
 type PushImagesConfig struct {
-	DockerRegistry string `yaml:"docker_registry"`
+	DockerRegistry string `mapdecode:"docker_registry"`
 }
 
 type Config struct {
@@ -45,50 +61,69 @@ type Config struct {
 }
 
 func New() (*Config, error) {
-	data, err := ioutil.ReadFile("docker-compose.yml")
+	fileName := "docker-compose.yml"
+	data, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		if os.IsNotExist(err) {
-			data, err = ioutil.ReadFile("docker-compose.yaml")
+			fileName = "docker-compose.yaml"
+			data, err = ioutil.ReadFile(fileName)
 		}
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	var versionHolder struct {
-		Version string `yaml:"version"`
-	}
-	err = yaml.Unmarshal(data, &versionHolder)
-	if err != nil {
-		return nil, err
-	}
-	if versionHolder.Version != "2.1" {
-		return nil, fmt.Errorf("unsupported docker-compose version")
-	}
-
-	var composeYAML composeYAML2_1
-	err = yaml.Unmarshal(data, &composeYAML)
+	var dataMap genericMap
+	err = yaml.Unmarshal(data, &dataMap)
 	if err != nil {
 		return nil, err
 	}
 
-	var customYAML struct {
+	var ver *version.Version
+	verRaw, hasVer := dataMap["version"]
+	if !hasVer {
+		ver = v1
+	} else if verStr, ok := verRaw.(string); ok {
+		ver, err = version.NewVersion(verStr)
+		if err != nil {
+			return nil, fmt.Errorf("file %#v has an invalid version: %#v", fileName, verStr)
+		}
+	} else {
+		return nil, fmt.Errorf("file %#v has a version that is not a string", fileName)
+	}
+
+	// Substitute variables with environment variables.
+	err = InterpolateConfig(fileName, dataMap, func(name string) (string, bool) {
+		val, found := os.LookupEnv(name)
+		return val, found
+	}, ver)
+	if err != nil {
+		return nil, err
+	}
+
+	var composeFile composeFile2_1
+	err = mapdecode.Decode(&composeFile, dataMap, mapdecode.IgnoreUnused(true))
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("error while parsing docker compose %#v", fileName))
+	}
+
+	var custom struct {
 		Custom struct {
-			PushImages *PushImagesConfig `yaml:"push_images"`
-		} `yaml:"x-jompose"`
+			PushImages *PushImagesConfig `mapdecode:"push_images"`
+		} `mapdecode:"x-jompose"`
 	}
-	err = yaml.Unmarshal(data, &customYAML)
+	err = mapdecode.Decode(&custom, dataMap, mapdecode.IgnoreUnused(true))
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, fmt.Sprintf("error while parsing x-jompose of %#v", fileName))
 	}
 
 	cfg := &Config{
 		CanonicalComposeFile: CanonicalComposeFile{
-			Version: versionHolder.Version,
+			Version: ver,
 		},
 		EnvironmentLabel: "env",
 	}
-	err = parseComposeYAML2_1(&composeYAML, &cfg.CanonicalComposeFile)
+	err = parseCompose2_1(&composeFile, &cfg.CanonicalComposeFile)
 	if err != nil {
 		return nil, err
 	}
@@ -99,8 +134,8 @@ func New() (*Config, error) {
 		}
 	}
 
-	if customYAML.Custom.PushImages != nil {
-		cfg.PushImages = customYAML.Custom.PushImages
+	if custom.Custom.PushImages != nil {
+		cfg.PushImages = custom.Custom.PushImages
 	}
 
 	return cfg, nil
@@ -130,7 +165,7 @@ func ensureNoDependsOnCycle(service *Service) error {
 }
 
 // https://github.com/docker/compose/blob/master/compose/config/config_schema_v2.1.json
-func parseComposeYAML2_1(composeYAML *composeYAML2_1, dockerComposeFile *CanonicalComposeFile) error {
+func parseCompose2_1(composeYAML *composeFile2_1, dockerComposeFile *CanonicalComposeFile) error {
 	n := len(composeYAML.Services)
 	if n > 0 {
 		dockerComposeFile.Services = make(map[string]*Service, n)
@@ -172,7 +207,7 @@ func parseComposeYAML2_1(composeYAML *composeYAML2_1, dockerComposeFile *Canonic
 	return nil
 }
 
-func parseServiceYAML2_1(serviceYAML *serviceYAML2_1) (*Service, error) {
+func parseServiceYAML2_1(serviceYAML *service2_1) (*Service, error) {
 	service := &Service{
 		Entrypoint: serviceYAML.Entrypoint.Values,
 		Image:      serviceYAML.Image,

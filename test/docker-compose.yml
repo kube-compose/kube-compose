@@ -20,7 +20,7 @@ services:
     - "8080"
     working_dir: /app/test
   db:
-    image: postgres:latest
+    image: postgres:$BLA
     healthcheck:
       test:
       - CMD-SHELL
@@ -29,7 +29,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      
+
 x-jompose:
   push_images:
     docker_registry: 'localhost:5000'
