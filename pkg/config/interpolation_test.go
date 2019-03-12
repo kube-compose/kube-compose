@@ -192,4 +192,5 @@ func TestInterpolate_NestedErrors(t *testing.T) {
 	if len(c.errorList) == 0 {
 		t.Fail()
 	}
+	t.Fail()
 }

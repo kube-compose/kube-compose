@@ -148,6 +148,7 @@ func (c *configInterpolator) addError(err error, p path) {
 func InterpolateConfig(fileName string, config genericMap, valueGetter ValueGetter, v *version.Version) error {
 =======
 // The implementation substitutes exactly the same sections as docker compose: https://github.com/docker/compose/blob/master/compose/config/config.py.
+// TODO https://github.com/jbrekelmans/jompose/issues/11 support arbitrary map types instead of genericMap.
 func InterpolateConfig(fileName string, config genericMap, valueGetter ValueGetter, version *version.Version) error {
 >>>>>>> d2d10a0... finalize implementation of variable substitutions
 	c := &configInterpolator{
@@ -296,6 +297,7 @@ func (c *configInterpolator) interpolateRecursive(obj interface{}, p path) inter
 		return m
 	}
 <<<<<<< HEAD
+<<<<<<< HEAD
 	if obj != nil && reflect.TypeOf(obj).Kind() == reflect.Slice {
 		slicev := reflect.ValueOf(obj)
 		for i := 0; i < slicev.Len(); i++ {
@@ -309,12 +311,23 @@ func (c *configInterpolator) interpolateRecursive(obj interface{}, p path) inter
 =======
 	if slice, ok := obj.([]interface{}); ok {
 		for i, val := range slice {
+=======
+	if reflect.TypeOf(obj).Kind() == reflect.Slice {
+		slicev := reflect.ValueOf(obj)
+		for i := 0; i < slicev.Len(); i++ {
+			iv := slicev.Index(i)
+>>>>>>> 32bf048... issue #7: fix bug where slices were not properly supported
 			childPath := p.appendInt(i)
-			slice[i] = c.interpolateRecursive(val, childPath)
+			val := iv.Interface()
+			val2 := c.interpolateRecursive(val, childPath)
+			iv.Set(reflect.ValueOf(val2))
 			childPath.pop()
 		}
+<<<<<<< HEAD
 		return slice
 >>>>>>> d2d10a0... finalize implementation of variable substitutions
+=======
+>>>>>>> 32bf048... issue #7: fix bug where slices were not properly supported
 	}
 	return obj
 }
