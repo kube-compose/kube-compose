@@ -3,6 +3,8 @@ package config
 import (
 	"fmt"
 	"strings"
+
+	"github.com/uber-go/mapdecode"
 )
 
 // https://github.com/docker/compose/blob/master/compose/config/config_schema_v2.1.json
@@ -28,11 +30,11 @@ type stringOrStringSlice struct {
 	Values []string
 }
 
-func (t *stringOrStringSlice) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	err := unmarshal(&t.Values)
+func (t *stringOrStringSlice) Decode(into mapdecode.Into) error {
+	err := into(&t.Values)
 	if err != nil {
 		var str string
-		err = unmarshal(&str)
+		err = into(&str)
 		if err != nil {
 			return err
 		}
@@ -45,11 +47,11 @@ type HealthcheckTest struct {
 	Values []string
 }
 
-func (t *HealthcheckTest) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	err := unmarshal(&t.Values)
+func (t *HealthcheckTest) Decode(into mapdecode.Into) error {
+	err := into(&t.Values)
 	if err != nil {
 		var str string
-		err = unmarshal(&str)
+		err = into(&str)
 		if err != nil {
 			return err
 		}
@@ -62,11 +64,11 @@ func (t *HealthcheckTest) UnmarshalYAML(unmarshal func(interface{}) error) error
 }
 
 type ServiceHealthcheck2_1 struct {
-	Disable  bool            `yaml:"disable"`
-	Interval *string         `yaml:"interval"`
-	Retries  *uint           `yaml:"retries"`
-	Test     HealthcheckTest `yaml:"test"`
-	Timeout  *string         `yaml:"timeout"`
+	Disable  bool            `mapdecode:"disable"`
+	Interval *string         `mapdecode:"interval"`
+	Retries  *uint           `mapdecode:"retries"`
+	Test     HealthcheckTest `mapdecode:"test"`
+	Timeout  *string         `mapdecode:"timeout"`
 	// start_period is only available in docker-compose 2.3 or higher
 }
 
@@ -78,14 +80,14 @@ type dependsOn2_1 struct {
 	Values map[string]ServiceHealthiness
 }
 
-func (t *dependsOn2_1) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (t *dependsOn2_1) Decode(into mapdecode.Into) error {
 	var strMap map[string]struct {
-		Condition string `yaml:"condition"`
+		Condition string `mapdecode:"condition"`
 	}
-	err := unmarshal(&strMap)
+	err := into(&strMap)
 	if err != nil {
 		var services []string
-		err = unmarshal(&services)
+		err = into(&services)
 		if err != nil {
 			return err
 		}
@@ -120,14 +122,12 @@ type environmentNameValuePair struct {
 }
 
 type environment2_1 struct {
-	KeysMayHaveVariableSubstitutions bool
-	Values                           []environmentNameValuePair
+	Values []environmentNameValuePair
 }
 
-func (t *environment2_1) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	t.KeysMayHaveVariableSubstitutions = false
+func (t *environment2_1) Decode(into mapdecode.Into) error {
 	var strMap map[string]string
-	err := unmarshal(&strMap)
+	err := into(&strMap)
 	if err == nil {
 		i := 0
 		t.Values = make([]environmentNameValuePair, len(strMap))
@@ -138,9 +138,8 @@ func (t *environment2_1) UnmarshalYAML(unmarshal func(interface{}) error) error 
 		}
 		return nil
 	}
-	t.KeysMayHaveVariableSubstitutions = true
 	var strSlice []string
-	err = unmarshal(&strSlice)
+	err = into(&strSlice)
 	if err == nil {
 		t.Values = make([]environmentNameValuePair, len(strSlice))
 		for i, nameValuePair := range strSlice {
@@ -158,22 +157,22 @@ func (t *environment2_1) UnmarshalYAML(unmarshal func(interface{}) error) error 
 	return err
 }
 
-type serviceYAML2_1 struct {
+type service2_1 struct {
 	Build struct {
-		Context    string `yaml:"context"`
-		Dockerfile string `yaml:"dockerfile"`
-	} `yaml:"build"`
-	DependsOn   dependsOn2_1           `yaml:"depends_on"`
-	Entrypoint  stringOrStringSlice    `yaml:"entrypoint"`
-	Environment environment2_1         `yaml:"environment"`
-	Healthcheck *ServiceHealthcheck2_1 `yaml:"healthcheck"`
-	Image       string                 `yaml:"image"`
-	Ports       []string               `yaml:"ports"`
-	Volumes     []string               `yaml:"volumes"`
-	WorkingDir  string                 `yaml:"working_dir"`
+		Context    string `mapdecode:"context"`
+		Dockerfile string `mapdecode:"dockerfile"`
+	} `mapdecode:"build"`
+	DependsOn   dependsOn2_1           `mapdecode:"depends_on"`
+	Entrypoint  stringOrStringSlice    `mapdecode:"entrypoint"`
+	Environment environment2_1         `mapdecode:"environment"`
+	Healthcheck *ServiceHealthcheck2_1 `mapdecode:"healthcheck"`
+	Image       string                 `mapdecode:"image"`
+	Ports       []string               `mapdecode:"ports"`
+	Volumes     []string               `mapdecode:"volumes"`
+	WorkingDir  string                 `mapdecode:"working_dir"`
 }
 
-type composeYAML2_1 struct {
-	Services map[string]serviceYAML2_1 `yaml:"services"`
-	Volumes  map[string]interface{}    `yaml:"volumes"`
+type composeFile2_1 struct {
+	Services map[string]service2_1  `mapdecode:"services"`
+	Volumes  map[string]interface{} `mapdecode:"volumes"`
 }
