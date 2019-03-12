@@ -11,7 +11,7 @@ Although [kompose](https://github.com/kubernetes/kompose) can already convert do
 1. Jompose currently depends on the docker daemon to pull Docker images and extract their healthcheck.
 
 # Installation
-Download the binary [here](releases), and place it on your `PATH`.
+Download the binary from https://github.com/jbrekelmans/jompose/releases, and place it on your `PATH`.
 
 # Usage
 Jompose loads pod and services definitions implicitly defined in a docker compose file, and creates them in a target namespace via the following command:
