@@ -356,6 +356,7 @@ func (u *upRunner) waitForServiceClusterIP(expected int) error {
 func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) {
 	expectedServiceCount := 0
 	for _, app := range u.apps {
+<<<<<<< HEAD
 		if !app.hasService {
 			continue
 		}
@@ -367,6 +368,36 @@ func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) 
 				Port:       port.Internal,
 				Protocol:   v1.Protocol(strings.ToUpper(port.Protocol)),
 				TargetPort: intstr.FromInt(int(port.Internal)),
+=======
+		if app.hasService {
+			expectedServiceCount++
+			dcService := u.cfg.CanonicalComposeFile.Services[app.name]
+			ports := dcService.Ports
+			servicePorts := make([]v1.ServicePort, len(ports))
+			for i, port := range ports {
+				servicePorts[i] = v1.ServicePort{
+					Name:       fmt.Sprintf("%s-%d", port.Protocol, port.ContainerPort),
+					Port:       port.ContainerPort,
+					Protocol:   v1.Protocol(port.Protocol),
+					TargetPort: intstr.FromInt(int(port.ContainerPort)),
+				}
+			}
+			service := &v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: servicePorts,
+					Selector: map[string]string{
+						"app":                  app.nameEncoded,
+						u.cfg.EnvironmentLabel: u.cfg.EnvironmentID,
+					},
+					// This is the default value.
+					// Type: v1.ServiceType("ClusterIP"),
+				},
+			}
+			u.initResourceObjectMeta(&service.ObjectMeta, app.nameEncoded, app.name)
+			_, err := u.k8sServiceClient.Create(service)
+			if err != nil {
+				return nil, err
+>>>>>>> 27b1745... fix #15, #14 and #17
 			}
 		}
 		service := &v1.Service{
