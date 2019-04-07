@@ -318,7 +318,8 @@ func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) 
 			servicePorts := make([]v1.ServicePort, len(ports))
 			for i, port := range ports {
 				servicePorts[i] = v1.ServicePort{
-					Port:       port.ExternalPort,
+					Name:       fmt.Sprintf("%s-%d", port.Protocol, port.ContainerPort),
+					Port:       port.ContainerPort,
 					Protocol:   v1.Protocol(port.Protocol),
 					TargetPort: intstr.FromInt(int(port.ContainerPort)),
 				}
