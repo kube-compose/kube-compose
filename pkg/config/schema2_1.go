@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/uber-go/mapdecode"
@@ -157,6 +158,24 @@ func (t *environment2_1) Decode(into mapdecode.Into) error {
 	return err
 }
 
+type port struct {
+	Value string
+}
+
+func (p *port) Decode(into mapdecode.Into) error {
+	var intVal int
+	intVal = 0
+	err := into(&intVal)
+	if err == nil {
+		p.Value = strconv.Itoa(intVal)
+		return nil
+	}
+	strVal := ""
+	err = into(&strVal)
+	p.Value = strVal
+	return err
+}
+
 type service2_1 struct {
 	Build struct {
 		Context    string `mapdecode:"context"`
@@ -167,7 +186,7 @@ type service2_1 struct {
 	Environment environment2_1         `mapdecode:"environment"`
 	Healthcheck *ServiceHealthcheck2_1 `mapdecode:"healthcheck"`
 	Image       string                 `mapdecode:"image"`
-	Ports       []string               `mapdecode:"ports"`
+	Ports       []port                 `mapdecode:"ports"`
 	Volumes     []string               `mapdecode:"volumes"`
 	WorkingDir  string                 `mapdecode:"working_dir"`
 }
