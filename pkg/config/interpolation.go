@@ -148,7 +148,7 @@ func (c *configInterpolator) addError(err error, p path) {
 func InterpolateConfig(fileName string, config genericMap, valueGetter ValueGetter, v *version.Version) error {
 =======
 // The implementation substitutes exactly the same sections as docker compose: https://github.com/docker/compose/blob/master/compose/config/config.py.
-// TODO https://github.com/jbrekelmans/jompose/issues/11 support arbitrary map types instead of genericMap.
+// TODO https://github.com/jbrekelmans/kube-compose/issues/11 support arbitrary map types instead of genericMap.
 func InterpolateConfig(fileName string, config genericMap, valueGetter ValueGetter, version *version.Version) error {
 >>>>>>> d2d10a0... finalize implementation of variable substitutions
 	c := &configInterpolator{

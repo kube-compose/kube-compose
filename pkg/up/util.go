@@ -16,12 +16,17 @@ import (
 	dockerContainers "github.com/docker/docker/api/types/container"
 	dockerFilters "github.com/docker/docker/api/types/filters"
 	dockerClient "github.com/docker/docker/client"
+<<<<<<< HEAD
 	dockerArchive "github.com/docker/docker/pkg/archive"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/docker"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/linux"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	"github.com/pkg/errors"
+=======
+	"github.com/jbrekelmans/kube-compose/pkg/config"
+	"github.com/jbrekelmans/kube-compose/pkg/docker"
+>>>>>>> 670f0fc... issue #16: rename jompose to kube-compose
 	v1 "k8s.io/api/core/v1"
 )
 

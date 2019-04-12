@@ -3,7 +3,10 @@ package down
 import (
 	"fmt"
 
+<<<<<<< HEAD
 	"github.com/jbrekelmans/kube-compose/internal/pkg/k8smeta"
+=======
+>>>>>>> 670f0fc... issue #16: rename jompose to kube-compose
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"

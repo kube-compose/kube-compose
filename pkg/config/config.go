@@ -134,7 +134,11 @@ func New(file *string) (*Config, error) {
 	}
 	err = mapdecode.Decode(&custom, dataMap, mapdecode.IgnoreUnused(true))
 	if err != nil {
+<<<<<<< HEAD
 		return nil, errors.Wrap(err, fmt.Sprintf("error while parsing x-kube-compose of %#v", *file))
+=======
+		return nil, errors.Wrap(err, fmt.Sprintf("error while parsing x-kube-compose of %#v", fileName))
+>>>>>>> 670f0fc... issue #16: rename jompose to kube-compose
 	}
 
 	cfg := &Config{

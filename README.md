@@ -1,6 +1,9 @@
 [![Build Status](https://travis-ci.com/jbrekelmans/kube-compose.svg?branch=master)](https://travis-ci.com/jbrekelmans/kube-compose)
+<<<<<<< HEAD
 [![License](https://img.shields.io/badge/license-Apache_v2.0-blue.svg)](https://github.com/jbrekelmans/kube-compose/blob/master/LICENSE.md)
 [![Coverage Status](https://coveralls.io/repos/github/jbrekelmans/kube-compose/badge.svg?branch=master)](https://coveralls.io/github/jbrekelmans/kube-compose?branch=master)
+=======
+>>>>>>> 670f0fc... issue #16: rename jompose to kube-compose
 
 # Introduction
 kube-compose is a CI tool that can create and destroy environments in Kubernetes based on docker compose files.

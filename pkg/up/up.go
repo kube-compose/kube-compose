@@ -12,6 +12,7 @@ import (
 	dockerRef "github.com/docker/distribution/reference"
 	dockerTypes "github.com/docker/docker/api/types"
 	dockerClient "github.com/docker/docker/client"
+<<<<<<< HEAD
 	"github.com/jbrekelmans/kube-compose/internal/pkg/docker"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/k8smeta"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
@@ -19,6 +20,11 @@ import (
 	cmdColor "github.com/logrusorgru/aurora"
 	goDigest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
+=======
+	"github.com/jbrekelmans/kube-compose/pkg/config"
+	k8sUtil "github.com/jbrekelmans/kube-compose/pkg/k8s"
+	digest "github.com/opencontainers/go-digest"
+>>>>>>> 670f0fc... issue #16: rename jompose to kube-compose
 	v1 "k8s.io/api/core/v1"
 	k8sError "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,10 +37,17 @@ import (
 type podStatus int
 
 const (
+<<<<<<< HEAD
 	podStatusReady     podStatus = 2
 	podStatusStarted   podStatus = 1
 	podStatusOther     podStatus = 0
 	podStatusCompleted podStatus = 3
+=======
+	annotationName             = "kube-compose/service"
+	podStatusReady   podStatus = 2
+	podStatusStarted podStatus = 1
+	podStatusOther   podStatus = 0
+>>>>>>> 670f0fc... issue #16: rename jompose to kube-compose
 )
 
 var colorSupported = []cmdColor.Color{409600, 147456, 344064, 81920, 212992, 278528, 475136}
@@ -207,8 +220,12 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 	} else if podImage == "" {
 		if !sourceImageIsNamed {
 			// TODO https://github.com/jbrekelmans/kube-compose/issues/6
+<<<<<<< HEAD
 			return fmt.Errorf("image reference %#v is likely unstable, "+
 				"please enable pushing of images or use named image references to improve consistency across hosts", sourceImage)
+=======
+			return nil, "", fmt.Errorf("image reference %s is likely unstable, please enable pushing of images or use named image references to improve reliability", sourceImage)
+>>>>>>> 670f0fc... issue #16: rename jompose to kube-compose
 		}
 		podImage = sourceImage
 	}
@@ -838,7 +855,11 @@ func (u *upRunner) checkIfPodsReady() bool {
 }
 
 // Run runs an operation similar docker-compose up against a Kubernetes cluster.
+<<<<<<< HEAD
 func Run(ctx context.Context, cfg *config.Config) error {
+=======
+func Run(cfg *config.Config) error {
+>>>>>>> 670f0fc... issue #16: rename jompose to kube-compose
 	// TODO https://github.com/jbrekelmans/kube-compose/issues/2 accept context as a parameter
 	u := &upRunner{
 		cfg: cfg,
