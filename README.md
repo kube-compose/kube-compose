@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.com/jbrekelmans/kube-compose.svg?branch=master)](https://travis-ci.com/jbrekelmans/kube-compose)
+[![License](https://img.shields.io/badge/license-Apache_v2.0-blue.svg)](https://github.com/jbrekelmans/kube-compose/blob/master/LICENSE.md)
 
 # Introduction
 kube-compose is a CI tool that can create and destroy environments in Kubernetes based on docker compose files.
