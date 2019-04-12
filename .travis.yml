@@ -7,7 +7,7 @@ env:
 # You don't need to test on very old version of the Go compiler. It's the user's
 # responsibility to keep their compilers up to date.
 go:
-- 1.11.x
+- 1.12.x
 
 # Skip the install step. Don't `go get` dependencies. Only build with the code	
 # in vendor/
@@ -16,8 +16,8 @@ install: true
 # # Anything in before_script that returns a nonzero exit code will flunk the	
 # # build and immediately stop. It's sorta like having set -e enabled in bash.	
 # # Make sure golangci-lint is vendored.
-# before_script:
-# - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh |
+before_script:
+- curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh |
 #   sh -s -- -b "$(go env GOPATH)"/bin v1.15.0
 # - go get github.com/mattn/goveralls
 # - make modules
@@ -26,6 +26,7 @@ install: true
 # failing test, we want to see both. Configure golangci-lint with a	
 # .golangci.yml file at the top level of your repo.
 script:
+- golangci-lint run
 - go test -v ./...
 
 before_deploy:
