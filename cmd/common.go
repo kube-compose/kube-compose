@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/jbrekelmans/jompose/pkg/config"
+	"github.com/jbrekelmans/kube-compose/pkg/config"
 	"github.com/urfave/cli"
 
 	"k8s.io/client-go/tools/clientcmd"

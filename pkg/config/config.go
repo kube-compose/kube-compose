@@ -114,7 +114,7 @@ func New() (*Config, error) {
 	}
 	err = mapdecode.Decode(&custom, dataMap, mapdecode.IgnoreUnused(true))
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("error while parsing x-jompose of %#v", fileName))
+		return nil, errors.Wrap(err, fmt.Sprintf("error while parsing x-kube-compose of %#v", fileName))
 	}
 
 	cfg := &Config{

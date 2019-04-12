@@ -6,7 +6,7 @@ import (
 
 	"github.com/urfave/cli"
 
-	"github.com/jbrekelmans/jompose/cmd"
+	"github.com/jbrekelmans/kube-compose/cmd"
 )
 
 func main() {
