@@ -1,15 +1,8 @@
 package cmd
 
 import (
-<<<<<<< HEAD
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	"github.com/spf13/cobra"
-=======
-	"fmt"
-
-	"github.com/jbrekelmans/kube-compose/pkg/config"
-	"github.com/urfave/cli"
->>>>>>> 670f0fc... issue #16: rename jompose to kube-compose
 
 	// Plugin does not export any functions therefore it is ignored IE. "_"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"

@@ -5,10 +5,7 @@ import (
 	"log"
 
 	"github.com/jbrekelmans/kube-compose/pkg/up"
-<<<<<<< HEAD
 	"github.com/spf13/cobra"
-=======
->>>>>>> 670f0fc... issue #16: rename jompose to kube-compose
 )
 
 var upCmd = &cobra.Command{

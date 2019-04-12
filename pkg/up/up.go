@@ -12,7 +12,6 @@ import (
 	dockerRef "github.com/docker/distribution/reference"
 	dockerTypes "github.com/docker/docker/api/types"
 	dockerClient "github.com/docker/docker/client"
-<<<<<<< HEAD
 	"github.com/jbrekelmans/kube-compose/internal/pkg/docker"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/k8smeta"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
@@ -20,11 +19,6 @@ import (
 	cmdColor "github.com/logrusorgru/aurora"
 	goDigest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
-=======
-	"github.com/jbrekelmans/kube-compose/pkg/config"
-	k8sUtil "github.com/jbrekelmans/kube-compose/pkg/k8s"
-	digest "github.com/opencontainers/go-digest"
->>>>>>> 670f0fc... issue #16: rename jompose to kube-compose
 	v1 "k8s.io/api/core/v1"
 	k8sError "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,17 +31,10 @@ import (
 type podStatus int
 
 const (
-<<<<<<< HEAD
 	podStatusReady     podStatus = 2
 	podStatusStarted   podStatus = 1
 	podStatusOther     podStatus = 0
 	podStatusCompleted podStatus = 3
-=======
-	annotationName             = "kube-compose/service"
-	podStatusReady   podStatus = 2
-	podStatusStarted podStatus = 1
-	podStatusOther   podStatus = 0
->>>>>>> 670f0fc... issue #16: rename jompose to kube-compose
 )
 
 var colorSupported = []cmdColor.Color{409600, 147456, 344064, 81920, 212992, 278528, 475136}
@@ -220,12 +207,8 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 	} else if podImage == "" {
 		if !sourceImageIsNamed {
 			// TODO https://github.com/jbrekelmans/kube-compose/issues/6
-<<<<<<< HEAD
 			return fmt.Errorf("image reference %#v is likely unstable, "+
 				"please enable pushing of images or use named image references to improve consistency across hosts", sourceImage)
-=======
-			return nil, "", fmt.Errorf("image reference %s is likely unstable, please enable pushing of images or use named image references to improve reliability", sourceImage)
->>>>>>> 670f0fc... issue #16: rename jompose to kube-compose
 		}
 		podImage = sourceImage
 	}
@@ -373,7 +356,6 @@ func (u *upRunner) waitForServiceClusterIP(expected int) error {
 func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) {
 	expectedServiceCount := 0
 	for _, app := range u.apps {
-<<<<<<< HEAD
 		if !app.hasService {
 			continue
 		}
@@ -385,36 +367,6 @@ func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) 
 				Port:       port.Internal,
 				Protocol:   v1.Protocol(strings.ToUpper(port.Protocol)),
 				TargetPort: intstr.FromInt(int(port.Internal)),
-=======
-		if app.hasService {
-			expectedServiceCount++
-			dcService := u.cfg.CanonicalComposeFile.Services[app.name]
-			ports := dcService.Ports
-			servicePorts := make([]v1.ServicePort, len(ports))
-			for i, port := range ports {
-				servicePorts[i] = v1.ServicePort{
-					Name:       fmt.Sprintf("%s-%d", port.Protocol, port.ContainerPort),
-					Port:       port.ContainerPort,
-					Protocol:   v1.Protocol(port.Protocol),
-					TargetPort: intstr.FromInt(int(port.ContainerPort)),
-				}
-			}
-			service := &v1.Service{
-				Spec: v1.ServiceSpec{
-					Ports: servicePorts,
-					Selector: map[string]string{
-						"app":                  app.nameEncoded,
-						u.cfg.EnvironmentLabel: u.cfg.EnvironmentID,
-					},
-					// This is the default value.
-					// Type: v1.ServiceType("ClusterIP"),
-				},
-			}
-			u.initResourceObjectMeta(&service.ObjectMeta, app.nameEncoded, app.name)
-			_, err := u.k8sServiceClient.Create(service)
-			if err != nil {
-				return nil, err
->>>>>>> 27b1745... fix #15, #14 and #17
 			}
 		}
 		service := &v1.Service{
@@ -466,14 +418,8 @@ func (u *upRunner) initLocalImages() error {
 		var imageIDSet *digestset.Set
 		if err == nil {
 			imageIDSet = digestset.NewSet()
-<<<<<<< HEAD
 			for i := 0; i < len(imageSummarySlice); i++ {
 				_ = imageIDSet.Add(goDigest.Digest(imageSummarySlice[i].ID))
-=======
-			for _, imageSummary := range imageSummarySlice {
-				//nolint
-				imageIDSet.Add(digest.Digest(imageSummary.ID))
->>>>>>> 39ec9e8... fix lint issues, add linting into travis
 			}
 		}
 		u.localImagesCache = localImagesCache{
@@ -757,19 +703,11 @@ func (u *upRunner) run() error {
 	for app := range u.appsToBeStarted {
 		// Begin pulling and pushing images immediately...
 		//nolint
-<<<<<<< HEAD
 		go u.getAppImageInfoOnce(app)
 	}
 	// Begin creating services and collecting their cluster IPs (we'll need this to
 	// set the hostAliases of each pod)
 	// nolint
-=======
-		go u.getAppImageOnce(app)
-	}
-	// Begin creating services and collecting their cluster IPs (we'll need this to
-	// set the hostAliases of each pod)
-	//nolint
->>>>>>> 39ec9e8... fix lint issues, add linting into travis
 	go u.createServicesAndGetPodHostAliasesOnce()
 	for app := range u.appsToBeStarted {
 		if len(app.composeService.DependsOn) != 0 {
@@ -869,11 +807,7 @@ func (u *upRunner) checkIfPodsReady() bool {
 }
 
 // Run runs an operation similar docker-compose up against a Kubernetes cluster.
-<<<<<<< HEAD
 func Run(ctx context.Context, cfg *config.Config) error {
-=======
-func Run(cfg *config.Config) error {
->>>>>>> 670f0fc... issue #16: rename jompose to kube-compose
 	// TODO https://github.com/jbrekelmans/kube-compose/issues/2 accept context as a parameter
 	u := &upRunner{
 		cfg: cfg,

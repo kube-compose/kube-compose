@@ -1,12 +1,4 @@
 test/output
 coverage*
-<<<<<<< HEAD
-<<<<<<< HEAD
 kube-compose
-=======
-jompose
->>>>>>> b967615... partially add variable substitution support
-=======
-kube-compose
->>>>>>> 670f0fc... issue #16: rename jompose to kube-compose
 .vscode

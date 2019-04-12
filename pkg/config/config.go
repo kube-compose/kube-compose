@@ -7,10 +7,7 @@ import (
 	"strconv"
 
 	version "github.com/hashicorp/go-version"
-<<<<<<< HEAD
 	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
-=======
->>>>>>> 39ec9e8... fix lint issues, add linting into travis
 	"github.com/pkg/errors"
 	"github.com/uber-go/mapdecode"
 	yaml "gopkg.in/yaml.v2"
@@ -137,11 +134,7 @@ func New(file *string) (*Config, error) {
 	}
 	err = mapdecode.Decode(&custom, dataMap, mapdecode.IgnoreUnused(true))
 	if err != nil {
-<<<<<<< HEAD
 		return nil, errors.Wrap(err, fmt.Sprintf("error while parsing x-kube-compose of %#v", *file))
-=======
-		return nil, errors.Wrap(err, fmt.Sprintf("error while parsing x-kube-compose of %#v", fileName))
->>>>>>> 670f0fc... issue #16: rename jompose to kube-compose
 	}
 
 	cfg := &Config{

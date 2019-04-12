@@ -51,11 +51,6 @@ github.com/hashicorp/hcl v1.0.0 h1:0Anlzjpi4vEasTeNFn2mLJgTSwt0+6sfsiTG8qcWGx4=
 github.com/hashicorp/hcl v1.0.0/go.mod h1:E5yfLk+7swimpb2L/Alb/PJmXilQ/rhwaUYs4T20WEQ=
 github.com/imdario/mergo v0.3.7 h1:Y+UAYTZ7gDEuOfhxKWy+dvb5dRQ6rJjFSdX2HZY1/gI=
 github.com/imdario/mergo v0.3.7/go.mod h1:2EnlNZ0deacrJVfApfmtdGgDfMuh/nq6Ok1EcJh5FfA=
-<<<<<<< HEAD
-github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NHg9XEKhtSvM=
-github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
-=======
->>>>>>> 670f0fc... issue #16: rename jompose to kube-compose
 github.com/jbrekelmans/jompose v0.0.0-20190407233303-c8a1ac032d84 h1:h7py5FPdnn+xHGuLjR3SbhAuY5w1/AasDc1N3K8V30E=
 github.com/jbrekelmans/jompose v0.0.0-20190407233303-c8a1ac032d84/go.mod h1:5NEjxrWacdbDYPkxjUfEVrv5hFDm/My+m0pYi1aanaE=
 github.com/json-iterator/go v1.1.5 h1:gL2yXlmiIo4+t+y32d4WGwOjKGYcGOuyrg46vadswDE=
