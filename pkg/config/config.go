@@ -20,7 +20,7 @@ var (
 	v3_3 = version.Must(version.NewVersion("3.3"))
 )
 
-// TODO https://github.com/jbrekelmans/jompose/issues/11 remove this type
+// TODO https://github.com/jbrekelmans/kube-compose/issues/11 remove this type
 type genericMap map[interface{}]interface{}
 
 type CanonicalComposeFile struct {
@@ -107,7 +107,7 @@ func New() (*Config, error) {
 	var custom struct {
 		Custom struct {
 			PushImages *PushImagesConfig `mapdecode:"push_images"`
-		} `mapdecode:"x-jompose"`
+		} `mapdecode:"x-kube-compose"`
 	}
 	err = mapdecode.Decode(&custom, dataMap, mapdecode.IgnoreUnused(true))
 	if err != nil {
