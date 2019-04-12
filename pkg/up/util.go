@@ -12,8 +12,8 @@ import (
 	dockerTypes "github.com/docker/docker/api/types"
 	dockerFilters "github.com/docker/docker/api/types/filters"
 	dockerClient "github.com/docker/docker/client"
-	"github.com/jbrekelmans/jompose/pkg/config"
-	"github.com/jbrekelmans/jompose/pkg/docker"
+	"github.com/jbrekelmans/kube-compose/pkg/config"
+	"github.com/jbrekelmans/kube-compose/pkg/docker"
 	v1 "k8s.io/api/core/v1"
 )
 

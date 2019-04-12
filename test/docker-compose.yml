@@ -32,6 +32,6 @@ services:
       timeout: 5s
       retries: 5
 
-x-jompose:
+x-kube-compose:
   push_images:
     docker_registry: 'localhost:5000'

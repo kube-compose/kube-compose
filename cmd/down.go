@@ -3,7 +3,7 @@ package cmd
 import (
 	"github.com/urfave/cli"
 
-	"github.com/jbrekelmans/jompose/pkg/down"
+	"github.com/jbrekelmans/kube-compose/pkg/down"
 )
 
 func NewDownCommand() cli.Command {

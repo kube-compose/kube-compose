@@ -10,8 +10,8 @@ import (
 	dockerRef "github.com/docker/distribution/reference"
 	dockerTypes "github.com/docker/docker/api/types"
 	dockerClient "github.com/docker/docker/client"
-	"github.com/jbrekelmans/jompose/pkg/config"
-	k8sUtil "github.com/jbrekelmans/jompose/pkg/k8s"
+	"github.com/jbrekelmans/kube-compose/pkg/config"
+	k8sUtil "github.com/jbrekelmans/kube-compose/pkg/k8s"
 	digest "github.com/opencontainers/go-digest"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +28,7 @@ func errorResourcesModifiedExternally() error {
 type podStatus int
 
 const (
-	annotationName             = "jompose/service"
+	annotationName             = "kube-compose/service"
 	podStatusReady   podStatus = 2
 	podStatusStarted podStatus = 1
 	podStatusOther   podStatus = 0
@@ -182,7 +182,7 @@ func (u *upRunner) getAppImage(app *app) (*config.Healthcheck, string, error) {
 		podImage = destinationImage + "@" + digest
 	} else if len(podImage) == 0 {
 		if !sourceImageIsNamed {
-			// TODO https://github.com/jbrekelmans/jompose/issues/6
+			// TODO https://github.com/jbrekelmans/kube-compose/issues/6
 			return nil, "", fmt.Errorf("image reference %s is likely unstable, please enable pushing of images or use named image references to improve reliability", sourceImage)
 		}
 		podImage = sourceImage
@@ -693,7 +693,7 @@ func (u *upRunner) run() error {
 
 // Run runs an operation similar docker-compose up against a Kubernetes cluster.
 func Run(cfg *config.Config) error {
-	// TODO https://github.com/jbrekelmans/jompose/issues/2 accept context as a parameter
+	// TODO https://github.com/jbrekelmans/kube-compose/issues/2 accept context as a parameter
 	u := &upRunner{
 		cfg:                  cfg,
 		ctx:                  context.Background(),
