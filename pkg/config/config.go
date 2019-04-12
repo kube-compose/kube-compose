@@ -5,21 +5,18 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/hashicorp/go-version"
+	version "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/uber-go/mapdecode"
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/rest"
 )
 
 var (
 	v1   = version.Must(version.NewVersion("1"))
-	v2   = version.Must(version.NewVersion("2"))
 	v2_1 = version.Must(version.NewVersion("2.1"))
-	v3   = version.Must(version.NewVersion("3"))
 	v3_1 = version.Must(version.NewVersion("3.1"))
-	v3_2 = version.Must(version.NewVersion("3.2"))
 	v3_3 = version.Must(version.NewVersion("3.3"))
 )
 

@@ -163,8 +163,7 @@ type port struct {
 }
 
 func (p *port) Decode(into mapdecode.Into) error {
-	var intVal int
-	intVal = 0
+	intVal := 0
 	err := into(&intVal)
 	if err == nil {
 		p.Value = strconv.Itoa(intVal)
