@@ -375,6 +375,7 @@ func (u *upRunner) initLocalImages() error {
 		if err == nil {
 			imageIDSet = digestset.NewSet()
 			for _, imageSummary := range imageSummarySlice {
+				//nolint
 				imageIDSet.Add(digest.Digest(imageSummary.ID))
 			}
 		}
@@ -393,14 +394,6 @@ func (u *upRunner) getLocalImageIDSet() (*digestset.Set, error) {
 		return nil, err
 	}
 	return u.localImagesCache.imageIDSet, nil
-}
-
-func (u *upRunner) dockerImageListCached() ([]dockerTypes.ImageSummary, error) {
-	err := u.initLocalImages()
-	if err != nil {
-		return nil, err
-	}
-	return u.localImagesCache.images, nil
 }
 
 func (u *upRunner) createServicesAndGetPodHostAliasesOnce() ([]v1.HostAlias, error) {
@@ -608,10 +601,12 @@ func (u *upRunner) run() error {
 
 	for _, app := range u.apps {
 		// Begin pulling and pushing images immediately...
+		//nolint
 		go u.getAppImageOnce(app)
 	}
 	// Begin creating services and collecting their cluster IPs (we'll need this to
 	// set the hostAliases of each pod)
+	//nolint
 	go u.createServicesAndGetPodHostAliasesOnce()
 
 	for _, app := range u.apps {
