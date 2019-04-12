@@ -1,10 +1,10 @@
 version: "2.1"
 services:
-  jompose:
+  kube-compose:
     build:
       context: .
       dockerfile: Dockerfile
-    image: jompose:latest
+    image: kube-compose:latest
     network_mode: host
     volumes:
     - ./test:/app/test:rw

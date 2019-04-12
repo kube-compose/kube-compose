@@ -3,7 +3,7 @@ package down
 import (
 	"fmt"
 
-	"github.com/jbrekelmans/jompose/pkg/config"
+	"github.com/jbrekelmans/kube-compose/pkg/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"

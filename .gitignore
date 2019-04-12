@@ -1,4 +1,4 @@
 test/output
 coverage*
-jompose
+kube-compose
 .vscode
