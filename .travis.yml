@@ -36,12 +36,12 @@ before_deploy:
   for T in linux darwin; do
     mkdir -p release/"$T"
     GOOS=$T
-    go build -a -installsuffix cgo -o release/"$T"/jompose .
+    go build -a -installsuffix cgo -o release/"$T"/kube-compose .
     (
       cd release/"$T"
-      tar -zcvf jompose.tar.gz jompose
-      mv jompose ../jompose."$T"
-      mv jompose.tar.gz ../jompose."$T".tar.gz
+      tar -zcvf kube-compose.tar.gz kube-compose
+      mv kube-compose ../kube-compose."$T"
+      mv kube-compose.tar.gz ../kube-compose."$T".tar.gz
     )
   done
 
@@ -50,16 +50,16 @@ deploy:
   api_key:
     secure: "lMNP+jt7wwI8r9iIG1PANEJ5gWRUMrMll+vjAv2slK7+jVGTTQ83z4u/pj06izlr8YhxcXwR3f/o1CatoF8s/MRPEW60WdTeX1R/PLHkszj6g+ySjpzwL/qf43VkxVJ8e/NtEvOSW+mFHRvg5FDnF2IzWxyXceYHpsIsRQSrYTyUsiSpK0aThHNaF51WmdC5p/TQSsV0P0ReLcuovBSMPaHtH0t8hWLi1D2aFTKkQoLGBmNXDWuhus0oapyH5ffNXT/qwnT/W8o55EYbSJQgqyk0xSqOnrFObW41GaKE7a0yooRtMZEszU5ciUImnDAaPO2b+3ntBt68lKxcnDtaNNRqZQRUs69XQ/ZVNJucNykG/BN1MmGofMtMB8bAQ1UkR+9OQQeKLot6IoDx+ZxNOmEsO9jSgVXPzHwMERqVL0zyOl2W3J45FP5RtdOD5N0/yRXjGLzLLcY5BsliH99SuQqSNRFPWULREA+/FFKKJYeX117zLzXmm1dBIfKXaCL1VEFVdXYE+ju6YEsaHBdTfrCWLkWuVSjLnVzdrW62Sr0q2d+uErAH9/PxDC6Lfj+3Nten/SmLJ+z3c1iMB4P44EvF4QAzTZPKQF5sxJbvKQZxmPyc2VmK+vrvQheZg2hao/ZRn0wbB3ZTatU7mfJawTVIyB5wVxbPydXlTmdwUlc="
   file:
-    - release/jompose.darwin
-    - release/jompose.darwin.tar.gz
-    - release/jompose.linux
-    - release/jompose.linux.tar.gz
+    - release/kube-compose.darwin
+    - release/kube-compose.darwin.tar.gz
+    - release/kube-compose.linux
+    - release/kube-compose.linux.tar.gz
   # Make sure you have skip_cleanup set to true, otherwise Travis CI will delete all the files created during the build, which will probably delete what you are trying to upload.
   skip_cleanup: true
   # Overwrite existing files
   overwrite: true
   on:
-    repo: jbrekelmans/jompose
+    repo: jbrekelmans/kube-compose
     # Only deploy when on matching branch selector
     branch: master
     # With on.tags: true, your Releases deployment will trigger if and only if the build is a tagged build.

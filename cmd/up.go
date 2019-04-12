@@ -3,7 +3,7 @@ package cmd
 import (
 	"github.com/urfave/cli"
 
-	"github.com/jbrekelmans/jompose/pkg/up"
+	"github.com/jbrekelmans/kube-compose/pkg/up"
 )
 
 func NewUpCommand() cli.Command {
