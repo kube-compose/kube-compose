@@ -7,7 +7,10 @@ import (
 	"strconv"
 
 	version "github.com/hashicorp/go-version"
+<<<<<<< HEAD
 	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
+=======
+>>>>>>> 39ec9e8... fix lint issues, add linting into travis
 	"github.com/pkg/errors"
 	"github.com/uber-go/mapdecode"
 	yaml "gopkg.in/yaml.v2"

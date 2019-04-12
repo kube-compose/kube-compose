@@ -466,8 +466,14 @@ func (u *upRunner) initLocalImages() error {
 		var imageIDSet *digestset.Set
 		if err == nil {
 			imageIDSet = digestset.NewSet()
+<<<<<<< HEAD
 			for i := 0; i < len(imageSummarySlice); i++ {
 				_ = imageIDSet.Add(goDigest.Digest(imageSummarySlice[i].ID))
+=======
+			for _, imageSummary := range imageSummarySlice {
+				//nolint
+				imageIDSet.Add(digest.Digest(imageSummary.ID))
+>>>>>>> 39ec9e8... fix lint issues, add linting into travis
 			}
 		}
 		u.localImagesCache = localImagesCache{
@@ -751,11 +757,19 @@ func (u *upRunner) run() error {
 	for app := range u.appsToBeStarted {
 		// Begin pulling and pushing images immediately...
 		//nolint
+<<<<<<< HEAD
 		go u.getAppImageInfoOnce(app)
 	}
 	// Begin creating services and collecting their cluster IPs (we'll need this to
 	// set the hostAliases of each pod)
 	// nolint
+=======
+		go u.getAppImageOnce(app)
+	}
+	// Begin creating services and collecting their cluster IPs (we'll need this to
+	// set the hostAliases of each pod)
+	//nolint
+>>>>>>> 39ec9e8... fix lint issues, add linting into travis
 	go u.createServicesAndGetPodHostAliasesOnce()
 	for app := range u.appsToBeStarted {
 		if len(app.composeService.DependsOn) != 0 {
