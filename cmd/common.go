@@ -18,12 +18,12 @@ func GlobalFlags() []cli.Flag {
 	return []cli.Flag{
 		cli.StringFlag{
 			Name:   environmentIDFlagName + ", e",
-			EnvVar: "JOMPOSE_ENVID",
+			EnvVar: "KUBECOMPOSE_ENVID",
 			Usage:  "used to isolate environments deployed to a shared namespace, by (1) using this value as a suffix of pod and service names and (2) using this value to isolate selectors",
 		},
 		cli.StringFlag{
 			Name:   namespaceFlagName + ", n",
-			EnvVar: "JOMPOSE_NAMESPACE",
+			EnvVar: "KUBECOMPOSE_NAMESPACE",
 			Usage:  "the target Kubernetes namespace",
 		},
 	}
