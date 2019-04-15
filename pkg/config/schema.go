@@ -64,7 +64,7 @@ func (t *HealthcheckTest) Decode(into mapdecode.Into) error {
 	return nil
 }
 
-type ServiceHealthcheck2_1 struct {
+type ServiceHealthcheck struct {
 	Disable  bool            `mapdecode:"disable"`
 	Interval *string         `mapdecode:"interval"`
 	Retries  *uint           `mapdecode:"retries"`
@@ -73,15 +73,15 @@ type ServiceHealthcheck2_1 struct {
 	// start_period is only available in docker-compose 2.3 or higher
 }
 
-func (h *ServiceHealthcheck2_1) GetTest() []string {
+func (h *ServiceHealthcheck) GetTest() []string {
 	return h.Test.Values
 }
 
-type dependsOn2_1 struct {
+type dependsOn struct {
 	Values map[string]ServiceHealthiness
 }
 
-func (t *dependsOn2_1) Decode(into mapdecode.Into) error {
+func (t *dependsOn) Decode(into mapdecode.Into) error {
 	var strMap map[string]struct {
 		Condition string `mapdecode:"condition"`
 	}
@@ -122,11 +122,11 @@ type environmentNameValuePair struct {
 	Value *string
 }
 
-type environment2_1 struct {
+type environment struct {
 	Values []environmentNameValuePair
 }
 
-func (t *environment2_1) Decode(into mapdecode.Into) error {
+func (t *environment) Decode(into mapdecode.Into) error {
 	var strMap map[string]string
 	err := into(&strMap)
 	if err == nil {
@@ -180,14 +180,14 @@ type service2_1 struct {
 		Context    string `mapdecode:"context"`
 		Dockerfile string `mapdecode:"dockerfile"`
 	} `mapdecode:"build"`
-	DependsOn   dependsOn2_1           `mapdecode:"depends_on"`
-	Entrypoint  stringOrStringSlice    `mapdecode:"entrypoint"`
-	Environment environment2_1         `mapdecode:"environment"`
-	Healthcheck *ServiceHealthcheck2_1 `mapdecode:"healthcheck"`
-	Image       string                 `mapdecode:"image"`
-	Ports       []port                 `mapdecode:"ports"`
-	Volumes     []string               `mapdecode:"volumes"`
-	WorkingDir  string                 `mapdecode:"working_dir"`
+	DependsOn   dependsOn           `mapdecode:"depends_on"`
+	Entrypoint  stringOrStringSlice `mapdecode:"entrypoint"`
+	Environment environment         `mapdecode:"environment"`
+	Healthcheck *ServiceHealthcheck `mapdecode:"healthcheck"`
+	Image       string              `mapdecode:"image"`
+	Ports       []port              `mapdecode:"ports"`
+	Volumes     []string            `mapdecode:"volumes"`
+	WorkingDir  string              `mapdecode:"working_dir"`
 }
 
 type composeFile2_1 struct {
