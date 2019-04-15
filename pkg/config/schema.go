@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -9,7 +10,6 @@ import (
 )
 
 // https://github.com/docker/compose/blob/master/compose/config/config_schema_v2.1.json
-
 type ServiceHealthiness int
 
 const (
@@ -64,7 +64,7 @@ func (t *HealthcheckTest) Decode(into mapdecode.Into) error {
 	return nil
 }
 
-type ServiceHealthcheck2_1 struct {
+type ServiceHealthcheck struct {
 	Disable  bool            `mapdecode:"disable"`
 	Interval *string         `mapdecode:"interval"`
 	Retries  *uint           `mapdecode:"retries"`
@@ -73,15 +73,15 @@ type ServiceHealthcheck2_1 struct {
 	// start_period is only available in docker-compose 2.3 or higher
 }
 
-func (h *ServiceHealthcheck2_1) GetTest() []string {
+func (h *ServiceHealthcheck) GetTest() []string {
 	return h.Test.Values
 }
 
-type dependsOn2_1 struct {
+type dependsOn struct {
 	Values map[string]ServiceHealthiness
 }
 
-func (t *dependsOn2_1) Decode(into mapdecode.Into) error {
+func (t *dependsOn) Decode(into mapdecode.Into) error {
 	var strMap map[string]struct {
 		Condition string `mapdecode:"condition"`
 	}
@@ -119,39 +119,72 @@ func (t *dependsOn2_1) Decode(into mapdecode.Into) error {
 
 type environmentNameValuePair struct {
 	Name  string
-	Value *string
+	Value *environmentValue
 }
 
-type environment2_1 struct {
+// TODO https://github.com/jbrekelmans/kube-compose/issues/40 check whether handling of large numbers is consistent with docker-compose
+// See https://github.com/docker/compose/blob/master/compose/config/config_schema_v2.1.json#L418
+type environmentValue struct {
+	FloatValue  *float64
+	IntValue    *int
+	StringValue *string
+}
+
+func (v *environmentValue) Decode(into mapdecode.Into) error {
+	var f float64
+	err := into(&f)
+	if err == nil {
+		if -9223372036854775000.0 <= f && f <= 9223372036854775000.0 && math.Floor(f) == f {
+			v.IntValue = new(int)
+			*v.IntValue = int(f)
+			return nil
+		}
+		v.FloatValue = new(float64)
+		*v.FloatValue = f
+		return nil
+	}
+	var s string
+	err = into(&s)
+	if err == nil {
+		v.StringValue = new(string)
+		*v.StringValue = s
+	}
+	return err
+}
+
+type environment struct {
 	Values []environmentNameValuePair
 }
 
-func (t *environment2_1) Decode(into mapdecode.Into) error {
-	var strMap map[string]string
-	err := into(&strMap)
+func (t *environment) Decode(into mapdecode.Into) error {
+	var intoMap map[string]environmentValue
+	err := into(&intoMap)
 	if err == nil {
 		i := 0
-		t.Values = make([]environmentNameValuePair, len(strMap))
-		for name, value := range strMap {
+		t.Values = make([]environmentNameValuePair, len(intoMap))
+		for name, value := range intoMap {
 			t.Values[i].Name = name
-			t.Values[i].Value = &value
+			valueCopy := new(environmentValue)
+			*valueCopy = value
+			t.Values[i].Value = valueCopy
 			i++
 		}
 		return nil
 	}
-	var strSlice []string
-	err = into(&strSlice)
+	var intoSlice []string
+	err = into(&intoSlice)
 	if err == nil {
-		t.Values = make([]environmentNameValuePair, len(strSlice))
-		for i, nameValuePair := range strSlice {
+		t.Values = make([]environmentNameValuePair, len(intoSlice))
+		for i, nameValuePair := range intoSlice {
 			j := strings.IndexRune(nameValuePair, '=')
 			if j < 0 {
 				t.Values[i].Name = nameValuePair
-				t.Values[i].Value = nil
 			} else {
 				t.Values[i].Name = nameValuePair[:j]
-				value := nameValuePair[j+1:]
-				t.Values[i].Value = &value
+				stringValue := nameValuePair[j+1:]
+				t.Values[i].Value = &environmentValue{
+					StringValue: &stringValue,
+				}
 			}
 		}
 	}
@@ -180,14 +213,14 @@ type service2_1 struct {
 		Context    string `mapdecode:"context"`
 		Dockerfile string `mapdecode:"dockerfile"`
 	} `mapdecode:"build"`
-	DependsOn   dependsOn2_1           `mapdecode:"depends_on"`
-	Entrypoint  stringOrStringSlice    `mapdecode:"entrypoint"`
-	Environment environment2_1         `mapdecode:"environment"`
-	Healthcheck *ServiceHealthcheck2_1 `mapdecode:"healthcheck"`
-	Image       string                 `mapdecode:"image"`
-	Ports       []port                 `mapdecode:"ports"`
-	Volumes     []string               `mapdecode:"volumes"`
-	WorkingDir  string                 `mapdecode:"working_dir"`
+	DependsOn   dependsOn           `mapdecode:"depends_on"`
+	Entrypoint  stringOrStringSlice `mapdecode:"entrypoint"`
+	Environment environment         `mapdecode:"environment"`
+	Healthcheck *ServiceHealthcheck `mapdecode:"healthcheck"`
+	Image       string              `mapdecode:"image"`
+	Ports       []port              `mapdecode:"ports"`
+	Volumes     []string            `mapdecode:"volumes"`
+	WorkingDir  string              `mapdecode:"working_dir"`
 }
 
 type composeFile2_1 struct {
