@@ -233,7 +233,7 @@ func (c *configInterpolator) interpolateRecursive(obj interface{}, p path) inter
 		}
 		return m
 	}
-	if reflect.TypeOf(obj).Kind() == reflect.Slice {
+	if obj != nil && reflect.TypeOf(obj).Kind() == reflect.Slice {
 		slicev := reflect.ValueOf(obj)
 		for i := 0; i < slicev.Len(); i++ {
 			iv := slicev.Index(i)
