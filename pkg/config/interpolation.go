@@ -5,11 +5,7 @@ import (
 	"reflect"
 	"strings"
 
-<<<<<<< HEAD
 	version "github.com/hashicorp/go-version"
-=======
-	"github.com/hashicorp/go-version"
->>>>>>> d2d10a0... finalize implementation of variable substitutions
 )
 
 type ValueGetter func(name string) (string, bool)
@@ -20,7 +16,6 @@ type configInterpolator struct {
 	fileName    string
 	valueGetter ValueGetter
 	version     *version.Version
-<<<<<<< HEAD
 }
 
 type stringOrInt struct {
@@ -62,50 +57,6 @@ func (c *configInterpolator) run() error {
 			}
 		}
 	}
-=======
-}
-
-type stringOrInt struct {
-	str string
-	i   int
-}
-
-type path []stringOrInt
-
-func (p path) appendStr(str string) path {
-	if len(str) == 0 {
-		panic(fmt.Errorf("s must not be empty"))
-	}
-	return append(p, stringOrInt{
-		str: str,
-	})
-}
-
-func (p path) appendInt(i int) path {
-	return append(p, stringOrInt{
-		i: i,
-	})
-}
-
-func (p path) pop() path {
-	return p[:len(p)-1]
-}
-
-func (c *configInterpolator) run() error {
-	if !c.version.GreaterThan(v1) {
-		c.interpolateSection(c.config, path{})
-	} else {
-		c.interpolateSectionByName("services")
-		if !c.version.LessThan(v3_1) {
-			c.interpolateSectionByName("volumes")
-			c.interpolateSectionByName("networks")
-			if !c.version.LessThan(v3_3) {
-				c.interpolateSectionByName("secrets")
-				c.interpolateSectionByName("configs")
-			}
-		}
-	}
->>>>>>> d2d10a0... finalize implementation of variable substitutions
 	// Primitive error handling does not report all errors...
 	if len(c.errorList) > 0 {
 		return c.errorList[0]
@@ -132,25 +83,15 @@ func (c *configInterpolator) interpolateSection(configDict genericMap, p path) {
 	}
 }
 
-<<<<<<< HEAD
 func (c *configInterpolator) addError(err error, _ path) {
-=======
-func (c *configInterpolator) addError(err error, p path) {
->>>>>>> d2d10a0... finalize implementation of variable substitutions
 	c.errorList = append(c.errorList, err)
 }
 
 // InterpolateConfig takes the root of a docker compose file as a generic structure and substitutes variables in it.
-<<<<<<< HEAD
 // The implementation substitutes exactly the same sections as docker compose:
 // https://github.com/docker/compose/master/compose/config/config.py.
 // TODO https://github.com/jbrekelmans/kube-compose/issues/11 support arbitrary map types instead of genericMap.
 func InterpolateConfig(fileName string, config genericMap, valueGetter ValueGetter, v *version.Version) error {
-=======
-// The implementation substitutes exactly the same sections as docker compose: https://github.com/docker/compose/blob/master/compose/config/config.py.
-// TODO https://github.com/jbrekelmans/kube-compose/issues/11 support arbitrary map types instead of genericMap.
-func InterpolateConfig(fileName string, config genericMap, valueGetter ValueGetter, version *version.Version) error {
->>>>>>> d2d10a0... finalize implementation of variable substitutions
 	c := &configInterpolator{
 		config:      config,
 		fileName:    fileName,
@@ -298,6 +239,7 @@ func (c *configInterpolator) interpolateRecursive(obj interface{}, p path) inter
 	}
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 	if obj != nil && reflect.TypeOf(obj).Kind() == reflect.Slice {
 		slicev := reflect.ValueOf(obj)
 		for i := 0; i < slicev.Len(); i++ {
@@ -313,6 +255,9 @@ func (c *configInterpolator) interpolateRecursive(obj interface{}, p path) inter
 		for i, val := range slice {
 =======
 	if reflect.TypeOf(obj).Kind() == reflect.Slice {
+=======
+	if obj != nil && reflect.TypeOf(obj).Kind() == reflect.Slice {
+>>>>>>> e55e9bd... issue #39: improve handling of environment to be more consistent with docker-compose
 		slicev := reflect.ValueOf(obj)
 		for i := 0; i < slicev.Len(); i++ {
 			iv := slicev.Index(i)
