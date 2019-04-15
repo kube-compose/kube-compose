@@ -244,8 +244,8 @@ func parseServiceYAML2_1(serviceYAML *service2_1) (*Service, error) {
 		} else if pair.Value.FloatValue != nil {
 			value = strconv.FormatFloat(*pair.Value.FloatValue, 'g', -1, 64)
 		} else {
-			// Environment variables will null values in the YAML are not set to empty strings
-			// See docker-compose.null-env.yml
+			// Environment variables with null values in the YAML are ignored.
+			// This was tested with docker-compose.null-env.yml.
 			continue
 		}
 		service.Environment[pair.Name] = value
