@@ -157,8 +157,13 @@ type environment struct {
 }
 
 func (t *environment) Decode(into mapdecode.Into) error {
+<<<<<<< HEAD:pkg/config/schema.go
 	var intoMap map[string]environmentValue
 	err := into(&intoMap)
+=======
+	var strMap map[string]string
+	err := into(&strMap)
+>>>>>>> f805861... issue #39: rename structs to no longer assume a specific docker-compose schema version:pkg/config/schema.go
 	if err == nil {
 		i := 0
 		t.Values = make([]environmentNameValuePair, len(intoMap))

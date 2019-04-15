@@ -23,8 +23,11 @@ type Healthcheck struct {
 	Timeout     time.Duration
 }
 
+<<<<<<< HEAD
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
+=======
+>>>>>>> f805861... issue #39: rename structs to no longer assume a specific docker-compose schema version
 func ParseHealthcheck(healthcheckYAML *ServiceHealthcheck) (*Healthcheck, bool, error) {
 	if healthcheckYAML == nil {
 		return nil, false, nil
