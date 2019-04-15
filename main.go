@@ -14,6 +14,7 @@ func main() {
 
 	app := cli.NewApp()
 	app.Flags = cmd.GlobalFlags()
+	app.Version = "3.0.2"
 	app.Commands = []cli.Command{
 		cmd.NewDownCommand(),
 		cmd.NewUpCommand(),
