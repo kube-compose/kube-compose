@@ -3,6 +3,9 @@ services:
   authentication-service:
     entrypoint: ["/bin/bash", "-c", "STOP=0; trap 'STOP=1' INT; while [[ $$STOP -eq 0 ]]; do sleep 1; done"]
     image: ubuntu:latest
+    environment:
+    - ASDF=10
+    - HENK
     depends_on:
       db:
         condition: service_healthy
@@ -14,6 +17,12 @@ services:
   permission-service:
     entrypoint: ["/bin/bash", "-c", "STOP=0; trap 'STOP=1' INT; while [[ $$STOP -eq 0 ]]; do sleep 1; done"]
     image: ubuntu:latest
+    environment:
+      ENVVAR_STR: str
+      ENVVAR_INT: 23
+      ENVVAR_FLOAT1: 23.15
+      ENVVAR_FLOAT2: 2312934891234981234.15123412384718237481723412341234
+      ENVVAR_NULL:
     healthcheck:
       disable: true
     ports:
