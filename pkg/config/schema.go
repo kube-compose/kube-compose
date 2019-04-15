@@ -191,6 +191,33 @@ func (t *environment) Decode(into mapdecode.Into) error {
 	return err
 }
 
+type extendsHelper struct {
+	File    *string `mapdecode:"file"`
+	Service string  `mapdecode:"service"`
+}
+
+type extends struct {
+	File    *string
+	Service string
+}
+
+func (e *extends) Decode(into mapdecode.Into) error {
+	var serviceName string
+	err := into(&serviceName)
+	if err == nil {
+		e.Service = serviceName
+		return nil
+	}
+	var extendsHelper extendsHelper
+	err = into(&extendsHelper)
+	if err != nil {
+		return err
+	}
+	e.File = extendsHelper.File
+	e.Service = extendsHelper.Service
+	return nil
+}
+
 type port struct {
 	Value string
 }
@@ -213,9 +240,10 @@ type service2_1 struct {
 		Context    string `mapdecode:"context"`
 		Dockerfile string `mapdecode:"dockerfile"`
 	} `mapdecode:"build"`
-	DependsOn   dependsOn           `mapdecode:"depends_on"`
+	DependsOn   *dependsOn          `mapdecode:"depends_on"`
 	Entrypoint  stringOrStringSlice `mapdecode:"entrypoint"`
 	Environment environment         `mapdecode:"environment"`
+	Extends     *extends            `mapdecode:"extends"`
 	Healthcheck *ServiceHealthcheck `mapdecode:"healthcheck"`
 	Image       string              `mapdecode:"image"`
 	Ports       []port              `mapdecode:"ports"`
