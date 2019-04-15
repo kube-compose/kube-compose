@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
 
 	version "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
@@ -227,17 +228,27 @@ func parseServiceYAML2_1(serviceYAML *service2_1) (*Service, error) {
 	service.Environment = make(map[string]string, len(serviceYAML.Environment.Values))
 	for _, pair := range serviceYAML.Environment.Values {
 		var value string
+		if len(pair.Name) == 0 {
+			return nil, fmt.Errorf("invalid environment variable: %s", pair.Name)
+		}
 		if pair.Value == nil {
 			var ok bool
 			value, ok = os.LookupEnv(pair.Name)
 			if !ok {
 				continue
 			}
+		} else if pair.Value.StringValue != nil {
+			value = *pair.Value.StringValue
+		} else if pair.Value.IntValue != nil {
+			value = strconv.Itoa(*pair.Value.IntValue)
+		} else if pair.Value.FloatValue != nil {
+			value = strconv.FormatFloat(*pair.Value.FloatValue, 'g', -1, 64)
 		} else {
-			value = *pair.Value
+			// Environment variables will null values in the YAML are not set to empty strings
+			// See docker-compose.null-env.yml
+			continue
 		}
 		service.Environment[pair.Name] = value
 	}
-
 	return service, nil
 }
