@@ -2,27 +2,30 @@ package config
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
 )
 
-type Port struct {
-	ContainerPort int32
-	ExternalPort  int32
-	Protocol      string
-}
+var portBindingSpecRegexp = regex.MustCompile(
+    "^"  // Match full string
+    "(?:"  // External part
+    "(?:(?P<host>[a-fA-F\\d.:]+):)?"  // Address
+    "(?P<externalMin>\\d*)(?:-(?P<externalMax>\\d+))?:"  // External range
+    ")?"
+    "(?P<internalMin>\\d+)(?:-(?P<internalMax>\\d+))?"  // Internal range
+    "(?P<protocol>/(?:udp|tcp|sctp))?"  // Protocol
+    "$"  // Match full string)
+)
 
-func parsePortUint(portStr string) (int32, error) {
-	port, err := strconv.ParseUint(portStr, 10, 64)
-	if err != nil {
-		return -1, errors.Wrap(err, fmt.Sprintf("unsupported port format %s", portStr))
-	}
-	if port >= 65536 {
-		return -1, fmt.Errorf("port must be < 65536 but got %d", port)
-	}
-	return int32(port), nil
+type PortBinding struct {
+	Internal 	int32 	// the internal port; the port on which the container would listen. At least 0 and less than 65536.
+	ExternalMin int32 	// the minimum external port. At least -1 and less than 65536. -1 if the internal port is not published.
+	ExternalMax	int32 	// the maximum external port. This value is undefined if ExternalMin is -1. Otherwise, at least 0 and less than 65536. Docker will choose from a random available port from the range to map to the internal port.
+	Protocol	string 	// one of "udp", "tcp" and "sctp"
+	Host		string 	// the host (see docker for more details). Can be an empty string if the host was not set in the specification.
 }
 
 // https://docs.docker.com/compose/compose-file/compose-file-v2/
@@ -36,45 +39,102 @@ func parsePortUint(portStr string) (int32, error) {
 //  - "127.0.0.1:5000-5010:5000-5010"
 //  - "6060:6060/udp"
 //  - "12400-12500:1240"
-func parsePorts(inPorts []port) ([]Port, error) {
-	n := len(inPorts)
-	if n == 0 {
-		return nil, nil
+	matches := portBindingSpecRegexp.FindStringSubmatch(spec)
+	if matches == nil {
+		return nil, fmt.Errorf("Invalid port %q, should be [[remote_ip:]remote_port[-remote_port]:]port[/protocol]", s)
 	}
-	outPorts := make([]Port, n)
-	for i, portRaw := range inPorts {
-		portRawStr := portRaw.Value
-		colonPos := strings.IndexByte(portRawStr, ':')
-		var containerPort int32
-		var externalPort int32
-		if colonPos >= 0 {
-			externalPortStr := portRawStr[:colonPos]
-			containerPortStr := portRawStr[colonPos+1:]
-			if strings.IndexByte(containerPortStr, ':') >= 0 {
-				return nil, fmt.Errorf("unsupported port format %s", portRawStr)
-			}
-			var err error
-			externalPort, err = parsePortUint(externalPortStr)
-			if err != nil {
-				return nil, err
-			}
-			containerPort, err = parsePortUint(containerPortStr)
-			if err != nil {
-				return nil, err
-			}
+	matchMap := buildRegexpMatchMap(portBindingSpecRegexp, matches)
+	
+	host := matchMap["host"]
+	protocol := matchMap["protocol"]
+	if len(protocol) == 0 {
+		protocol = "tcp"
+	}
+
+	internal := []int32{}
+	internalMin, err := parsePortUint(matchMap["internalMin"])
+	if err != nil {
+		return nil, err
+	}
+	internalMaxStr := matchMap["internalMax"]
+	if len(internalMaxStr) == 0 {
+		internal = append(internal, internalMin)
+	} else {
+		internalMax, err := parsePortUint(internalMaxStr)
+		if err != nil {
+			return nil, err
+		}
+			internal = append(internal, i)
+		}
+	}
+
+	external := []int32{}
+	externalMinStr := matchMap["externalMin"]
+	if len(externalMinStr) > 0 {
+		externalMin, err := parsePortUint(externalMinStr)
+		if err != nil {
+			return nil, err
+		}
+		externalMaxStr := matchMap["externalMax"]
+		if len(externalMaxStr) == 0 {
+			external = append(external, externalMin)
 		} else {
-			var err error
-			containerPort, err = parsePortUint(portRawStr)
+			externalMax, err := parsePortUint(externalMaxStr)
 			if err != nil {
 				return nil, err
 			}
-			externalPort = containerPort
-		}
-		outPorts[i] = Port{
-			ContainerPort: containerPort,
-			ExternalPort:  externalPort,
-			Protocol:      "TCP",
+			if len(internal) == 1 {
+				return append(portBindings, PortBinding{
+					Internal: internal[0],
+					ExternalMin: externalMin,
+					ExternalMax: externalMax,
+					Protocol: protocol,
+					Host: host,
+				}), nil
+			} else {
+					external = append(external, i)
+				}
+			}
 		}
 	}
-	return outPorts, nil
+	if len(externalMinStr) > 0 && len(internal) != len(external) {
+		return nil, fmt.Errorf("Port ranges don't match in length")
+	}
+	for j, i := range internal {
+		portBinding := PortBinding{
+			Internal: i,
+			ExternalMin: -1,
+			ExternalMax: -1,
+			Protocol: protocol,
+			Host: host,
+		}
+		if len(externalMinStr) > 0 {
+			portBinding.ExternalMin = external[j]
+			portBinding.ExternalMax = external[j]
+		}
+		portBindings = append(portBindings, portBinding)
+	}
+	return portBindings, nil
+}
+
+func parsePortUint(portStr string) (int32, error) {
+	port, err := strconv.ParseUint(portStr, 10, 64)
+	if err != nil {
+		return -1, errors.Wrap(err, fmt.Sprintf("unsupported port format %s", portStr))
+	}
+	if port >= 65536 {
+		return -1, fmt.Errorf("port must be < 65536 but got %d", port)
+	}
+	return int32(port), nil
+}
+
+func parsePorts(inputs []port) ([]PortBinding, error) {
+	portBindings := []PortBinding{}
+	for _, input := range inputs {
+		var err error
+		if err != nil {
+			return nil, err
+		}
+	}
+	return portBindings, nil
 }
