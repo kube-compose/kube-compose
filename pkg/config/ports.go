@@ -8,14 +8,15 @@ import (
 	"github.com/pkg/errors"
 )
 
+// TODO https://github.com/jbrekelmans/kube-compose/issues/46
 var portBindingSpecRegexp = regexp.MustCompile(
     "^" +  // Match full string
-    "(?:" +  // External part
-    "(?:(?P<host>[a-fA-F\\d.:]+):)?" +  // Address
-    "(?P<externalMin>\\d*)(?:-(?P<externalMax>\\d+))?:" +  // External range
+    "(" +  // External part
+    "((?P<host>[a-fA-F\\d.:]+):)?" +  // Address
+    "(?P<externalMin>[\\d]*)(-(?P<externalMax>\\d+))?:" +  // External range
     ")?" +
-    "(?P<internalMin>\\d+)(?:-(?P<internalMax>\\d+))?" +  // Internal range
-    "(?P<protocol>/(?:udp|tcp|sctp))?" +  // Protocol
+    "(?P<internalMin>\\d+)(-(?P<internalMax>\\d+))?" +  // Internal range
+    "(?P<protocol>/(udp|tcp|sctp))?" +  // Protocol
     "$",  // Match full string)
 )
 
