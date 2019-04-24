@@ -4,22 +4,22 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
-	"strings"
 
 	"github.com/pkg/errors"
 )
 
-var portBindingSpecRegexp = regex.MustCompile(
-    "^"  // Match full string
-    "(?:"  // External part
-    "(?:(?P<host>[a-fA-F\\d.:]+):)?"  // Address
-    "(?P<externalMin>\\d*)(?:-(?P<externalMax>\\d+))?:"  // External range
-    ")?"
-    "(?P<internalMin>\\d+)(?:-(?P<internalMax>\\d+))?"  // Internal range
-    "(?P<protocol>/(?:udp|tcp|sctp))?"  // Protocol
-    "$"  // Match full string)
+var portBindingSpecRegexp = regexp.MustCompile(
+    "^" +  // Match full string
+    "(?:" +  // External part
+    "(?:(?P<host>[a-fA-F\\d.:]+):)?" +  // Address
+    "(?P<externalMin>\\d*)(?:-(?P<externalMax>\\d+))?:" +  // External range
+    ")?" +
+    "(?P<internalMin>\\d+)(?:-(?P<internalMax>\\d+))?" +  // Internal range
+    "(?P<protocol>/(?:udp|tcp|sctp))?" +  // Protocol
+    "$",  // Match full string)
 )
 
+// PortBinding is the parsed/canonical form of a docker publish port specification. 
 type PortBinding struct {
 	Internal 	int32 	// the internal port; the port on which the container would listen. At least 0 and less than 65536.
 	ExternalMin int32 	// the minimum external port. At least -1 and less than 65536. -1 if the internal port is not published.
@@ -42,7 +42,7 @@ type PortBinding struct {
 func parsePortBindings(spec string, portBindings []PortBinding) ([]PortBinding, error) {
 	matches := portBindingSpecRegexp.FindStringSubmatch(spec)
 	if matches == nil {
-		return nil, fmt.Errorf("Invalid port %q, should be [[remote_ip:]remote_port[-remote_port]:]port[/protocol]", s)
+		return nil, fmt.Errorf("Invalid port %q, should be [[remote_ip:]remote_port[-remote_port]:]port[/protocol]", spec)
 	}
 	matchMap := buildRegexpMatchMap(portBindingSpecRegexp, matches)
 	
@@ -93,10 +93,9 @@ func parsePortBindings(spec string, portBindings []PortBinding) ([]PortBinding, 
 					Protocol: protocol,
 					Host: host,
 				}), nil
-			} else {
-				for i := externalMin; i <= externalMax; i++ {
-					external = append(external, i)
-				}
+			}
+			for i := externalMin; i <= externalMax; i++ {
+				external = append(external, i)
 			}
 		}
 	}
