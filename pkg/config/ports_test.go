@@ -4,7 +4,7 @@ import "testing"
 
 func TestParsePortBindingsInternalMinTooLarge(t *testing.T) {
 	portBindings := []PortBinding{}
-	portBindings, err := parsePortBindings("65536", portBindings)
+	_, err := parsePortBindings("65536", portBindings)
 	if err == nil {
 		t.Fail()
 	}
@@ -12,7 +12,7 @@ func TestParsePortBindingsInternalMinTooLarge(t *testing.T) {
 
 func TestParsePortBindingsInternalMaxTooLarge(t *testing.T) {
 	portBindings := []PortBinding{}
-	portBindings, err := parsePortBindings("65535-65536", portBindings)
+	_, err := parsePortBindings("65535-65536", portBindings)
 	if err == nil {
 		t.Fail()
 	}
@@ -20,7 +20,7 @@ func TestParsePortBindingsInternalMaxTooLarge(t *testing.T) {
 
 func TestParsePortBindingsExternalMinTooLarge(t *testing.T) {
 	portBindings := []PortBinding{}
-	portBindings, err := parsePortBindings("65536:8000", portBindings)
+	_, err := parsePortBindings("65536:8000", portBindings)
 	if err == nil {
 		t.Fail()
 	}
@@ -28,7 +28,7 @@ func TestParsePortBindingsExternalMinTooLarge(t *testing.T) {
 
 func TestParsePortBindingsExternalMaxTooLarge(t *testing.T) {
 	portBindings := []PortBinding{}
-	portBindings, err := parsePortBindings("65535-65536:8000-8001", portBindings)
+	_, err := parsePortBindings("65535-65536:8000-8001", portBindings)
 	if err == nil {
 		t.Fail()
 	}
@@ -36,7 +36,7 @@ func TestParsePortBindingsExternalMaxTooLarge(t *testing.T) {
 
 func TestParsePortBindingsRandomlyAvailable(t *testing.T) {
 	portBindings := []PortBinding{}
-	portBindings, err := parsePortBindings("8000-8001:8000", portBindings)
+	_, err := parsePortBindings("8000-8001:8000", portBindings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func TestParsePortBindingsRandomlyAvailable(t *testing.T) {
 
 func TestParsePortBindingsRangeLengthMismatch(t *testing.T) {
 	portBindings := []PortBinding{}
-	portBindings, err := parsePortBindings("8000-8002:8000-8001", portBindings)
+	_, err := parsePortBindings("8000-8002:8000-8001", portBindings)
 	if err == nil {
 		t.Fail()
 	}
@@ -52,7 +52,7 @@ func TestParsePortBindingsRangeLengthMismatch(t *testing.T) {
 
 func TestParsePortBindingsSuccessWithExternal(t *testing.T) {
 	portBindings := []PortBinding{}
-	portBindings, err := parsePortBindings("myhostname:8000-8001:8000-8001/udp", portBindings)
+	_, err := parsePortBindings("myhostname:8000-8001:8000-8001/udp", portBindings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestParsePortBindingsSuccessWithExternal(t *testing.T) {
 
 func TestParsePortBindingsSuccessWithoutExternal(t *testing.T) {
 	portBindings := []PortBinding{}
-	portBindings, err := parsePortBindings("8000-8001", portBindings)
+	_, err := parsePortBindings("8000-8001", portBindings)
 	if err != nil {
 		t.Fatal(err)
 	}

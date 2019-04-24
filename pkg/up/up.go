@@ -317,10 +317,10 @@ func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) 
 			servicePorts := make([]v1.ServicePort, len(dcService.Ports))
 			for i, port := range dcService.Ports {
 				servicePorts[i] = v1.ServicePort{
-					Name:       fmt.Sprintf("%s%d", port.Protocol, port.InternalPort),
-					Port:       port.InternalPort,
+					Name:       fmt.Sprintf("%s%d", port.Protocol, port.Internal),
+					Port:       port.Internal,
 					Protocol:   v1.Protocol(strings.ToUpper(port.Protocol)),
-					TargetPort: intstr.FromInt(int(port.InternalPort)),
+					TargetPort: intstr.FromInt(int(port.Internal)),
 				}
 			}
 			service := &v1.Service{
@@ -428,13 +428,12 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 		}
 	}
 	var containerPorts []v1.ContainerPort
-	dcPorts := dcService.Ports
-	if len(dcPorts) > 0 {
-		containerPorts = make([]v1.ContainerPort, len(dcPorts))
-		for i, port := range dcPorts {
+	if len(dcService.Ports) > 0 {
+		containerPorts = make([]v1.ContainerPort, len(dcService.Ports))
+		for i, port := range dcService.Ports {
 			containerPorts[i] = v1.ContainerPort{
-				ContainerPort: port.ContainerPort,
-				Protocol:      v1.Protocol(port.Protocol),
+				ContainerPort: port.Internal,
+				Protocol:      v1.Protocol(strings.ToUpper(port.Protocol)),
 			}
 		}
 	}
