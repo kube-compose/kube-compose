@@ -52,7 +52,7 @@ func TestParsePortBindingsRangeLengthMismatch(t *testing.T) {
 
 func TestParsePortBindingsSuccessWithExternal(t *testing.T) {
 	portBindings := []PortBinding{}
-	_, err := parsePortBindings("myhostname:8000-8001:8000-8001/udp", portBindings)
+	_, err := parsePortBindings("127.0.0.1:8000-8001:8000-8001/udp", portBindings)
 	if err != nil {
 		t.Fatal(err)
 	}
