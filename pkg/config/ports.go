@@ -39,6 +39,7 @@ type PortBinding struct {
 //  - "127.0.0.1:5000-5010:5000-5010"
 //  - "6060:6060/udp"
 //  - "12400-12500:1240"
+func parsePortBindings(spec string, portBindings []PortBinding) ([]PortBinding, error) {
 	matches := portBindingSpecRegexp.FindStringSubmatch(spec)
 	if matches == nil {
 		return nil, fmt.Errorf("Invalid port %q, should be [[remote_ip:]remote_port[-remote_port]:]port[/protocol]", s)
@@ -64,6 +65,7 @@ type PortBinding struct {
 		if err != nil {
 			return nil, err
 		}
+		for i := internalMin; i <= internalMax; i++ {
 			internal = append(internal, i)
 		}
 	}
@@ -92,6 +94,7 @@ type PortBinding struct {
 					Host: host,
 				}), nil
 			} else {
+				for i := externalMin; i <= externalMax; i++ {
 					external = append(external, i)
 				}
 			}
@@ -132,6 +135,7 @@ func parsePorts(inputs []port) ([]PortBinding, error) {
 	portBindings := []PortBinding{}
 	for _, input := range inputs {
 		var err error
+		portBindings, err = parsePortBindings(input.Value, portBindings)
 		if err != nil {
 			return nil, err
 		}
