@@ -36,7 +36,7 @@ type Service struct {
 	Healthcheck         *Healthcheck
 	HealthcheckDisabled bool
 	Image               string
-	Ports               []Port
+	Ports               []PortBinding
 	ServiceName         string
 	WorkingDir          string
 

@@ -119,7 +119,7 @@ func TestInterpolateBracesError1(t *testing.T) {
 	m := map[string]string{}
 	_, err := Interpolate("${VAR1?errorMsg1}", mapValueGetter(m), true)
 	if err == nil {
-		t.Fatal()
+		t.Fail()
 	}
 }
 
@@ -129,7 +129,7 @@ func TestInterpolateBracesError2(t *testing.T) {
 	}
 	_, err := Interpolate("${VAR1:?errorMsg1}", mapValueGetter(m), true)
 	if err == nil {
-		t.Fatal(err)
+		t.Fail()
 	}
 }
 
