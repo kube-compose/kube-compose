@@ -35,15 +35,12 @@ type PortBinding struct {
 	Host string
 }
 
-func parsePortUint(portStr string) (int32, error) {
-	port, err := strconv.ParseUint(portStr, 10, 64)
-	if err != nil {
-		return -1, errors.Wrap(err, fmt.Sprintf("unsupported port format %s", portStr))
-	}
-	if port >= 65536 {
-		return -1, fmt.Errorf("port must be < 65536 but got %d", port)
-	}
-	return int32(port), nil
+type PortBinding struct {
+	Internal 	int32 	// the internal port; the port on which the container would listen. At least 0 and less than 65536.
+	ExternalMin int32 	// the minimum external port. At least -1 and less than 65536. -1 if the internal port is not published.
+	ExternalMax	int32 	// the maximum external port. This value is undefined if ExternalMin is -1. Otherwise, at least 0 and less than 65536. Docker will choose from a random available port from the range to map to the internal port.
+	Protocol	string 	// one of "udp", "tcp" and "sctp"
+	Host		string 	// the host (see docker for more details). Can be an empty string if the host was not set in the specification.
 }
 
 // https://docs.docker.com/compose/compose-file/compose-file-v2/
@@ -104,10 +101,10 @@ func parsePortBindings(spec string, portBindings []PortBinding) ([]PortBinding, 
 			externalMax, err := parsePortUint(externalMaxStr)
 			if err != nil {
 				return nil, err
+<<<<<<< HEAD
 			}
 			if len(internal) == 1 {
 				return append(portBindings, PortBinding{
-					Internal:    internal[0],
 					ExternalMin: externalMin,
 					ExternalMax: externalMax,
 					Protocol:    protocol,
@@ -134,10 +131,10 @@ func parsePortBindings(spec string, portBindings []PortBinding) ([]PortBinding, 
 			portBinding.ExternalMin = external[j]
 			portBinding.ExternalMax = external[j]
 		}
-		portBindings = append(portBindings, portBinding)
-	}
-	return portBindings, nil
-}
+=======
+			}
+			if len(internal) == 1 {
+				return append(portBindings, PortBinding{
 
 func parsePortUint(portStr string) (int32, error) {
 	port, err := strconv.ParseUint(portStr, 10, 64)
@@ -154,7 +151,10 @@ func parsePorts(inputs []port) ([]PortBinding, error) {
 	portBindings := []PortBinding{}
 	for _, input := range inputs {
 		var err error
+<<<<<<< HEAD
 		portBindings, err = parsePortBindings(input.Value, portBindings)
+=======
+>>>>>>> b024d2b... fix jbrekelmans/kube-compose#31: support port ranges and full docker port bindings in config module
 		if err != nil {
 			return nil, err
 		}

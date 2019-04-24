@@ -309,11 +309,7 @@ func parseServiceYAML2_1(serviceYAML *service2_1) (*Service, error) {
 			value = strconv.FormatInt(*pair.Value.Int64Value, 10)
 		case pair.Value.FloatValue != nil:
 			value = strconv.FormatFloat(*pair.Value.FloatValue, 'g', -1, 64)
-<<<<<<< HEAD
 		default:
-=======
-		} else {
->>>>>>> f0ba06a... issue #39: improve comment
 			// Environment variables with null values in the YAML are ignored.
 			// This was tested with docker-compose.null-env.yml.
 			continue
