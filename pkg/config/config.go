@@ -227,9 +227,8 @@ func parseCompose2_1(composeYAML *composeFile2_1, dockerComposeFile *CanonicalCo
 
 			service := dockerComposeFile.Services[name]
 			extendedService := dockerComposeFile.Services[serviceYAML.Extends.Service]
+			// Perform merge
 			merge(service, extendedService)
-			fmt.Println(extendedServiceYAML)
-			// Perform merge...
 			// TODO https://github.com/docker/compose/blob/master/compose/config/config.py#L1092
 		}
 	}
