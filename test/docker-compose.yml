@@ -1,3 +1,12 @@
+# version: '3'
+# services:
+#   web:
+#     image: nginx
+#     ports:
+#      - "5000:5000"
+#   redis:
+#     image: "redis:alpine"
+
 version: "2.1"
 services:
   authentication-service:
@@ -7,14 +16,14 @@ services:
     - ASDF=10
     - HENK
     depends_on:
-      db:
+      permission-service-b:
         condition: service_healthy
     environment:
       DB_URL: postgresql://db:5432
     ports:
     - "8080"
     working_dir: /app/test
-  permission-service:
+  permission-service-b:
     entrypoint: ["/bin/bash", "-c", "STOP=0; trap 'STOP=1' INT; while [[ $$STOP -eq 0 ]]; do sleep 1; done"]
     image: ubuntu:latest
     environment:
@@ -22,7 +31,7 @@ services:
       ENVVAR_INT: 23
       ENVVAR_FLOAT1: 23.15
       ENVVAR_FLOAT2: 2312934891234981234.15123412384718237481723412341234
-      ENVVAR_NULL:
+      ENVVAR_NULL: 
     healthcheck:
       disable: true
     ports:
@@ -30,8 +39,13 @@ services:
     - 8081
     - 8082:8082
     working_dir: /app/test
-  db:
-    image: postgres:$BLA
+    depends_on:
+      web1-b1:  
+        condition: service_healthy 
+      web1-b2:  
+        condition: service_healthy   
+  db-c2:
+    image: postgres:latest 
     healthcheck:
       test:
       - CMD-SHELL
@@ -39,8 +53,26 @@ services:
       - 'pg_isready -U postgres || exit 1'
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 5   
+  web1-b1:
+    image: nginx
+    ports:
+     - "5000:5000"   
+    depends_on:
+      web1-c1:  
+        condition: service_healthy   
+  web1-b2:
+    image: nginx
+    ports:
+     - "5000:5000"  
+  web1-c1:
+    image: nginx
+    ports:
+     - "5000:5000" 
+    depends_on:
+      db-c2:  
+        condition: service_healthy     
 
-x-kube-compose:
-  push_images:
-    docker_registry: 'localhost:5000'
+# x-kube-compose:
+#   push_images:
+#     docker_registry: 'localhost:5000'

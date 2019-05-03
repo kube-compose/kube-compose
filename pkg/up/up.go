@@ -2,6 +2,7 @@ package up
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -16,7 +17,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
 	"k8s.io/client-go/kubernetes"
 	clientV1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
@@ -72,18 +72,19 @@ type localImagesCacheOrError struct {
 }
 
 type upRunner struct {
-	apps                 map[string]*app
-	appsWithoutPods      map[*app]bool
-	cfg                  *config.Config
-	ctx                  context.Context
-	dockerClient         *dockerClient.Client
-	localImagesCache     localImagesCacheOrError
-	localImagesCacheOnce *sync.Once
-	k8sClientset         *kubernetes.Clientset
-	k8sServiceClient     clientV1.ServiceInterface
-	k8sPodClient         clientV1.PodInterface
-	hostAliasesOnce      *sync.Once
-	hostAliases          hostAliasesOrError
+	apps                  map[string]*app
+	appsThatNeedToBeReady map[*app]bool
+	appsWithoutPods       map[*app]bool
+	cfg                   *config.Config
+	ctx                   context.Context
+	dockerClient          *dockerClient.Client
+	localImagesCache      localImagesCacheOrError
+	localImagesCacheOnce  *sync.Once
+	k8sClientset          *kubernetes.Clientset
+	k8sServiceClient      clientV1.ServiceInterface
+	k8sPodClient          clientV1.PodInterface
+	hostAliasesOnce       *sync.Once
+	hostAliases           hostAliasesOrError
 }
 
 func (u *upRunner) initKubernetesClientset() error {
@@ -97,8 +98,47 @@ func (u *upRunner) initKubernetesClientset() error {
 	return nil
 }
 
+func contains(arr []string, str string) bool {
+	for _, a := range arr {
+		if a == str {
+			return true
+		}
+	}
+	return false
+}
+
+func (u *upRunner) podsToBeCreated() error {
+	appNames := make([]string, len(u.apps))
+	podsRequired := []string{}
+	n := 0
+	for _, app := range u.apps {
+		if contains(u.cfg.Services, app.name) {
+			appNames[n] = app.name
+			n++
+			for n > 0 {
+				appName := appNames[n-1]
+				n--
+				for dependencyApp := range u.cfg.CanonicalComposeFile.Services[appName].DependsOn {
+					appNames[n] = u.apps[dependencyApp.ServiceName].name
+					n++
+				}
+				podsRequired = append(podsRequired, appName)
+			}
+		} else if len(u.cfg.Services) == 0 {
+			podsRequired = append(podsRequired, app.name)
+		}
+	}
+	for app := range u.appsWithoutPods {
+		if !contains(podsRequired, app.name) {
+			delete(u.appsWithoutPods, app)
+		}
+	}
+	return nil
+}
+
 func (u *upRunner) initApps() error {
 	u.apps = make(map[string]*app, len(u.cfg.CanonicalComposeFile.Services))
+	u.appsThatNeedToBeReady = map[*app]bool{}
 	u.appsWithoutPods = make(map[*app]bool, len(u.cfg.CanonicalComposeFile.Services))
 	for name, dcService := range u.cfg.CanonicalComposeFile.Services {
 		app := &app{
@@ -109,6 +149,9 @@ func (u *upRunner) initApps() error {
 		u.appsWithoutPods[app] = true
 		app.hasService = len(dcService.Ports) > 0
 		u.apps[name] = app
+	}
+	if err := u.podsToBeCreated(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -337,7 +380,9 @@ func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) 
 			u.initResourceObjectMeta(&service.ObjectMeta, app.nameEncoded, app.name)
 			_, err := u.k8sServiceClient.Create(service)
 			if err != nil {
-				return nil, err
+				if err.Error() != errors.New("services \""+service.Name+"\" already exists").Error() {
+					return nil, err
+				}
 			}
 			fmt.Printf("app %s: created service %s\n", app.name, service.ObjectMeta.Name)
 		}
@@ -474,10 +519,12 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 		},
 	}
 	u.initResourceObjectMeta(&pod.ObjectMeta, app.nameEncoded, app.name)
+
 	podServer, err := u.k8sPodClient.Create(pod)
 	if err != nil {
 		return podServer, err
 	}
+	u.appsThatNeedToBeReady[app] = true
 	return podServer, nil
 }
 
@@ -519,6 +566,7 @@ func parsePodStatus(pod *v1.Pod) (podStatus, error) {
 }
 
 func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
+
 	app, err := u.findAppFromResourceObjectMeta(&pod.ObjectMeta)
 	if err != nil {
 		return err
@@ -597,17 +645,16 @@ func (u *upRunner) run() error {
 	}
 	u.dockerClient = dockerClient
 
-	for _, app := range u.apps {
+	for app := range u.appsWithoutPods {
 		// Begin pulling and pushing images immediately...
 		//nolint
 		go u.getAppImageOnce(app)
 	}
 	// Begin creating services and collecting their cluster IPs (we'll need this to
 	// set the hostAliases of each pod)
-	//nolint
+	// nolint
 	go u.createServicesAndGetPodHostAliasesOnce()
-
-	for _, app := range u.apps {
+	for app := range u.appsWithoutPods {
 		if len(u.cfg.CanonicalComposeFile.Services[app.name].DependsOn) == 0 {
 			pod, err := u.createPod(app)
 			if err != nil {
@@ -671,7 +718,7 @@ func (u *upRunner) run() error {
 			return err
 		}
 		allPodsReady := true
-		for _, app := range u.apps {
+		for app := range u.appsThatNeedToBeReady {
 			if app.maxObservedPodStatus != podStatusReady {
 				allPodsReady = false
 			}
@@ -680,7 +727,7 @@ func (u *upRunner) run() error {
 			break
 		}
 	}
-	fmt.Printf("pods ready (%d/%d)\n", len(u.apps), len(u.apps))
+	fmt.Printf("pods ready (%d/%d)\n", len(u.appsThatNeedToBeReady), len(u.appsThatNeedToBeReady))
 	return nil
 }
 
