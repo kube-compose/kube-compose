@@ -26,6 +26,9 @@ import (
 	k8swatch "k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	clientV1 "k8s.io/client-go/kubernetes/typed/core/v1"
+
+	k8sError "k8s.io/apimachinery/pkg/api/errors"
+
 )
 
 type podStatus int
@@ -86,6 +89,7 @@ type localImagesCache struct {
 type upRunner struct {
 	apps                  map[string]*app
 	appsThatNeedToBeReady map[*app]bool
+<<<<<<< HEAD
 	appsToBeStarted       map[*app]bool
 	cfg                   *config.Config
 	ctx                   context.Context
@@ -97,6 +101,19 @@ type upRunner struct {
 	hostAliases           hostAliases
 	completedChannels     []chan interface{}
 	maxServiceNameLength  int
+=======
+	appsWithoutPods       map[*app]bool
+	cfg                   *config.Config
+	ctx                   context.Context
+	dockerClient          *dockerClient.Client
+	localImagesCache      localImagesCacheOrError
+	localImagesCacheOnce  *sync.Once
+	k8sClientset          *kubernetes.Clientset
+	k8sServiceClient      clientV1.ServiceInterface
+	k8sPodClient          clientV1.PodInterface
+	hostAliasesOnce       *sync.Once
+	hostAliases           hostAliasesOrError
+>>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
 }
 
 func (u *upRunner) initKubernetesClientset() error {
@@ -110,6 +127,7 @@ func (u *upRunner) initKubernetesClientset() error {
 	return nil
 }
 
+<<<<<<< HEAD
 func (u *upRunner) initAppsToBeStarted() {
 	u.appsToBeStarted = map[*app]bool{}
 	colorIndex := 0
@@ -134,6 +152,42 @@ func (u *upRunner) initApps() {
 	u.apps = make(map[string]*app, len(u.cfg.CanonicalComposeFile.Services))
 	u.appsThatNeedToBeReady = map[*app]bool{}
 	for name, composeService := range u.cfg.CanonicalComposeFile.Services {
+=======
+func (u *upRunner) initAppsToBeStarted() error {
+	appNames := make([]string, len(u.apps))
+	podsRequired := []string{}
+	n := 0
+	for _, app := range u.apps {
+		if contains(u.cfg.Services, app.name) {
+			appNames[n] = app.name
+			n++
+			for n > 0 {
+				appName := appNames[n-1]
+				n--
+				for dependencyApp := range u.cfg.CanonicalComposeFile.Services[appName].DependsOn {
+					appNames[n] = u.apps[dependencyApp.ServiceName].name
+					n++
+				}
+				podsRequired = append(podsRequired, appName)
+			}
+		} else if len(u.cfg.Services) == 0 {
+			podsRequired = append(podsRequired, app.name)
+		}
+	}
+	for app := range u.appsWithoutPods {
+		if !contains(podsRequired, app.name) {
+			delete(u.appsWithoutPods, app)
+		}
+	}
+	return nil
+}
+
+func (u *upRunner) initApps() error {
+	u.apps = make(map[string]*app, len(u.cfg.CanonicalComposeFile.Services))
+	u.appsThatNeedToBeReady = map[*app]bool{}
+	u.appsWithoutPods = make(map[*app]bool, len(u.cfg.CanonicalComposeFile.Services))
+	for name, dcService := range u.cfg.CanonicalComposeFile.Services {
+>>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
 		app := &app{
 			name:                                 name,
 			composeService:                       composeService,
@@ -143,6 +197,25 @@ func (u *upRunner) initApps() {
 		app.hasService = len(composeService.Ports) > 0
 		u.apps[name] = app
 	}
+<<<<<<< HEAD
+=======
+	if err := u.initAppsToBeStarted(); err != nil {
+		return err
+	}
+	return nil
+}
+func (u *upRunner) initResourceObjectMeta(objectMeta *metav1.ObjectMeta, nameEncoded, name string) {
+	objectMeta.Name = nameEncoded + "-" + u.cfg.EnvironmentID
+	if objectMeta.Labels == nil {
+		objectMeta.Labels = map[string]string{}
+	}
+	objectMeta.Labels["app"] = nameEncoded
+	objectMeta.Labels[u.cfg.EnvironmentLabel] = u.cfg.EnvironmentID
+	if objectMeta.Annotations == nil {
+		objectMeta.Annotations = map[string]string{}
+	}
+	objectMeta.Annotations[annotationName] = name
+>>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
 }
 
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
@@ -368,6 +441,7 @@ func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) 
 				Protocol:   v1.Protocol(strings.ToUpper(port.Protocol)),
 				TargetPort: intstr.FromInt(int(port.Internal)),
 			}
+<<<<<<< HEAD
 		}
 		service := &v1.Service{
 			Spec: v1.ServiceSpec{
@@ -385,6 +459,29 @@ func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) 
 			return nil, err
 		default:
 			fmt.Printf("app %s: service %s created\n", app.name, service.ObjectMeta.Name)
+=======
+			service := &v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: servicePorts,
+					Selector: map[string]string{
+						"app":                  app.nameEncoded,
+						u.cfg.EnvironmentLabel: u.cfg.EnvironmentID,
+					},
+					// This is the default value.
+					// Type: v1.ServiceType("ClusterIP"),
+				},
+			}
+			u.initResourceObjectMeta(&service.ObjectMeta, app.nameEncoded, app.name)
+			_, err := u.k8sServiceClient.Create(service)
+
+			if k8sError.IsAlreadyExists(err) {
+				fmt.Printf("app %s: service %s already exists\n", app.name, service.ObjectMeta.Name)
+			} else if err != nil {
+				return nil, err
+			} else {
+				fmt.Printf("app %s: created service %s\n", app.name, service.ObjectMeta.Name)
+			}
+>>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
 		}
 	}
 	if expectedServiceCount == 0 {
@@ -497,6 +594,7 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 		return nil, err
 	}
 
+<<<<<<< HEAD
 	var securityContext *v1.PodSecurityContext
 	if u.cfg.RunAsUser {
 		securityContext = &v1.PodSecurityContext{
@@ -506,6 +604,8 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 			securityContext.RunAsGroup = app.imageInfo.user.GID
 		}
 	}
+=======
+>>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
 	pod := &v1.Pod{
 		Spec: v1.PodSpec{
 			// new(bool) allocates a bool, sets it to false, and returns a pointer to it.
@@ -583,7 +683,11 @@ func parsePodStatus(pod *v1.Pod) (podStatus, error) {
 // nolint
 func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 
+<<<<<<< HEAD
 	app, err := u.findAppFromObjectMeta(&pod.ObjectMeta)
+=======
+	app, err := u.findAppFromResourceObjectMeta(&pod.ObjectMeta)
+>>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
 	if err != nil {
 		return err
 	}
@@ -700,7 +804,11 @@ func (u *upRunner) run() error {
 	}
 	u.dockerClient = dc
 
+<<<<<<< HEAD
 	for app := range u.appsToBeStarted {
+=======
+	for app := range u.appsWithoutPods {
+>>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
 		// Begin pulling and pushing images immediately...
 		//nolint
 		go u.getAppImageInfoOnce(app)
@@ -709,6 +817,7 @@ func (u *upRunner) run() error {
 	// set the hostAliases of each pod)
 	// nolint
 	go u.createServicesAndGetPodHostAliasesOnce()
+<<<<<<< HEAD
 	for app := range u.appsToBeStarted {
 		if len(app.composeService.DependsOn) != 0 {
 			continue
@@ -717,6 +826,16 @@ func (u *upRunner) run() error {
 		pod, err = u.createPod(app)
 		if err != nil {
 			return err
+=======
+	for app := range u.appsWithoutPods {
+		if len(u.cfg.CanonicalComposeFile.Services[app.name].DependsOn) == 0 {
+			pod, err := u.createPod(app)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("app %s: created pod %s because all its dependency conditions are met\n", app.name, pod.ObjectMeta.Name)
+			delete(u.appsWithoutPods, app)
+>>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
 		}
 		fmt.Printf("app %s: created pod %s because all its dependency conditions are met\n", app.name, pod.ObjectMeta.Name)
 		delete(u.appsToBeStarted, app)
@@ -779,20 +898,34 @@ func (u *upRunner) run() error {
 		default:
 			return fmt.Errorf("got unexpected error event from channel: %+v", event.Object)
 		}
+
 		err = u.createPodsIfNeeded()
 		if err != nil {
 			return err
 		}
+<<<<<<< HEAD
 		if u.checkIfPodsReady() {
+=======
+		allPodsReady := true
+		for app := range u.appsThatNeedToBeReady {
+			if app.maxObservedPodStatus != podStatusReady {
+				allPodsReady = false
+			}
+		}
+		if allPodsReady {
+>>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
 			break
 		}
 	}
 	fmt.Printf("pods ready (%d/%d)\n", len(u.appsThatNeedToBeReady), len(u.appsThatNeedToBeReady))
+<<<<<<< HEAD
 	// Wait for completed channels
 	for _, completedChannel := range u.completedChannels {
 		<-completedChannel
 	}
 
+=======
+>>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
 	return nil
 }
 

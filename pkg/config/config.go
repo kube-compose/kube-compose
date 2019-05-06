@@ -55,6 +55,7 @@ type PushImagesConfig struct {
 
 type Config struct {
 	CanonicalComposeFile CanonicalComposeFile
+<<<<<<< HEAD
 
 	Detach bool
 
@@ -72,6 +73,14 @@ type Config struct {
 
 	// A subset of docker compose services to start and stop.
 	filter map[string]bool
+=======
+	EnvironmentID        string // All Kubernetes resources are named with "-"+EnvironmentID as a suffix, and have an additional label "env="+EnvironmentID so that namespaces can be shared.
+	EnvironmentLabel     string
+	KubeConfig           *rest.Config
+	Namespace            string
+	PushImages           *PushImagesConfig
+	Services             []string
+>>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
 }
 
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64

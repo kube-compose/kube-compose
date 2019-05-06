@@ -2,7 +2,12 @@ package cmd
 
 import (
 	"github.com/jbrekelmans/kube-compose/pkg/config"
+<<<<<<< HEAD
 	"github.com/spf13/cobra"
+=======
+	"github.com/urfave/cli"
+	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+>>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
 
 	// Plugin does not export any functions therefore it is ignored IE. "_"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -26,6 +31,7 @@ func setFromKubeConfig(cfg *config.Config) error {
 	return nil
 }
 
+<<<<<<< HEAD
 func getFileFlag(cmd *cobra.Command) (*string, error) {
 	var file *string
 	if cmd.Flags().Changed("file") {
@@ -35,6 +41,15 @@ func getFileFlag(cmd *cobra.Command) (*string, error) {
 		}
 		file = new(string)
 		*file = fileStr
+=======
+func updateConfigFromCli(cfg *config.Config, c *cli.Context) error {
+	environmentID := c.GlobalString(environmentIDFlagName)
+	cfg.Services = c.Args()
+	if len(environmentID) == 0 && !c.GlobalIsSet(environmentIDFlagName) {
+		return fmt.Errorf("the environment id is required")
+	} else if len(environmentID) == 0 {
+		return fmt.Errorf("environment id must not be empty")
+>>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
 	}
 	return file, nil
 }
