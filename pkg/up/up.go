@@ -373,11 +373,12 @@ func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) 
 			}
 			u.initResourceObjectMeta(&service.ObjectMeta, app.nameEncoded, app.name)
 			_, err := u.k8sServiceClient.Create(service)
+
 			if k8sError.IsAlreadyExists(err) {
-				fmt.Printf("service %s already exists\n", service.Name)
-			}else if err != nil {
-				 return nil, err
-			}else{
+				fmt.Printf("app %s: service %s already exists\n", app.name, service.ObjectMeta.Name)
+			} else if err != nil {
+				return nil, err
+			} else {
 				fmt.Printf("app %s: created service %s\n", app.name, service.ObjectMeta.Name)
 			}
 		}
