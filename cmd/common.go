@@ -5,6 +5,7 @@ import (
 
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	"github.com/urfave/cli"
+	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -52,6 +53,7 @@ func newConfigFromEnv() (*config.Config, error) {
 
 func updateConfigFromCli(cfg *config.Config, c *cli.Context) error {
 	environmentID := c.GlobalString(environmentIDFlagName)
+	cfg.Services = c.Args()
 	if len(environmentID) == 0 && !c.GlobalIsSet(environmentIDFlagName) {
 		return fmt.Errorf("the environment id is required")
 	} else if len(environmentID) == 0 {
