@@ -229,3 +229,12 @@ func pushImageWithLogging(ctx context.Context, dockerClient *dockerClient.Client
 	fmt.Printf("app %s: pushing image %s (%.1f%%) @%s\n", appName, image, 100.0, digest)
 	return digest, err
 }
+
+func contains(arr []string, str string) bool {
+	for _, a := range arr {
+		if a == str {
+			return true
+		}
+	}
+	return false
+}
