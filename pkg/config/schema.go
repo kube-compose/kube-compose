@@ -201,6 +201,7 @@ type extends struct {
 	Service string
 }
 
+// Used by mapdecode package
 func (e *extends) Decode(into mapdecode.Into) error {
 	var serviceName string
 	err := into(&serviceName)
