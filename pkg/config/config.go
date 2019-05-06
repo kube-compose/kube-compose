@@ -174,23 +174,27 @@ func parseCompose2_1(composeYAML *composeFile2_1, dockerComposeFile *CanonicalCo
 			}
 			service.ServiceName = name
 			dockerComposeFile.Services[name] = service
-			for dependsOnService := range serviceYAML.DependsOn.Values {
-				if _, ok := composeYAML.Services[dependsOnService]; !ok {
-					return fmt.Errorf("service %s refers to a non-existing service in depends_on: %s", name, dependsOnService)
+			if serviceYAML.DependsOn != nil {
+				for dependsOnService := range serviceYAML.DependsOn.Values {
+					if _, ok := composeYAML.Services[dependsOnService]; !ok {
+						return fmt.Errorf("service %s refers to a non-existing service in depends_on: %s", name, dependsOnService)
+					}
 				}
 			}
 		}
 		for name1, serviceYAML := range composeYAML.Services {
 			service1 := dockerComposeFile.Services[name1]
 			service1.DependsOn = map[*Service]ServiceHealthiness{}
-			for name2, serviceHealthiness := range serviceYAML.DependsOn.Values {
-				service2 := dockerComposeFile.Services[name2]
-				service1.DependsOn[service2] = serviceHealthiness
+			if serviceYAML.DependsOn != nil {
+				for name2, serviceHealthiness := range serviceYAML.DependsOn.Values {
+					service2 := dockerComposeFile.Services[name2]
+					service1.DependsOn[service2] = serviceHealthiness
+				}
 			}
 		}
 		for _, service := range dockerComposeFile.Services {
 
-			// Reset the visisted marker on each service. This is a precondition of ensureNoDependsOnCycle.
+			// Reset the visited marker on each service. This is a precondition of ensureNoDependsOnCycle.
 			for _, service := range dockerComposeFile.Services {
 				service.visited = false
 			}
@@ -200,6 +204,32 @@ func parseCompose2_1(composeYAML *composeFile2_1, dockerComposeFile *CanonicalCo
 			if err != nil {
 				return err
 			}
+		}
+
+		// Handle extends, cannot extend a service that has depends_on
+		for name, serviceYAML := range composeYAML.Services {
+			if serviceYAML.Extends == nil {
+				continue
+			}
+			if serviceYAML.Extends.File != nil {
+				// TODO https://github.com/jbrekelmans/kube-compose/issues/43
+				return fmt.Errorf("extends with file is not supported")
+			}
+			extendedServiceYAML, ok := composeYAML.Services[serviceYAML.Extends.Service]
+			if !ok {
+				return fmt.Errorf("service %s refers to a non-existing service in extends: %s", name, serviceYAML.Extends.Service)
+			}
+			if extendedServiceYAML.DependsOn != nil {
+				return fmt.Errorf("cannot extend service %s: services with 'depends_on' cannot be extended", serviceYAML.Extends.Service)
+			}
+			// TODO check for links, volumes_from, net and network_mode as per:
+			// https://github.com/docker/compose/blob/master/compose/config/config.py#L695
+
+			service := dockerComposeFile.Services[name]
+			extendedService := dockerComposeFile.Services[serviceYAML.Extends.Service]
+			// Perform merge
+			merge(service, extendedService)
+			// TODO https://github.com/docker/compose/blob/master/compose/config/config.py#L1092
 		}
 	}
 	return nil
