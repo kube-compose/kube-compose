@@ -2,7 +2,6 @@ package up
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -14,11 +13,16 @@ import (
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	k8sUtil "github.com/jbrekelmans/kube-compose/pkg/k8s"
 	digest "github.com/opencontainers/go-digest"
+	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
 	"k8s.io/client-go/kubernetes"
 	clientV1 "k8s.io/client-go/kubernetes/typed/core/v1"
+
+	k8sError "k8s.io/apimachinery/pkg/api/errors"
+
 )
 
 func errorResourcesModifiedExternally() error {
@@ -98,16 +102,7 @@ func (u *upRunner) initKubernetesClientset() error {
 	return nil
 }
 
-func contains(arr []string, str string) bool {
-	for _, a := range arr {
-		if a == str {
-			return true
-		}
-	}
-	return false
-}
-
-func (u *upRunner) podsToBeCreated() error {
+func (u *upRunner) initAppsToBeStarted() error {
 	appNames := make([]string, len(u.apps))
 	podsRequired := []string{}
 	n := 0
@@ -150,7 +145,7 @@ func (u *upRunner) initApps() error {
 		app.hasService = len(dcService.Ports) > 0
 		u.apps[name] = app
 	}
-	if err := u.podsToBeCreated(); err != nil {
+	if err := u.initAppsToBeStarted(); err != nil {
 		return err
 	}
 	return nil
@@ -379,12 +374,13 @@ func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) 
 			}
 			u.initResourceObjectMeta(&service.ObjectMeta, app.nameEncoded, app.name)
 			_, err := u.k8sServiceClient.Create(service)
-			if err != nil {
-				if err.Error() != errors.New("services \""+service.Name+"\" already exists").Error() {
-					return nil, err
-				}
+			if k8sError.IsAlreadyExists(err) {
+				fmt.Printf("services %s already exists\n", service.Name)
+			}else if err != nil {
+				 return nil, err
+			}else{
+				fmt.Printf("app %s: created service %s\n", app.name, service.ObjectMeta.Name)
 			}
-			fmt.Printf("app %s: created service %s\n", app.name, service.ObjectMeta.Name)
 		}
 	}
 	if expectedServiceCount == 0 {
@@ -499,6 +495,7 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	pod := &v1.Pod{
 		Spec: v1.PodSpec{
 			AutomountServiceAccountToken: newFalsePointer(),
@@ -519,7 +516,6 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 		},
 	}
 	u.initResourceObjectMeta(&pod.ObjectMeta, app.nameEncoded, app.name)
-
 	podServer, err := u.k8sPodClient.Create(pod)
 	if err != nil {
 		return podServer, err
@@ -713,6 +709,7 @@ func (u *upRunner) run() error {
 		} else {
 			return fmt.Errorf("got unexpected error event from channel: %+v", event.Object)
 		}
+
 		err = u.createPodsIfNeeded()
 		if err != nil {
 			return err
