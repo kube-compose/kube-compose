@@ -9,7 +9,7 @@ func merge(service *Service, extendedService *Service) {
 
 func mergeStringMap(intoStringMap map[string]string, fromStringMap map[string]string) {
 	for k, v := range fromStringMap {
-		if _, ok := intoStringMap[k]; ok {
+		if _, ok := intoStringMap[k]; !ok {
 			intoStringMap[k] = v
 		}
 	}
