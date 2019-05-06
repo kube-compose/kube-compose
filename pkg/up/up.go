@@ -13,7 +13,6 @@ import (
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	k8sUtil "github.com/jbrekelmans/kube-compose/pkg/k8s"
 	digest "github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -375,7 +374,7 @@ func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) 
 			u.initResourceObjectMeta(&service.ObjectMeta, app.nameEncoded, app.name)
 			_, err := u.k8sServiceClient.Create(service)
 			if k8sError.IsAlreadyExists(err) {
-				fmt.Printf("services %s already exists\n", service.Name)
+				fmt.Printf("service %s already exists\n", service.Name)
 			}else if err != nil {
 				 return nil, err
 			}else{
