@@ -56,6 +56,7 @@ type Config struct {
 	KubeConfig           *rest.Config
 	Namespace            string
 	PushImages           *PushImagesConfig
+	Services             []string
 }
 
 func New() (*Config, error) {
