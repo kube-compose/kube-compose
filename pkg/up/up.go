@@ -13,6 +13,7 @@ import (
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	k8sUtil "github.com/jbrekelmans/kube-compose/pkg/k8s"
 	digest "github.com/opencontainers/go-digest"
+	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -137,7 +138,7 @@ func (u *upRunner) getAppImage(app *app) (*config.Healthcheck, string, error) {
 	// Use the same interpretation of images as docker-compose (use ParseAnyReferenceWithSet)
 	sourceImageRef, err := dockerRef.ParseAnyReferenceWithSet(sourceImage, localImageIDSet)
 	if err != nil {
-		return nil, "", err
+		return nil, "", errors.Wrap(err, fmt.Sprintf("error while parsing image %s", sourceImage))
 	}
 
 	// We need the image locally always, so we can parse its healthcheck
