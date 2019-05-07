@@ -33,10 +33,10 @@ type podStatus int
 
 const (
 	annotationName             = "kube-compose/service"
-	podStatusReady   podStatus = 2
-	podStatusStarted podStatus = 1
-	podStatusOther   podStatus = 0
-	podStatusCompleted podStatus = 3
+	podStatusReady      podStatus = 2
+	podStatusStarted    podStatus = 1
+	podStatusOther      podStatus = 0
+	podStatusCompleted  podStatus = 3
 )
 
 func (podStatus *podStatus) String() string {
@@ -45,7 +45,7 @@ func (podStatus *podStatus) String() string {
 		return "ready"
 	case podStatusStarted:
 		return "started"
-  case podStatusCompleted:
+	case podStatusCompleted:
 		return "completed"
 	}
 	return "other"
@@ -550,7 +550,7 @@ func parsePodStatus(pod *v1.Pod) (podStatus, error) {
 					t.Message,
 				)
 			}
-			return 3, nil
+			return podStatusCompleted, nil
 		}
 
 		if w := containerStatus.State.Waiting; w != nil && w.Reason == "ErrImagePull" {
@@ -743,7 +743,7 @@ func (u *upRunner) run() error {
 func (u *upRunner) checkIfPodsReady() bool{
 	allPodsReady := true
 	for app := range u.appsThatNeedToBeReady {
-		if !(app.maxObservedPodStatus == podStatusReady || app.maxObservedPodStatus == podStatusCompleted)  {
+		if app.maxObservedPodStatus < podStatusReady {
 			allPodsReady = false
 		}
 	}
