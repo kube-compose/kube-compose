@@ -46,6 +46,7 @@ linters:
     - maligned
     - prealloc
     - gochecknoglobals
+    - depguard
 
 run:
   skip-dirs:
