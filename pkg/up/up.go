@@ -518,8 +518,10 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	}
 	u.initResourceObjectMeta(&pod.ObjectMeta, app.nameEncoded, app.name)
 	podServer, err := u.k8sPodClient.Create(pod)
-	if err != nil {
-		return podServer, err
+	if k8sError.IsAlreadyExists(err) {
+		fmt.Printf("app %s: pod %s already exists\n", app.name, app.nameEncoded)
+	} else if err != nil {
+		return nil, err
 	}
 	u.appsThatNeedToBeReady[app] = true
 	return podServer, nil
@@ -575,6 +577,7 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 	if err != nil {
 		return err
 	}
+
 	if podStatus > app.maxObservedPodStatus {
 		app.maxObservedPodStatus = podStatus
 		fmt.Printf("app %s: pod status %s\n", app.name, &app.maxObservedPodStatus)
@@ -679,6 +682,12 @@ func (u *upRunner) run() error {
 	if err != nil {
 		return err
 	}
+
+	if u.checkIfPodsReady(){
+		fmt.Printf("pods ready (%d/%d)\n", len(u.appsThatNeedToBeReady), len(u.appsThatNeedToBeReady))
+		return nil
+	}
+
 	listOptions.ResourceVersion = podList.ResourceVersion
 	listOptions.Watch = true
 	watch, err := u.k8sPodClient.Watch(listOptions)
@@ -688,6 +697,7 @@ func (u *upRunner) run() error {
 	defer watch.Stop()
 	eventChannel := watch.ResultChan()
 	for {
+
 		event, ok := <-eventChannel
 		if !ok {
 			return fmt.Errorf("channel unexpectedly closed")
@@ -715,18 +725,23 @@ func (u *upRunner) run() error {
 		if err != nil {
 			return err
 		}
-		allPodsReady := true
-		for app := range u.appsThatNeedToBeReady {
-			if app.maxObservedPodStatus != podStatusReady {
-				allPodsReady = false
-			}
-		}
-		if allPodsReady {
+
+		if u.checkIfPodsReady() {
 			break
 		}
 	}
 	fmt.Printf("pods ready (%d/%d)\n", len(u.appsThatNeedToBeReady), len(u.appsThatNeedToBeReady))
 	return nil
+}
+
+func (u *upRunner) checkIfPodsReady() bool{
+	allPodsReady := true
+	for app := range u.appsThatNeedToBeReady {
+		if app.maxObservedPodStatus != podStatusReady {
+			allPodsReady = false
+		}
+	}
+	return allPodsReady
 }
 
 // Run runs an operation similar docker-compose up against a Kubernetes cluster.
