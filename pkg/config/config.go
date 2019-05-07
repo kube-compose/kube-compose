@@ -57,6 +57,7 @@ type Config struct {
 	Namespace            string
 	PushImages           *PushImagesConfig
 	Services             []string
+	Detach               bool
 }
 
 func New() (*Config, error) {
