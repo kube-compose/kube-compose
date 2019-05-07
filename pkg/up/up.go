@@ -1,6 +1,7 @@
 package up
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"strings"
@@ -22,7 +23,6 @@ import (
 	clientV1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	k8sError "k8s.io/apimachinery/pkg/api/errors"
-
 )
 
 func errorResourcesModifiedExternally() error {
@@ -55,13 +55,14 @@ type appImage struct {
 }
 
 type app struct {
-	serviceClusterIP     string
-	appImage             *appImage
-	appImageOnce         *sync.Once
-	hasService           bool
-	maxObservedPodStatus podStatus
-	name                 string
-	nameEncoded          string
+	serviceClusterIP                     string
+	appImage                             *appImage
+	appImageOnce                         *sync.Once
+	hasService                           bool
+	maxObservedPodStatus                 podStatus
+	name                                 string
+	nameEncoded                          string
+	containersForWhichWeAreStreamingLogs map[string]bool
 }
 
 type hostAliasesOrError struct {
@@ -89,6 +90,7 @@ type upRunner struct {
 	k8sPodClient          clientV1.PodInterface
 	hostAliasesOnce       *sync.Once
 	hostAliases           hostAliasesOrError
+	completedChannels     []chan interface{}
 }
 
 func (u *upRunner) initKubernetesClientset() error {
@@ -137,9 +139,10 @@ func (u *upRunner) initApps() error {
 	u.appsWithoutPods = make(map[*app]bool, len(u.cfg.CanonicalComposeFile.Services))
 	for name, dcService := range u.cfg.CanonicalComposeFile.Services {
 		app := &app{
-			appImageOnce: &sync.Once{},
-			name:         name,
-			nameEncoded:  k8sUtil.EncodeName(name),
+			appImageOnce:                         &sync.Once{},
+			name:                                 name,
+			nameEncoded:                          k8sUtil.EncodeName(name),
+			containersForWhichWeAreStreamingLogs: make(map[string]bool),
 		}
 		u.appsWithoutPods[app] = true
 		app.hasService = len(dcService.Ports) > 0
@@ -571,6 +574,44 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 	if app == nil {
 		return nil
 	}
+	// For each container of the pod:
+	// 		if the container is running
+	//			// use app.containersForWhichWeAreStreamingLogs to determine the following condition
+	// 			if we are not already streaming logs for the container
+	//				start streaming logs for the container
+	if !u.cfg.Detach {
+		for _, containerStatus := range pod.Status.ContainerStatuses {
+			_, ok := app.containersForWhichWeAreStreamingLogs[containerStatus.Name]
+			if !ok && containerStatus.State.Running != nil {
+				app.containersForWhichWeAreStreamingLogs[containerStatus.Name] = true
+				getPodLogOptions := &v1.PodLogOptions{
+					Follow:    true,
+					Container: containerStatus.Name,
+				}
+				completedChannel := make(chan interface{})
+				u.completedChannels = append(u.completedChannels, completedChannel)
+				go func() {
+					getLogsRequest := u.k8sPodClient.GetLogs(pod.ObjectMeta.Name, getPodLogOptions)
+					bodyReader, err := getLogsRequest.Stream()
+					if err != nil {
+						panic(err)
+					}
+					defer func() {
+						err := bodyReader.Close()
+						if err != nil {
+							fmt.Println(err)
+						}
+					}()
+					scanner := bufio.NewScanner(bodyReader)
+					for scanner.Scan() {
+						logline := app.name + " | " + scanner.Text()
+						fmt.Println(logline)
+					}
+					close(completedChannel)
+				}()
+			}
+		}
+	}
 	podStatus, err := parsePodStatus(pod)
 	if err != nil {
 		return err
@@ -726,6 +767,11 @@ func (u *upRunner) run() error {
 		}
 	}
 	fmt.Printf("pods ready (%d/%d)\n", len(u.appsThatNeedToBeReady), len(u.appsThatNeedToBeReady))
+	// Wait for completed channels
+	for _, completedChannel := range u.completedChannels {
+		<-completedChannel
+	}
+
 	return nil
 }
 
