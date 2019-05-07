@@ -33,9 +33,10 @@ type podStatus int
 
 const (
 	annotationName             = "kube-compose/service"
-	podStatusReady   podStatus = 2
-	podStatusStarted podStatus = 1
-	podStatusOther   podStatus = 0
+	podStatusReady      podStatus = 2
+	podStatusStarted    podStatus = 1
+	podStatusOther      podStatus = 0
+	podStatusCompleted  podStatus = 3
 )
 
 func (podStatus *podStatus) String() string {
@@ -44,6 +45,8 @@ func (podStatus *podStatus) String() string {
 		return "ready"
 	case podStatusStarted:
 		return "started"
+	case podStatusCompleted:
+		return "completed"
 	}
 	return "other"
 }
@@ -518,8 +521,10 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	}
 	u.initResourceObjectMeta(&pod.ObjectMeta, app.nameEncoded, app.name)
 	podServer, err := u.k8sPodClient.Create(pod)
-	if err != nil {
-		return podServer, err
+	if k8sError.IsAlreadyExists(err) {
+		fmt.Printf("app %s: pod %s already exists\n", app.name, app.nameEncoded)
+	} else if err != nil {
+		return nil, err
 	}
 	u.appsThatNeedToBeReady[app] = true
 	return podServer, nil
@@ -535,14 +540,17 @@ func parsePodStatus(pod *v1.Pod) (podStatus, error) {
 	for _, containerStatus := range pod.Status.ContainerStatuses {
 		t := containerStatus.State.Terminated
 		if t != nil {
-			return podStatusOther, fmt.Errorf("aborting because container %s of pod %s terminated (code=%d,signal=%d,reason=%s): %s",
-				containerStatus.Name,
-				pod.ObjectMeta.Name,
-				t.ExitCode,
-				t.Signal,
-				t.Reason,
-				t.Message,
-			)
+			if t.Reason != "Completed" {
+				return podStatusOther, fmt.Errorf("aborting because container %s of pod %s terminated (code=%d,signal=%d,reason=%s): %s",
+					containerStatus.Name,
+					pod.ObjectMeta.Name,
+					t.ExitCode,
+					t.Signal,
+					t.Reason,
+					t.Message,
+				)
+			}
+			return podStatusCompleted, nil
 		}
 
 		if w := containerStatus.State.Waiting; w != nil && w.Reason == "ErrImagePull" {
@@ -575,6 +583,7 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 	if err != nil {
 		return err
 	}
+
 	if podStatus > app.maxObservedPodStatus {
 		app.maxObservedPodStatus = podStatus
 		fmt.Printf("app %s: pod status %s\n", app.name, &app.maxObservedPodStatus)
@@ -679,6 +688,12 @@ func (u *upRunner) run() error {
 	if err != nil {
 		return err
 	}
+
+	if u.checkIfPodsReady(){
+		fmt.Printf("pods ready (%d/%d)\n", len(u.appsThatNeedToBeReady), len(u.appsThatNeedToBeReady))
+		return nil
+	}
+
 	listOptions.ResourceVersion = podList.ResourceVersion
 	listOptions.Watch = true
 	watch, err := u.k8sPodClient.Watch(listOptions)
@@ -688,6 +703,7 @@ func (u *upRunner) run() error {
 	defer watch.Stop()
 	eventChannel := watch.ResultChan()
 	for {
+
 		event, ok := <-eventChannel
 		if !ok {
 			return fmt.Errorf("channel unexpectedly closed")
@@ -715,18 +731,23 @@ func (u *upRunner) run() error {
 		if err != nil {
 			return err
 		}
-		allPodsReady := true
-		for app := range u.appsThatNeedToBeReady {
-			if app.maxObservedPodStatus != podStatusReady {
-				allPodsReady = false
-			}
-		}
-		if allPodsReady {
+
+		if u.checkIfPodsReady() {
 			break
 		}
 	}
 	fmt.Printf("pods ready (%d/%d)\n", len(u.appsThatNeedToBeReady), len(u.appsThatNeedToBeReady))
 	return nil
+}
+
+func (u *upRunner) checkIfPodsReady() bool{
+	allPodsReady := true
+	for app := range u.appsThatNeedToBeReady {
+		if app.maxObservedPodStatus < podStatusReady {
+			allPodsReady = false
+		}
+	}
+	return allPodsReady
 }
 
 // Run runs an operation similar docker-compose up against a Kubernetes cluster.
