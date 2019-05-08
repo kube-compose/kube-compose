@@ -7,6 +7,7 @@ require (
 	github.com/jbrekelmans/jompose v0.0.0-20190407233303-c8a1ac032d84 // indirect
 	github.com/opencontainers/go-digest v1.0.0-rc1
 	github.com/pkg/errors v0.8.1
+	github.com/spf13/cobra v0.0.3 // indirect
 	github.com/uber-go/mapdecode v1.0.0
 	github.com/urfave/cli v1.20.0
 	gopkg.in/yaml.v2 v2.2.2
