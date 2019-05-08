@@ -32,11 +32,11 @@ func errorResourcesModifiedExternally() error {
 type podStatus int
 
 const (
-	annotationName             = "kube-compose/service"
-	podStatusReady      podStatus = 2
-	podStatusStarted    podStatus = 1
-	podStatusOther      podStatus = 0
-	podStatusCompleted  podStatus = 3
+	annotationName               = "kube-compose/service"
+	podStatusReady     podStatus = 2
+	podStatusStarted   podStatus = 1
+	podStatusOther     podStatus = 0
+	podStatusCompleted podStatus = 3
 )
 
 func (podStatus *podStatus) String() string {
@@ -596,10 +596,13 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 					Follow:    true,
 					Container: containerStatus.Name,
 				}
+				// Capture the pod name in a variable. We cannot use the pod variable in the goroutine because it is
+				// invalid after this function returns.
+				podName := pod.ObjectMeta.Name
 				completedChannel := make(chan interface{})
 				u.completedChannels = append(u.completedChannels, completedChannel)
 				go func() {
-					getLogsRequest := u.k8sPodClient.GetLogs(pod.ObjectMeta.Name, getPodLogOptions)
+					getLogsRequest := u.k8sPodClient.GetLogs(podName, getPodLogOptions)
 					bodyReader, err := getLogsRequest.Stream()
 					if err != nil {
 						panic(err)
@@ -730,7 +733,7 @@ func (u *upRunner) run() error {
 		return err
 	}
 
-	if u.checkIfPodsReady(){
+	if u.checkIfPodsReady() {
 		fmt.Printf("pods ready (%d/%d)\n", len(u.appsThatNeedToBeReady), len(u.appsThatNeedToBeReady))
 		return nil
 	}
@@ -786,7 +789,7 @@ func (u *upRunner) run() error {
 	return nil
 }
 
-func (u *upRunner) checkIfPodsReady() bool{
+func (u *upRunner) checkIfPodsReady() bool {
 	allPodsReady := true
 	for app := range u.appsThatNeedToBeReady {
 		if app.maxObservedPodStatus < podStatusReady {
