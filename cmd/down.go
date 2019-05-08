@@ -1,25 +1,32 @@
 package cmd
 
 import (
-	"github.com/urfave/cli"
+	"log"
 
 	"github.com/jbrekelmans/kube-compose/pkg/down"
+	"github.com/spf13/cobra"
 )
 
-func NewDownCommand() cli.Command {
-	return cli.Command{
-		Name:  "down",
-		Usage: "deletes pods and services",
-		Action: func(c *cli.Context) error {
-			cfg, err := newConfigFromEnv()
-			if err != nil {
-				return err
-			}
-			err = updateConfigFromCli(cfg, c)
-			if err != nil {
-				return err
-			}
-			return down.Run(cfg)
-		},
+var downCmd = &cobra.Command{
+	Use:   "down",
+	Short: "A brief description of your command",
+	Long:  `destroy all pods and services`,
+	Run:   downCommand,
+}
+
+func downCommand(cmd *cobra.Command, args []string) {
+	cfg, err := newConfigFromEnv()
+	if err != nil {
+		log.Fatal(err)
 	}
+	cfg.EnvironmentID, _ = cmd.Flags().GetString("env-id")
+	cfg.Namespace, _ = cmd.Flags().GetString("namespace")
+	err = down.Run(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func init() {
+	rootCmd.AddCommand(downCmd)
 }
