@@ -11,7 +11,7 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "kube-compose",
 	Short: "k8s",
-	Long:  `Environments on k8s made easy`,
+	Long:  "Environments on k8s made easy",
 }
 
 func Execute() {
