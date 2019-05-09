@@ -80,6 +80,7 @@ var (
 	staticPushStatusInfoFromLabel map[string]*staticStatusInfo
 )
 
+// Special init function for this package
 func init() {
 	n := len(staticPullStatusInfoSlice)
 	staticPullStatusInfoFromLabel = make(map[string]*staticStatusInfo, n)
