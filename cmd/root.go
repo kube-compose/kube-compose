@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var rootCmd = &cobra.Command{
@@ -21,8 +22,22 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringP("namespace", "n", "", "namespace for environment (required)")
-	rootCmd.MarkPersistentFlagRequired("namespace")
-	rootCmd.PersistentFlags().StringP("env-id", "e", "", "used to isolate environments deployed to a shared namespace, by (1) using this value as a suffix of pod and service names and (2) using this value to isolate selectors(required)")
-	rootCmd.MarkPersistentFlagRequired("env-id")
+	env := &struct {
+		namespace string
+		envID     string
+	}{}
+	viper.SetEnvPrefix("kubecompose")
+	rootCmd.PersistentFlags().StringVarP(&env.namespace, "namespace", "n", "", "namespace for environment")
+	rootCmd.PersistentFlags().StringVarP(&env.envID, "env-id", "e", "", "used to isolate environments deployed to a shared namespace, by (1) using this value as a suffix of pod and service names and (2) using this value to isolate selectors(required)")
+	viper.AutomaticEnv()
+	if env.namespace == "" && viper.GetString("namespace") != "" {
+		// check if environment variable is set
+		env.namespace = viper.GetString("namespace")
+	}
+	if env.envID == "" && viper.GetString("envid") != "" {
+		env.envID = viper.GetString("envid")
+
+	} else {
+		rootCmd.MarkPersistentFlagRequired("env-id")
+	}
 }

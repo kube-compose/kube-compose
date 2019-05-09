@@ -10,7 +10,7 @@ import (
 var downCmd = &cobra.Command{
 	Use:   "down",
 	Short: "A brief description of your command",
-	Long:  `destroy all pods and services`,
+	Long:  "destroy all pods and services",
 	Run:   downCommand,
 }
 
@@ -20,7 +20,9 @@ func downCommand(cmd *cobra.Command, args []string) {
 		log.Fatal(err)
 	}
 	cfg.EnvironmentID, _ = cmd.Flags().GetString("env-id")
-	cfg.Namespace, _ = cmd.Flags().GetString("namespace")
+	if x, _ := cmd.Flags().GetString("namespace"); x != "" {
+		cfg.Namespace, _ = cmd.Flags().GetString("namespace")
+	}
 	err = down.Run(cfg)
 	if err != nil {
 		log.Fatal(err)

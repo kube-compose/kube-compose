@@ -596,13 +596,10 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 					Follow:    true,
 					Container: containerStatus.Name,
 				}
-				// Capture the pod name in a variable. We cannot use the pod variable in the goroutine because it is
-				// invalid after this function returns.
-				podName := pod.ObjectMeta.Name
 				completedChannel := make(chan interface{})
 				u.completedChannels = append(u.completedChannels, completedChannel)
 				go func() {
-					getLogsRequest := u.k8sPodClient.GetLogs(podName, getPodLogOptions)
+					getLogsRequest := u.k8sPodClient.GetLogs(pod.ObjectMeta.Name, getPodLogOptions)
 					bodyReader, err := getLogsRequest.Stream()
 					if err != nil {
 						panic(err)
@@ -722,8 +719,8 @@ func (u *upRunner) run() error {
 	if err != nil {
 		return err
 	}
-	for _, pod := range podList.Items {
-		err = u.updateAppMaxObservedPodStatus(&pod)
+	for i := 0; i < len(podList.Items); i++ {
+		err = u.updateAppMaxObservedPodStatus(&podList.Items[i])
 		if err != nil {
 			return err
 		}
