@@ -31,7 +31,9 @@ func upCommand(cmd *cobra.Command, args []string) {
 	}
 }
 
-// nolint
+// This method is generated when cobra is initialized.
+// Flags and configuration settings are meant to be
+// configured here.
 func init() {
 	rootCmd.AddCommand(upCmd)
 	upCmd.PersistentFlags().BoolP("detach", "d", false, "Detach mode")

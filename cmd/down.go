@@ -29,7 +29,9 @@ func downCommand(cmd *cobra.Command, _ []string) {
 	}
 }
 
-// nolint
+// This method is generated when cobra is initialized.
+// Flags and configuration settings are meant to be
+// configured here.
 func init() {
 	rootCmd.AddCommand(downCmd)
 }
