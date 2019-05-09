@@ -5,6 +5,8 @@ import (
 
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	"github.com/urfave/cli"
+
+	// gcp plugin doesn't provide any functions therefore importing as "_" is fine.
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 
 	"k8s.io/client-go/tools/clientcmd"
@@ -20,7 +22,8 @@ func GlobalFlags() []cli.Flag {
 		cli.StringFlag{
 			Name:   environmentIDFlagName + ", e",
 			EnvVar: "KUBECOMPOSE_ENVID",
-			Usage:  "used to isolate environments deployed to a shared namespace, by (1) using this value as a suffix of pod and service names and (2) using this value to isolate selectors",
+			Usage: "used to isolate environments deployed to a shared namespace, " +
+				"by (1) using this value as a suffix of pod and service names and (2) using this value to isolate selectors",
 		},
 		cli.StringFlag{
 			Name:   namespaceFlagName + ", n",
@@ -54,16 +57,16 @@ func newConfigFromEnv() (*config.Config, error) {
 func updateConfigFromCli(cfg *config.Config, c *cli.Context) error {
 	environmentID := c.GlobalString(environmentIDFlagName)
 	cfg.Services = c.Args()
-	if len(environmentID) == 0 && !c.GlobalIsSet(environmentIDFlagName) {
+	if environmentID == "" && !c.GlobalIsSet(environmentIDFlagName) {
 		return fmt.Errorf("the environment id is required")
-	} else if len(environmentID) == 0 {
+	} else if environmentID == "" {
 		return fmt.Errorf("environment id must not be empty")
 	}
 	cfg.EnvironmentID = environmentID
 
 	namespace := c.GlobalString(namespaceFlagName)
 	if len(namespace) > 0 || c.GlobalIsSet(namespaceFlagName) {
-		if len(namespace) == 0 {
+		if namespace == "" {
 			return fmt.Errorf("namespace must not be empty")
 		}
 		cfg.Namespace = namespace

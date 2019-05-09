@@ -34,7 +34,7 @@ func createReadinessProbeFromDockerHealthcheck(healthcheck *config.Healthcheck) 
 	offset := 0
 	if healthcheck.IsShell {
 		// The Shell is hardcoded by docker to be /bin/sh
-		// Add 2 to accomodate for /bin/sh -c
+		// Add 2 to accomomdate for /bin/sh -c
 		offset = 2
 	}
 	n := len(healthcheck.Test) + offset
@@ -116,13 +116,14 @@ func inspectImageRawParseHealthcheck(inspectRaw []byte) (*config.Healthcheck, er
 
 // resolveLocalImageID resolves an image ID against a cached list (like the one output by the command "docker images").
 // ref is assumed not to be a partial image ID.
+// nolint
 func resolveLocalImageID(ref dockerRef.Reference, localImageIDSet *digestset.Set, localImagesCache []dockerTypes.ImageSummary) string {
 	named, isNamed := ref.(dockerRef.Named)
 	digested, isDigested := ref.(dockerRef.Digested)
 	// By definition of dockerRef.ParseAnyReferenceWithSet isNamed or isDigested is true
 	if !isNamed {
 		imageID := digested.String()
-		if _, err := localImageIDSet.Lookup(string(imageID)); err == digestset.ErrDigestNotFound {
+		if _, err := localImageIDSet.Lookup(imageID); err == digestset.ErrDigestNotFound {
 			return ""
 		}
 		// The only other error returned by Lookup is a digestset.ErrDigestAmbiguous, which cannot
@@ -134,10 +135,10 @@ func resolveLocalImageID(ref dockerRef.Reference, localImageIDSet *digestset.Set
 	if isDigested {
 		// docker images returns RepoDigests as a familiar name with a digest
 		repoDigest := familiarName + "@" + string(digested.Digest())
-		for _, imageSummary := range localImagesCache {
-			for _, repoDigest2 := range imageSummary.RepoDigests {
+		for i := 0; i < len(localImagesCache); i++ {
+			for _, repoDigest2 := range localImagesCache[i].RepoDigests {
 				if repoDigest == repoDigest2 {
-					return imageSummary.ID
+					return localImagesCache[i].ID
 				}
 			}
 		}
@@ -146,10 +147,10 @@ func resolveLocalImageID(ref dockerRef.Reference, localImageIDSet *digestset.Set
 	if len(tag) > 0 {
 		// docker images returns RepoTags as a familiar name with a tag
 		repoTag := familiarName + ":" + tag
-		for _, imageSummary := range localImagesCache {
-			for _, repoTag2 := range imageSummary.RepoTags {
+		for i := 0; i < len(localImagesCache); i++ {
+			for _, repoTag2 := range localImagesCache[i].RepoTags {
 				if repoTag == repoTag2 {
-					return imageSummary.ID
+					return localImagesCache[i].ID
 				}
 			}
 		}
@@ -160,22 +161,23 @@ func resolveLocalImageID(ref dockerRef.Reference, localImageIDSet *digestset.Set
 // resolveLocalImageAfterPull resolves an image based on a repository and digest by querying the docker daemon.
 // This is exactly the information we have available after pulling an image.
 // Returns the image ID, repo digest and optionally an error.
-func resolveLocalImageAfterPull(ctx context.Context, dockerClient *dockerClient.Client, named dockerRef.Named, digest string) (string, string, error) {
+func resolveLocalImageAfterPull(ctx context.Context, dc *dockerClient.Client, named dockerRef.Named, digest string) (
+	imageID, repoDigest string, err error) {
 	filters := dockerFilters.NewArgs()
 	familiarName := dockerRef.FamiliarName(named)
 	filters.Add("reference", familiarName)
-	imageSummaries, err := dockerClient.ImageList(ctx, dockerTypes.ImageListOptions{
+	imageSummaries, err := dc.ImageList(ctx, dockerTypes.ImageListOptions{
 		All:     false,
 		Filters: filters,
 	})
 	if err != nil {
 		return "", "", err
 	}
-	repoDigest := familiarName + "@" + digest
-	for _, imageSummary := range imageSummaries {
-		for _, repoDigest2 := range imageSummary.RepoDigests {
+	repoDigest = familiarName + "@" + digest
+	for i := 0; i < len(imageSummaries); i++ {
+		for _, repoDigest2 := range imageSummaries[i].RepoDigests {
 			if repoDigest == repoDigest2 {
-				return imageSummary.ID, repoDigest, nil
+				return imageSummaries[i].ID, repoDigest, nil
 			}
 		}
 	}
@@ -190,9 +192,9 @@ func getTag(ref dockerRef.Reference) string {
 	return refWithTag.Tag()
 }
 
-func pullImageWithLogging(ctx context.Context, dockerClient *dockerClient.Client, appName, image string) (string, error) {
+func pullImageWithLogging(ctx context.Context, dc *dockerClient.Client, appName, image string) (string, error) {
 	lastLogTime := time.Now().Add(-2 * time.Second)
-	digest, err := docker.PullImage(ctx, dockerClient, image, "123", func(pull *docker.PullOrPush) {
+	digest, err := docker.PullImage(ctx, dc, image, "123", func(pull *docker.PullOrPush) {
 		t := time.Now()
 		elapsed := t.Sub(lastLogTime)
 		if elapsed >= 2*time.Second {
@@ -208,13 +210,13 @@ func pullImageWithLogging(ctx context.Context, dockerClient *dockerClient.Client
 	return digest, nil
 }
 
-func pushImageWithLogging(ctx context.Context, dockerClient *dockerClient.Client, appName, image, bearerToken string) (string, error) {
+func pushImageWithLogging(ctx context.Context, dc *dockerClient.Client, appName, image, bearerToken string) (string, error) {
 	lastLogTime := time.Now().Add(-2 * time.Second)
 	registryAuth, err := docker.EncodeRegistryAuth("unused", bearerToken)
 	if err != nil {
 		return "", err
 	}
-	digest, err := docker.PushImage(ctx, dockerClient, image, registryAuth, func(push *docker.PullOrPush) {
+	digest, err := docker.PushImage(ctx, dc, image, registryAuth, func(push *docker.PullOrPush) {
 		t := time.Now()
 		elapsed := t.Sub(lastLogTime)
 		if elapsed >= 2*time.Second {
