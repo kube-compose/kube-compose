@@ -172,6 +172,7 @@ func (u *upRunner) initResourceObjectMeta(objectMeta *metav1.ObjectMeta, nameEnc
 	objectMeta.Annotations[annotationName] = name
 }
 
+// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
 func (u *upRunner) getAppImage(app *app) (*config.Healthcheck, string, error) {
 	sourceImage := u.cfg.CanonicalComposeFile.Services[app.name].Image
@@ -295,6 +296,7 @@ func (u *upRunner) waitForServiceClusterIPCountRemaining() int {
 	return remaining
 }
 
+// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
 func (u *upRunner) waitForServiceClusterIP(expected int) error {
 	listOptions := metav1.ListOptions{
@@ -363,6 +365,7 @@ func (u *upRunner) waitForServiceClusterIP(expected int) error {
 	return nil
 }
 
+// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
 func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) {
 	expectedServiceCount := 0
@@ -466,6 +469,7 @@ func (u *upRunner) createServicesAndGetPodHostAliasesOnce() ([]v1.HostAlias, err
 	return u.hostAliases.v, u.hostAliases.err
 }
 
+// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
 func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	imageHealthcheck, podImage, err := u.getAppImageOnce(app)
@@ -546,6 +550,7 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	return podServer, nil
 }
 
+// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
 func parsePodStatus(pod *v1.Pod) (podStatus, error) {
 	for _, condition := range pod.Status.Conditions {
@@ -587,6 +592,7 @@ func parsePodStatus(pod *v1.Pod) (podStatus, error) {
 	return podStatusOther, nil
 }
 
+// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
 func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 
@@ -648,6 +654,7 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 	return nil
 }
 
+// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
 func (u *upRunner) createPodsIfNeeded() error {
 	for app1 := range u.appsWithoutPods {
@@ -693,6 +700,7 @@ func (u *upRunner) createPodsIfNeeded() error {
 	return nil
 }
 
+// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
 func (u *upRunner) run() error {
 	err := u.initApps()

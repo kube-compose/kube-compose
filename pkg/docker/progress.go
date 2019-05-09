@@ -165,6 +165,7 @@ func (d *PullOrPush) Progress() float64 {
 	return sum / float64(count)
 }
 
+// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
 func (d *PullOrPush) Wait(onUpdate func(*PullOrPush)) (string, error) {
 	decoder := json.NewDecoder(d.reader)
