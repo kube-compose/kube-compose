@@ -38,6 +38,6 @@ func init() {
 		env.envID = viper.GetString("envid")
 
 	} else {
-		_ = rootCmd.MarkPersistentFlagRequired("env-id")
+		rootCmd.MarkPersistentFlagRequired("env-id")
 	}
 }

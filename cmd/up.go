@@ -31,7 +31,6 @@ func upCommand(cmd *cobra.Command, args []string) {
 	}
 }
 
-// nolint
 func init() {
 	rootCmd.AddCommand(upCmd)
 	upCmd.PersistentFlags().BoolP("detach", "d", false, "Detach mode")
