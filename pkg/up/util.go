@@ -34,7 +34,7 @@ func createReadinessProbeFromDockerHealthcheck(healthcheck *config.Healthcheck) 
 	offset := 0
 	if healthcheck.IsShell {
 		// The Shell is hardcoded by docker to be /bin/sh
-		// Add 2 to accomomdate for /bin/sh -c
+		// Add 2 to accommodate for /bin/sh -c
 		offset = 2
 	}
 	n := len(healthcheck.Test) + offset
@@ -116,6 +116,7 @@ func inspectImageRawParseHealthcheck(inspectRaw []byte) (*config.Healthcheck, er
 
 // resolveLocalImageID resolves an image ID against a cached list (like the one output by the command "docker images").
 // ref is assumed not to be a partial image ID.
+// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
 func resolveLocalImageID(ref dockerRef.Reference, localImageIDSet *digestset.Set, localImagesCache []dockerTypes.ImageSummary) string {
 	named, isNamed := ref.(dockerRef.Named)

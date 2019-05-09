@@ -62,6 +62,7 @@ type Config struct {
 	Detach           bool
 }
 
+// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
 func New() (*Config, error) {
 	fileName := "docker-compose.yml"
@@ -169,6 +170,7 @@ func ensureNoDependsOnCycle(service *Service) error {
 }
 
 // https://github.com/docker/compose/blob/master/compose/config/config_schema_v2.1.json
+// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
 func parseCompose2_1(composeYAML *composeFile2_1, dockerComposeFile *CanonicalComposeFile) error {
 	n := len(composeYAML.Services)
@@ -242,6 +244,7 @@ func parseCompose2_1(composeYAML *composeFile2_1, dockerComposeFile *CanonicalCo
 	return nil
 }
 
+// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
 func parseServiceYAML2_1(serviceYAML *service2_1) (*Service, error) {
 	service := &Service{
