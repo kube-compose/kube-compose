@@ -49,8 +49,9 @@ linters:
     - depguard
 
 run:
-  skip-dirs:
-    - test/testdata_etc
+  skip-files:
+    - go.mod
+    - go.sum
 
 issues:
   exclude-rules:
