@@ -209,13 +209,13 @@ func (e *extends) Decode(into mapdecode.Into) error {
 		e.Service = serviceName
 		return nil
 	}
-	var extendsHelper extendsHelper
-	err = into(&extendsHelper)
+	var eHelper extendsHelper
+	err = into(&eHelper)
 	if err != nil {
 		return err
 	}
-	e.File = extendsHelper.File
-	e.Service = extendsHelper.Service
+	e.File = eHelper.File
+	e.Service = eHelper.Service
 	return nil
 }
 
@@ -253,6 +253,6 @@ type service2_1 struct {
 }
 
 type composeFile2_1 struct {
-	Services map[string]service2_1  `mapdecode:"services"`
+	Services map[string]*service2_1 `mapdecode:"services"`
 	Volumes  map[string]interface{} `mapdecode:"volumes"`
 }

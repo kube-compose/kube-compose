@@ -53,7 +53,7 @@ func (d *downRunner) deleteCommon(errorChannel chan<- error, kind string, lister
 	}
 }
 
-func (d *downRunner) deleteServices(errorChannel chan<- error) {
+func (d *downRunner) deleteK8sResource(resource string, errorChannel chan<- error) {
 	lister := func(listOptions metav1.ListOptions) ([]*v1.ObjectMeta, error) {
 		serviceList, err := d.k8sServiceClient.List(listOptions)
 		if err != nil {
@@ -65,22 +65,7 @@ func (d *downRunner) deleteServices(errorChannel chan<- error) {
 		}
 		return list, nil
 	}
-	d.deleteCommon(errorChannel, "Service", lister, d.k8sServiceClient.Delete)
-}
-
-func (d *downRunner) deletePods(errorChannel chan<- error) {
-	lister := func(listOptions metav1.ListOptions) ([]*v1.ObjectMeta, error) {
-		podList, err := d.k8sPodClient.List(listOptions)
-		if err != nil {
-			return nil, err
-		}
-		list := make([]*v1.ObjectMeta, len(podList.Items))
-		for i := 0; i < len(podList.Items); i++ {
-			list[i] = &podList.Items[i].ObjectMeta
-		}
-		return list, nil
-	}
-	d.deleteCommon(errorChannel, "Pod", lister, d.k8sPodClient.Delete)
+	d.deleteCommon(errorChannel, resource, lister, d.k8sServiceClient.Delete)
 }
 
 func (d *downRunner) run() error {
@@ -92,8 +77,8 @@ func (d *downRunner) run() error {
 	for i := 0; i < len(errorChannels); i++ {
 		errorChannels[i] = make(chan error, 1)
 	}
-	go d.deleteServices(errorChannels[0])
-	go d.deletePods(errorChannels[1])
+	go d.deleteK8sResource("Service", errorChannels[0])
+	go d.deleteK8sResource("Pod", errorChannels[1])
 	var firstError error
 	for i := 0; i < len(errorChannels); i++ {
 		err, more := <-errorChannels[i]
