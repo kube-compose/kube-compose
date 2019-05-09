@@ -32,7 +32,7 @@ Now you've added our custom tap, you can download with the following command:
 brew install kube-compose
 ```
 
-To upgrade your proxy to the latest stable release use the following command:
+To upgrade kube-compose to the latest stable release use the following command:
 
 ```bash
 brew upgrade kube-compose
