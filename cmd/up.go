@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	// "github.com/jbrekelmans/kube-compose/pkg/up"
-
 	"log"
 
 	"github.com/jbrekelmans/kube-compose/pkg/up"
@@ -16,8 +14,6 @@ var upCmd = &cobra.Command{
 	Run:   upCommand,
 }
 
-var detach bool
-
 func upCommand(cmd *cobra.Command, args []string) {
 	cfg, err := newConfigFromEnv()
 	if err != nil {
@@ -28,12 +24,12 @@ func upCommand(cmd *cobra.Command, args []string) {
 	cfg.Services = args
 	cfg.Detach, _ = cmd.Flags().GetBool("detach")
 	err = up.Run(cfg)
-	if err != nil{
+	if err != nil {
 		log.Fatal(err)
 	}
 }
 
 func init() {
 	rootCmd.AddCommand(upCmd)
-	upCmd.PersistentFlags().BoolVarP(&detach, "detach", "d", false, "Detach mode")
+	upCmd.PersistentFlags().BoolP("detach", "d", false, "Detach mode")
 }

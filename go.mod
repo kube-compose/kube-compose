@@ -10,7 +10,6 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/spf13/cobra v0.0.3 // indirect
 	github.com/uber-go/mapdecode v1.0.0
-	github.com/urfave/cli v1.20.0
 	gopkg.in/yaml.v2 v2.2.2
 	k8s.io/api v0.0.0-20190111032252-67edc246be36
 	k8s.io/apimachinery v0.0.0-20190216013122-f05b8decd79c
