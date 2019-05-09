@@ -44,6 +44,8 @@ Otherwise download the binary from https://github.com/jbrekelmans/kube-compose/r
 
 ### Prerequisites
 
+NA
+
 ### Testing
 
 Use `kubectl` or `oc` to set the target Kubernetes namespace and the service account of kube-compose.
