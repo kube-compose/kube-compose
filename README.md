@@ -91,7 +91,7 @@ Available Commands:
   help        Help about any command
 ```
 
-The `kube-compose up` command behaves in the same manner `docker-compose up` would be expected, however kube-compose loads the traditional docker-compose.yml file and translates the definition into kubernetes native manifests that allow the services to be created while respecting all docker-compose routing and functionality while utilizing kubernetes resources behind the scenes.
+Intuitively, the `kube-compose up` mirrors functionality of `docker-compose up`, but runs containers on a Kubernetes cluster instead of on the host docker. Likewise `kube-compose down` behaves in a similar fashion.
 
 ## Environment Variables
 
