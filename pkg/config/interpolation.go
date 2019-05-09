@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/hashicorp/go-version"
+	version "github.com/hashicorp/go-version"
 )
 
 type ValueGetter func(name string) (string, bool)
@@ -26,7 +26,7 @@ type stringOrInt struct {
 type path []stringOrInt
 
 func (p path) appendStr(str string) path {
-	if len(str) == 0 {
+	if str == "" {
 		panic(fmt.Errorf("s must not be empty"))
 	}
 	return append(p, stringOrInt{
@@ -84,19 +84,20 @@ func (c *configInterpolator) interpolateSection(configDict genericMap, p path) {
 	}
 }
 
-func (c *configInterpolator) addError(err error, p path) {
+func (c *configInterpolator) addError(err error, _ path) {
 	c.errorList = append(c.errorList, err)
 }
 
 // InterpolateConfig takes the root of a docker compose file as a generic structure and substitutes variables in it.
-// The implementation substitutes exactly the same sections as docker compose: https://github.com/docker/compose/blob/master/compose/config/config.py.
+// The implementation substitutes exactly the same sections as docker compose:
+// https://github.com/docker/compose/master/compose/config/config.py.
 // TODO https://github.com/jbrekelmans/kube-compose/issues/11 support arbitrary map types instead of genericMap.
-func InterpolateConfig(fileName string, config genericMap, valueGetter ValueGetter, version *version.Version) error {
+func InterpolateConfig(fileName string, config genericMap, valueGetter ValueGetter, v *version.Version) error {
 	c := &configInterpolator{
 		config:      config,
 		fileName:    fileName,
 		valueGetter: valueGetter,
-		version:     version,
+		version:     v,
 	}
 	return c.run()
 }
@@ -106,7 +107,9 @@ func InterpolateConfig(fileName string, config genericMap, valueGetter ValueGett
 // The implementation is not strict on the syntax between two paired curly braces, but
 // is otherwise identical to the Python implementation:
 // https://github.com/docker/compose/blob/master/compose/config/interpolation.py
-func Interpolate(str string, valueGetter ValueGetter, version bool) (string, error) {
+// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
+// nolint
+func Interpolate(str string, valueGetter ValueGetter, v bool) (string, error) {
 	var sb strings.Builder
 	for {
 		i := strings.IndexRune(str, '$')
@@ -115,7 +118,7 @@ func Interpolate(str string, valueGetter ValueGetter, version bool) (string, err
 		}
 		sb.WriteString(str[:i])
 		str = str[i+1:]
-		if len(str) == 0 {
+		if str == "" {
 			return "", fmt.Errorf("$ followed by EOF")
 		}
 		if str[0] == byte('_') || IsASCIILetter(str[0]) {
@@ -146,24 +149,26 @@ func Interpolate(str string, valueGetter ValueGetter, version bool) (string, err
 			treatEmptyAsUnset := false
 			hasErrorMsg := false
 			var errorMsgOrDefaultVal string
-			if version {
+			if v {
 				j = strings.IndexAny(str[1:i], ":?-")
 				if j >= 0 {
 					j++
-					if str[j] == byte(':') {
+					switch {
+					case str[j] == byte(':'):
 						treatEmptyAsUnset = true
-						if str[j+1] == byte('?') {
+						switch {
+						case str[j+1] == byte('?'):
 							hasErrorMsg = true
 							errorMsgOrDefaultVal = str[j+2 : i]
-						} else if str[j+1] == byte('-') {
+						case str[j+1] == byte('-'):
 							errorMsgOrDefaultVal = str[j+2 : i]
-						} else {
+						default:
 							j = -1
 						}
-					} else if str[j] == byte('?') {
+					case str[j] == byte('?'):
 						hasErrorMsg = true
 						errorMsgOrDefaultVal = str[j+1 : i]
-					} else {
+					default:
 						errorMsgOrDefaultVal = str[j+1 : i]
 					}
 				}
@@ -179,7 +184,7 @@ func Interpolate(str string, valueGetter ValueGetter, version bool) (string, err
 			}
 			name := str[1:j]
 			value, found := valueGetter(name)
-			if !found || (len(value) == 0 && treatEmptyAsUnset) {
+			if !found || (value == "" && treatEmptyAsUnset) {
 				if hasErrorMsg {
 					return "", fmt.Errorf("substitution variable %#v has no value or value is empty: %#v", name, errorMsgOrDefaultVal)
 				}
