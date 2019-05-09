@@ -14,7 +14,7 @@ var downCmd = &cobra.Command{
 	Run:   downCommand,
 }
 
-func downCommand(cmd *cobra.Command, args []string) {
+func downCommand(cmd *cobra.Command, _ []string) {
 	cfg, err := newConfigFromEnv()
 	if err != nil {
 		log.Fatal(err)
@@ -29,6 +29,10 @@ func downCommand(cmd *cobra.Command, args []string) {
 	}
 }
 
+// This method is generated when cobra is initialized.
+// Flags and configuration settings are meant to be
+// configured here.
+// nolint
 func init() {
 	rootCmd.AddCommand(downCmd)
 }
