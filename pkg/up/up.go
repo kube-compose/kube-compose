@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"sync"
 
@@ -13,11 +14,13 @@ import (
 	dockerClient "github.com/docker/docker/client"
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	k8sUtil "github.com/jbrekelmans/kube-compose/pkg/k8s"
-	digest "github.com/opencontainers/go-digest"
+	goDigest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	k8swatch "k8s.io/apimachinery/pkg/watch"
 
 	"k8s.io/client-go/kubernetes"
 	clientV1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -32,11 +35,11 @@ func errorResourcesModifiedExternally() error {
 type podStatus int
 
 const (
-	annotationName             = "kube-compose/service"
-	podStatusReady      podStatus = 2
-	podStatusStarted    podStatus = 1
-	podStatusOther      podStatus = 0
-	podStatusCompleted  podStatus = 3
+	annotationName               = "kube-compose/service"
+	podStatusReady     podStatus = 2
+	podStatusStarted   podStatus = 1
+	podStatusOther     podStatus = 0
+	podStatusCompleted podStatus = 3
 )
 
 func (podStatus *podStatus) String() string {
@@ -169,10 +172,12 @@ func (u *upRunner) initResourceObjectMeta(objectMeta *metav1.ObjectMeta, nameEnc
 	objectMeta.Annotations[annotationName] = name
 }
 
+// nolint
 func (u *upRunner) getAppImage(app *app) (*config.Healthcheck, string, error) {
 	sourceImage := u.cfg.CanonicalComposeFile.Services[app.name].Image
-	if len(sourceImage) == 0 {
-		return nil, "", fmt.Errorf("docker compose service %s has no image or image is the empty string, and building images is not supported", app.name)
+	if sourceImage == "" {
+		return nil, "", fmt.Errorf("docker compose service %s has no image or is a empty string, and building images is not supported",
+			app.name)
 	}
 	localImageIDSet, err := u.getLocalImageIDSet()
 	if err != nil {
@@ -189,11 +194,12 @@ func (u *upRunner) getAppImage(app *app) (*config.Healthcheck, string, error) {
 	sourceImageID := resolveLocalImageID(sourceImageRef, localImageIDSet, u.localImagesCache.images)
 
 	var podImage string
-	if len(sourceImageID) == 0 {
+	if sourceImageID == "" {
 		if !sourceImageIsNamed {
 			return nil, "", fmt.Errorf("could not find image %s locally, and building images is not supported", sourceImage)
 		}
-		digest, err := pullImageWithLogging(u.ctx, u.dockerClient, app.name, sourceImageRef.String())
+		var digest string
+		digest, err = pullImageWithLogging(u.ctx, u.dockerClient, app.name, sourceImageRef.String())
 		if err != nil {
 			return nil, "", err
 		}
@@ -201,8 +207,9 @@ func (u *upRunner) getAppImage(app *app) (*config.Healthcheck, string, error) {
 		if err != nil {
 			return nil, "", err
 		}
-		if len(sourceImageID) == 0 {
-			return nil, "", fmt.Errorf("could get id of pulled image %s, this is either a bug or images were removed by an external process (please try again)", sourceImage)
+		if sourceImageID == "" {
+			return nil, "", fmt.Errorf("could get ID of image %s, "+
+				"this is either a bug or images were removed by an external process (please try again)", sourceImage)
 		}
 		// len(podImage) > 0 by definition of resolveLocalImageAfterPull
 	}
@@ -217,17 +224,19 @@ func (u *upRunner) getAppImage(app *app) (*config.Healthcheck, string, error) {
 		if err != nil {
 			return nil, "", err
 		}
-		digest, err := pushImageWithLogging(u.ctx, u.dockerClient, app.name,
+		var digest string
+		digest, err = pushImageWithLogging(u.ctx, u.dockerClient, app.name,
 			destinationImagePush,
 			u.cfg.KubeConfig.BearerToken)
 		if err != nil {
 			return nil, "", err
 		}
 		podImage = destinationImage + "@" + digest
-	} else if len(podImage) == 0 {
+	} else if podImage == "" {
 		if !sourceImageIsNamed {
 			// TODO https://github.com/jbrekelmans/kube-compose/issues/6
-			return nil, "", fmt.Errorf("image reference %s is likely unstable, please enable pushing of images or use named image references to improve reliability", sourceImage)
+			return nil, "", fmt.Errorf("image reference %s is likely unstable, "+
+				"please enable pushing of images or use named image references to improve reliability", sourceImage)
 		}
 		podImage = sourceImage
 	}
@@ -279,13 +288,14 @@ func (u *upRunner) waitForServiceClusterIPUpdate(service *v1.Service) (*app, err
 func (u *upRunner) waitForServiceClusterIPCountRemaining() int {
 	remaining := 0
 	for _, app := range u.apps {
-		if app.hasService && len(app.serviceClusterIP) == 0 {
+		if app.hasService && app.serviceClusterIP == "" {
 			remaining++
 		}
 	}
 	return remaining
 }
 
+// nolint
 func (u *upRunner) waitForServiceClusterIP(expected int) error {
 	listOptions := metav1.ListOptions{
 		LabelSelector: u.cfg.EnvironmentLabel + "=" + u.cfg.EnvironmentID,
@@ -297,8 +307,8 @@ func (u *upRunner) waitForServiceClusterIP(expected int) error {
 	if len(serviceList.Items) < expected {
 		return errorResourcesModifiedExternally()
 	}
-	for _, service := range serviceList.Items {
-		_, err = u.waitForServiceClusterIPUpdate(&service)
+	for i := 0; i < len(serviceList.Items); i++ {
+		_, err = u.waitForServiceClusterIPUpdate(&serviceList.Items[i])
 		if err != nil {
 			return err
 		}
@@ -322,13 +332,14 @@ func (u *upRunner) waitForServiceClusterIP(expected int) error {
 		if !ok {
 			return fmt.Errorf("channel unexpectedly closed")
 		}
-		if event.Type == "ADDED" || event.Type == "MODIFIED" {
+		switch event.Type {
+		case k8swatch.Added, k8swatch.Modified:
 			service := event.Object.(*v1.Service)
 			_, err := u.waitForServiceClusterIPUpdate(service)
 			if err != nil {
 				return err
 			}
-		} else if event.Type == "DELETED" {
+		case k8swatch.Deleted:
 			service := event.Object.(*v1.Service)
 			app, err := u.findAppFromResourceObjectMeta(&service.ObjectMeta)
 			if err != nil {
@@ -337,7 +348,7 @@ func (u *upRunner) waitForServiceClusterIP(expected int) error {
 			if app != nil {
 				return errorResourcesModifiedExternally()
 			}
-		} else {
+		default:
 			return fmt.Errorf("got unexpected error event from channel: %+v", event.Object)
 		}
 		remainingNew := u.waitForServiceClusterIPCountRemaining()
@@ -352,42 +363,44 @@ func (u *upRunner) waitForServiceClusterIP(expected int) error {
 	return nil
 }
 
+// nolint
 func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) {
 	expectedServiceCount := 0
 	for _, app := range u.apps {
-		if app.hasService {
-			expectedServiceCount++
-			dcService := u.cfg.CanonicalComposeFile.Services[app.name]
-			servicePorts := make([]v1.ServicePort, len(dcService.Ports))
-			for i, port := range dcService.Ports {
-				servicePorts[i] = v1.ServicePort{
-					Name:       fmt.Sprintf("%s%d", port.Protocol, port.Internal),
-					Port:       port.Internal,
-					Protocol:   v1.Protocol(strings.ToUpper(port.Protocol)),
-					TargetPort: intstr.FromInt(int(port.Internal)),
-				}
+		if !app.hasService {
+			continue
+		}
+		expectedServiceCount++
+		dcService := u.cfg.CanonicalComposeFile.Services[app.name]
+		servicePorts := make([]v1.ServicePort, len(dcService.Ports))
+		for i, port := range dcService.Ports {
+			servicePorts[i] = v1.ServicePort{
+				Name:       fmt.Sprintf("%s%d", port.Protocol, port.Internal),
+				Port:       port.Internal,
+				Protocol:   v1.Protocol(strings.ToUpper(port.Protocol)),
+				TargetPort: intstr.FromInt(int(port.Internal)),
 			}
-			service := &v1.Service{
-				Spec: v1.ServiceSpec{
-					Ports: servicePorts,
-					Selector: map[string]string{
-						"app":                  app.nameEncoded,
-						u.cfg.EnvironmentLabel: u.cfg.EnvironmentID,
-					},
-					// This is the default value.
-					// Type: v1.ServiceType("ClusterIP"),
+		}
+		service := &v1.Service{
+			Spec: v1.ServiceSpec{
+				Ports: servicePorts,
+				Selector: map[string]string{
+					"app":                  app.nameEncoded,
+					u.cfg.EnvironmentLabel: u.cfg.EnvironmentID,
 				},
-			}
-			u.initResourceObjectMeta(&service.ObjectMeta, app.nameEncoded, app.name)
-			_, err := u.k8sServiceClient.Create(service)
-
-			if k8sError.IsAlreadyExists(err) {
-				fmt.Printf("app %s: service %s already exists\n", app.name, service.ObjectMeta.Name)
-			} else if err != nil {
-				return nil, err
-			} else {
-				fmt.Printf("app %s: created service %s\n", app.name, service.ObjectMeta.Name)
-			}
+				// This is the default value.
+				// Type: v1.ServiceType("ClusterIP"),
+			},
+		}
+		u.initResourceObjectMeta(&service.ObjectMeta, app.nameEncoded, app.name)
+		_, err := u.k8sServiceClient.Create(service)
+		switch {
+		case k8sError.IsAlreadyExists(err):
+			fmt.Printf("app %s: service %s already exists\n", app.name, service.ObjectMeta.Name)
+		case err != nil:
+			return nil, err
+		default:
+			fmt.Printf("app %s: created service %s\n", app.name, service.ObjectMeta.Name)
 		}
 	}
 	if expectedServiceCount == 0 {
@@ -421,9 +434,8 @@ func (u *upRunner) initLocalImages() error {
 		var imageIDSet *digestset.Set
 		if err == nil {
 			imageIDSet = digestset.NewSet()
-			for _, imageSummary := range imageSummarySlice {
-				//nolint
-				imageIDSet.Add(digest.Digest(imageSummary.ID))
+			for i := 0; i < len(imageSummarySlice); i++ {
+				_ = imageIDSet.Add(goDigest.Digest(imageSummarySlice[i].ID))
 			}
 		}
 		u.localImagesCache = localImagesCacheOrError{
@@ -454,6 +466,7 @@ func (u *upRunner) createServicesAndGetPodHostAliasesOnce() ([]v1.HostAlias, err
 	return u.hostAliases.v, u.hostAliases.err
 }
 
+// nolint
 func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	imageHealthcheck, podImage, err := u.getAppImageOnce(app)
 	if err != nil {
@@ -507,7 +520,7 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 		Spec: v1.PodSpec{
 			AutomountServiceAccountToken: newFalsePointer(),
 			Containers: []v1.Container{
-				v1.Container{
+				{
 					Command:         dcService.Entrypoint,
 					Env:             envVars,
 					Image:           podImage,
@@ -533,6 +546,7 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	return podServer, nil
 }
 
+// nolint
 func parsePodStatus(pod *v1.Pod) (podStatus, error) {
 	for _, condition := range pod.Status.Conditions {
 		if condition.Type == v1.PodReady && condition.Status == v1.ConditionTrue {
@@ -573,6 +587,7 @@ func parsePodStatus(pod *v1.Pod) (podStatus, error) {
 	return podStatusOther, nil
 }
 
+// nolint
 func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 
 	app, err := u.findAppFromResourceObjectMeta(&pod.ObjectMeta)
@@ -600,12 +615,13 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 				u.completedChannels = append(u.completedChannels, completedChannel)
 				go func() {
 					getLogsRequest := u.k8sPodClient.GetLogs(pod.ObjectMeta.Name, getPodLogOptions)
-					bodyReader, err := getLogsRequest.Stream()
+					var bodyReader io.ReadCloser
+					bodyReader, err = getLogsRequest.Stream()
 					if err != nil {
 						panic(err)
 					}
 					defer func() {
-						err := bodyReader.Close()
+						err = bodyReader.Close()
 						if err != nil {
 							fmt.Println(err)
 						}
@@ -632,6 +648,7 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 	return nil
 }
 
+// nolint
 func (u *upRunner) createPodsIfNeeded() error {
 	for app1 := range u.appsWithoutPods {
 		dependsOn := u.cfg.CanonicalComposeFile.Services[app1.name].DependsOn
@@ -676,6 +693,7 @@ func (u *upRunner) createPodsIfNeeded() error {
 	return nil
 }
 
+// nolint
 func (u *upRunner) run() error {
 	err := u.initApps()
 	if err != nil {
@@ -686,11 +704,12 @@ func (u *upRunner) run() error {
 		return err
 	}
 	// Initialize docker client
-	dockerClient, err := dockerClient.NewEnvClient()
+	var dc *dockerClient.Client
+	dc, err = dockerClient.NewEnvClient()
 	if err != nil {
 		return err
 	}
-	u.dockerClient = dockerClient
+	u.dockerClient = dc
 
 	for app := range u.appsWithoutPods {
 		// Begin pulling and pushing images immediately...
@@ -702,14 +721,17 @@ func (u *upRunner) run() error {
 	// nolint
 	go u.createServicesAndGetPodHostAliasesOnce()
 	for app := range u.appsWithoutPods {
-		if len(u.cfg.CanonicalComposeFile.Services[app.name].DependsOn) == 0 {
-			pod, err := u.createPod(app)
-			if err != nil {
-				return err
-			}
-			fmt.Printf("app %s: created pod %s because all its dependency conditions are met\n", app.name, pod.ObjectMeta.Name)
-			delete(u.appsWithoutPods, app)
+		if len(u.cfg.CanonicalComposeFile.Services[app.name].DependsOn) != 0 {
+			continue
 		}
+		var pod *v1.Pod
+		pod, err = u.createPod(app)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("app %s: created pod %s because all its dependency conditions are met\n", app.name, pod.ObjectMeta.Name)
+		delete(u.appsWithoutPods, app)
+
 	}
 
 	listOptions := metav1.ListOptions{
@@ -719,8 +741,8 @@ func (u *upRunner) run() error {
 	if err != nil {
 		return err
 	}
-	for _, pod := range podList.Items {
-		err = u.updateAppMaxObservedPodStatus(&pod)
+	for i := 0; i < len(podList.Items); i++ {
+		err = u.updateAppMaxObservedPodStatus(&podList.Items[i])
 		if err != nil {
 			return err
 		}
@@ -730,7 +752,7 @@ func (u *upRunner) run() error {
 		return err
 	}
 
-	if u.checkIfPodsReady(){
+	if u.checkIfPodsReady() {
 		fmt.Printf("pods ready (%d/%d)\n", len(u.appsThatNeedToBeReady), len(u.appsThatNeedToBeReady))
 		return nil
 	}
@@ -749,25 +771,26 @@ func (u *upRunner) run() error {
 		if !ok {
 			return fmt.Errorf("channel unexpectedly closed")
 		}
-		if event.Type == "ADDED" || event.Type == "MODIFIED" {
+		switch event.Type {
+		case k8swatch.Added, k8swatch.Modified:
 			pod := event.Object.(*v1.Pod)
 			err = u.updateAppMaxObservedPodStatus(pod)
 			if err != nil {
 				return err
 			}
-		} else if event.Type == "DELETED" {
+		case k8swatch.Deleted:
 			pod := event.Object.(*v1.Pod)
-			app, err := u.findAppFromResourceObjectMeta(&pod.ObjectMeta)
+			var app *app
+			app, err = u.findAppFromResourceObjectMeta(&pod.ObjectMeta)
 			if err != nil {
 				return err
 			}
 			if app != nil {
 				return errorResourcesModifiedExternally()
 			}
-		} else {
+		default:
 			return fmt.Errorf("got unexpected error event from channel: %+v", event.Object)
 		}
-
 		err = u.createPodsIfNeeded()
 		if err != nil {
 			return err
@@ -786,7 +809,7 @@ func (u *upRunner) run() error {
 	return nil
 }
 
-func (u *upRunner) checkIfPodsReady() bool{
+func (u *upRunner) checkIfPodsReady() bool {
 	allPodsReady := true
 	for app := range u.appsThatNeedToBeReady {
 		if app.maxObservedPodStatus < podStatusReady {

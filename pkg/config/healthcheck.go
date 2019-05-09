@@ -23,6 +23,7 @@ type Healthcheck struct {
 	Timeout     time.Duration
 }
 
+// nolint
 func ParseHealthcheck(healthcheckYAML *ServiceHealthcheck) (*Healthcheck, bool, error) {
 	if healthcheckYAML == nil {
 		return nil, false, nil
@@ -44,7 +45,8 @@ func ParseHealthcheck(healthcheckYAML *ServiceHealthcheck) (*Healthcheck, bool, 
 	case HealthcheckCommandShell:
 		healthcheck.IsShell = true
 	default:
-		return nil, false, fmt.Errorf("field \"test\" of Healthcheck must have a first element that is one of \"NONE\", \"CMD\" and \"%s\"", HealthcheckCommandShell)
+		return nil, false, fmt.Errorf("field \"test\" of Healthcheck must have a first element that is one of \"NONE\", \"CMD\" and \"%s\"",
+			HealthcheckCommandShell)
 	}
 	if test[0] == HealthcheckCommandNone {
 		return nil, true, nil
