@@ -21,7 +21,9 @@ func Execute() {
 	}
 }
 
-// nolint
+// This method is generated when cobra is initialized.
+// Flags and configuration settings are meant to be
+// configured here.
 func init() {
 	env := &struct {
 		namespace string
