@@ -80,7 +80,10 @@ var (
 	staticPushStatusInfoFromLabel map[string]*staticStatusInfo
 )
 
-// Special init function for this package
+// Use of a init function here is safe because the function has no side effects other than initializing some global variables.
+// (but since init runs first nothing can observe this)
+// Since the values of the globals are inter-dependent,
+// using code to initialize them encodes such dependencies and makes the code easier to understand for developers.
 func init() {
 	n := len(staticPullStatusInfoSlice)
 	staticPullStatusInfoFromLabel = make(map[string]*staticStatusInfo, n)
