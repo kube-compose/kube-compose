@@ -10,23 +10,29 @@ import (
 
 // TODO https://github.com/jbrekelmans/kube-compose/issues/46
 var portBindingSpecRegexp = regexp.MustCompile(
-    "^" +  // Match full string
-    "(?:" +  // External part
-    "(?:(?P<host>[a-fA-F\\d.:]+?):)?" +  // IP address
-    "(?P<externalMin>[\\d]*)(?:-(?P<externalMax>\\d+))?:" +  // External range
-    ")?" +
-    "(?P<internalMin>\\d+)(?:-(?P<internalMax>\\d+))?" +  // Internal range
-    "(?P<protocol>/(?:udp|tcp|sctp))?" +  // Protocol
-    "$",  // Match full string)
+	"^" + // Match full string
+		"(?:" + // External part
+		"(?:(?P<host>[a-fA-F\\d.:]+?):)?" + // IP address
+		"(?P<externalMin>[\\d]*)(?:-(?P<externalMax>\\d+))?:" + // External range
+		")?" +
+		"(?P<internalMin>\\d+)(?:-(?P<internalMax>\\d+))?" + // Internal range
+		"(?P<protocol>/(?:udp|tcp|sctp))?" + // Protocol
+		"$", // Match full string)
 )
 
-// PortBinding is the parsed/canonical form of a docker publish port specification. 
+// PortBinding is the parsed/canonical form of a docker publish port specification.
 type PortBinding struct {
-	Internal 	int32 	// the internal port; the port on which the container would listen. At least 0 and less than 65536.
-	ExternalMin int32 	// the minimum external port. At least -1 and less than 65536. -1 if the internal port is not published.
-	ExternalMax	int32 	// the maximum external port. This value is undefined if ExternalMin is -1. Otherwise, at least 0 and less than 65536. Docker will choose from a random available port from the range to map to the internal port.
-	Protocol	string 	// one of "udp", "tcp" and "sctp"
-	Host		string 	// the host (see docker for more details). Can be an empty string if the host was not set in the specification.
+	// the internal port; the port on which the container would listen. At least 0 and less than 65536.
+	Internal int32
+	// the minimum external port. At least -1 and less than 65536. -1 if the internal port is not published.
+	ExternalMin int32
+	// the maximum external port. This value is undefined if ExternalMin is -1. Otherwise, at least 0 and less than 65536.
+	// Docker will choose from a random available port from the range to map to the internal port.
+	ExternalMax int32
+	// one of "udp", "tcp" and "sctp"
+	Protocol string
+	// the host (see docker for more details). Can be an empty string if the host was not set in the specification.
+	Host string
 }
 
 // https://docs.docker.com/compose/compose-file/compose-file-v2/
@@ -40,18 +46,21 @@ type PortBinding struct {
 //  - "127.0.0.1:5000-5010:5000-5010"
 //  - "6060:6060/udp"
 //  - "12400-12500:1240"
+<<<<<<< HEAD
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
+=======
+>>>>>>> 63e2104... Fixing lint issues
 // nolint
 func parsePortBindings(spec string, portBindings []PortBinding) ([]PortBinding, error) {
 	matches := portBindingSpecRegexp.FindStringSubmatch(spec)
 	if matches == nil {
-		return nil, fmt.Errorf("Invalid port %q, should be [[remote_ip:]remote_port[-remote_port]:]port[/protocol]", spec)
+		return nil, fmt.Errorf("invalid port %q, should be [[remote_ip:]remote_port[-remote_port]:]port[/protocol]", spec)
 	}
 	matchMap := buildRegexpMatchMap(portBindingSpecRegexp, matches)
-	
+
 	host := matchMap["host"]
 	protocol := matchMap["protocol"]
-	if len(protocol) == 0 {
+	if protocol == "" {
 		protocol = "tcp"
 	}
 
@@ -61,7 +70,7 @@ func parsePortBindings(spec string, portBindings []PortBinding) ([]PortBinding, 
 		return nil, err
 	}
 	internalMaxStr := matchMap["internalMax"]
-	if len(internalMaxStr) == 0 {
+	if internalMaxStr == "" {
 		internal = append(internal, internalMin)
 	} else {
 		internalMax, err := parsePortUint(internalMaxStr)
@@ -81,7 +90,7 @@ func parsePortBindings(spec string, portBindings []PortBinding) ([]PortBinding, 
 			return nil, err
 		}
 		externalMaxStr := matchMap["externalMax"]
-		if len(externalMaxStr) == 0 {
+		if externalMaxStr == "" {
 			external = append(external, externalMin)
 		} else {
 			externalMax, err := parsePortUint(externalMaxStr)
@@ -90,11 +99,11 @@ func parsePortBindings(spec string, portBindings []PortBinding) ([]PortBinding, 
 			}
 			if len(internal) == 1 {
 				return append(portBindings, PortBinding{
-					Internal: internal[0],
+					Internal:    internal[0],
 					ExternalMin: externalMin,
 					ExternalMax: externalMax,
-					Protocol: protocol,
-					Host: host,
+					Protocol:    protocol,
+					Host:        host,
 				}), nil
 			}
 			for i := externalMin; i <= externalMax; i++ {
@@ -103,15 +112,15 @@ func parsePortBindings(spec string, portBindings []PortBinding) ([]PortBinding, 
 		}
 	}
 	if len(externalMinStr) > 0 && len(internal) != len(external) {
-		return nil, fmt.Errorf("Port ranges don't match in length")
+		return nil, fmt.Errorf("port ranges don't match in length")
 	}
 	for j, i := range internal {
 		portBinding := PortBinding{
-			Internal: i,
+			Internal:    i,
 			ExternalMin: -1,
 			ExternalMax: -1,
-			Protocol: protocol,
-			Host: host,
+			Protocol:    protocol,
+			Host:        host,
 		}
 		if len(externalMinStr) > 0 {
 			portBinding.ExternalMin = external[j]

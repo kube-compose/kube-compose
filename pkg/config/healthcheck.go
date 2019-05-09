@@ -24,10 +24,14 @@ type Healthcheck struct {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
 =======
 >>>>>>> f805861... issue #39: rename structs to no longer assume a specific docker-compose schema version
+=======
+// nolint
+>>>>>>> 63e2104... Fixing lint issues
 func ParseHealthcheck(healthcheckYAML *ServiceHealthcheck) (*Healthcheck, bool, error) {
 	if healthcheckYAML == nil {
 		return nil, false, nil

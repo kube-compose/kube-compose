@@ -42,7 +42,11 @@ func createReadinessProbeFromDockerHealthcheck(healthcheck *config.Healthcheck) 
 	offset := 0
 	if healthcheck.IsShell {
 		// The Shell is hardcoded by docker to be /bin/sh
+<<<<<<< HEAD
 		// Add 2 to accommodate for /bin/sh -c
+=======
+		// Add 2 to accomomdate for /bin/sh -c
+>>>>>>> 63e2104... Fixing lint issues
 		offset = 2
 	}
 	n := len(healthcheck.Test) + offset
@@ -203,7 +207,10 @@ func getUserinfoFromImage(ctx context.Context, dc *dockerClient.Client, image st
 
 // resolveLocalImageID resolves an image ID against a cached list (like the one output by the command "docker images").
 // ref is assumed not to be a partial image ID.
+<<<<<<< HEAD
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
+=======
+>>>>>>> 63e2104... Fixing lint issues
 // nolint
 func resolveLocalImageID(ref dockerRef.Reference, localImageIDSet *digestset.Set, localImagesCache []dockerTypes.ImageSummary) string {
 	named, isNamed := ref.(dockerRef.Named)

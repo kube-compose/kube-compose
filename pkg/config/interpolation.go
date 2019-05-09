@@ -27,6 +27,12 @@ type stringOrInt struct {
 type path []stringOrInt
 
 func (p path) appendStr(str string) path {
+<<<<<<< HEAD
+=======
+	if str == "" {
+		panic(fmt.Errorf("s must not be empty"))
+	}
+>>>>>>> 63e2104... Fixing lint issues
 	return append(p, stringOrInt{
 		str: str,
 	})
@@ -106,7 +112,10 @@ func InterpolateConfig(fileName string, config genericMap, valueGetter ValueGett
 // The implementation is not strict on the syntax between two paired curly braces, but
 // is otherwise identical to the Python implementation:
 // https://github.com/docker/compose/blob/master/compose/config/interpolation.py
+<<<<<<< HEAD
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
+=======
+>>>>>>> 63e2104... Fixing lint issues
 // nolint
 func Interpolate(str string, valueGetter ValueGetter, v bool) (string, error) {
 	var sb strings.Builder

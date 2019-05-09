@@ -49,9 +49,14 @@ linters:
     - depguard
 
 run:
+<<<<<<< HEAD
   skip-files:
     - go.mod
     - go.sum
+=======
+  skip-dirs:
+    - test/testdata_etc
+>>>>>>> 63e2104... Fixing lint issues
 
 issues:
   exclude-rules:

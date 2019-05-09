@@ -100,6 +100,7 @@ func TestParsePortUint_TooLarge(t *testing.T) {
 		t.Fail()
 	}
 }
+<<<<<<< HEAD
 
 func TestParsePorts_Error(t *testing.T) {
 	p := port{
@@ -116,3 +117,5 @@ func TestParsePorts_Error(t *testing.T) {
 func TestParsePorts_Success(t *testing.T) {
 	_, _ = parsePorts([]port{})
 }
+=======
+>>>>>>> 63e2104... Fixing lint issues
