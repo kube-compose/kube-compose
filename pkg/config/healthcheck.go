@@ -23,6 +23,7 @@ type Healthcheck struct {
 	Timeout     time.Duration
 }
 
+// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
 func ParseHealthcheck(healthcheckYAML *ServiceHealthcheck) (*Healthcheck, bool, error) {
 	if healthcheckYAML == nil {

@@ -107,6 +107,7 @@ func InterpolateConfig(fileName string, config genericMap, valueGetter ValueGett
 // The implementation is not strict on the syntax between two paired curly braces, but
 // is otherwise identical to the Python implementation:
 // https://github.com/docker/compose/blob/master/compose/config/interpolation.py
+// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
 func Interpolate(str string, valueGetter ValueGetter, v bool) (string, error) {
 	var sb strings.Builder
