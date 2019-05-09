@@ -32,11 +32,11 @@ func errorResourcesModifiedExternally() error {
 type podStatus int
 
 const (
-	annotationName             = "kube-compose/service"
-	podStatusReady      podStatus = 2
-	podStatusStarted    podStatus = 1
-	podStatusOther      podStatus = 0
-	podStatusCompleted  podStatus = 3
+	annotationName               = "kube-compose/service"
+	podStatusReady     podStatus = 2
+	podStatusStarted   podStatus = 1
+	podStatusOther     podStatus = 0
+	podStatusCompleted podStatus = 3
 )
 
 func (podStatus *podStatus) String() string {
@@ -719,8 +719,8 @@ func (u *upRunner) run() error {
 	if err != nil {
 		return err
 	}
-	for _, pod := range podList.Items {
-		err = u.updateAppMaxObservedPodStatus(&pod)
+	for i := 0; i < len(podList.Items); i++ {
+		err = u.updateAppMaxObservedPodStatus(&podList.Items[i])
 		if err != nil {
 			return err
 		}
@@ -730,7 +730,7 @@ func (u *upRunner) run() error {
 		return err
 	}
 
-	if u.checkIfPodsReady(){
+	if u.checkIfPodsReady() {
 		fmt.Printf("pods ready (%d/%d)\n", len(u.appsThatNeedToBeReady), len(u.appsThatNeedToBeReady))
 		return nil
 	}
@@ -786,7 +786,7 @@ func (u *upRunner) run() error {
 	return nil
 }
 
-func (u *upRunner) checkIfPodsReady() bool{
+func (u *upRunner) checkIfPodsReady() bool {
 	allPodsReady := true
 	for app := range u.appsThatNeedToBeReady {
 		if app.maxObservedPodStatus < podStatusReady {
