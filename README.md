@@ -48,7 +48,7 @@ NA
 
 ### Testing
 
-Use `kubectl` or `oc` to set the target Kubernetes namespace and the service account of kube-compose.
+Use `kubectl` to set the target Kubernetes namespace and the service account of kube-compose.
 
 Run `kube-compose` with the test [docker-compose.yml](test/docker-compose.yml):
 
@@ -95,16 +95,18 @@ Intuitively, the `kube-compose up` mirrors functionality of `docker-compose up`,
 
 ## Environment Variables
 
-kube-compose currently supports 2 environment variables. If this environment variables are set, you need not pass as flag to kube-compose command.
-```
-KUBECOMPOSE_NAMESPACE
-KUBECOMPOSE_ENVID
+kube-compose currently supports 2 environment variables. If these environment variables are set, you don't need to pass the `--namespace` and `--env-id` flags.
+
+```bash
+export KUBECOMPOSE_NAMESPACE=""
+export KUBECOMPOSE_ENVID=""
 ```
 
 ## Examples
 
 kube-compose loads pod and services definitions implicitly defined in a docker compose file, and creates them in a target namespace via the following command:
-```
+
+```bash
 kube-compose -e mybuildid up
 ```
 
@@ -115,43 +117,49 @@ If no `~/.kube/config` exists and kube-compose is run inside a pod in Kubernetes
 The namespace can be overridden via the `--namespace` option, for example: `kube-compose --namespace ci up`.
 
 ### Foreground mode to view the logs of running pods
-```
-kube-compose --namespace default --env-id test123 up 
+
+```bash
+kube-compose --namespace default --env-id test123 up
 
 kube-compose --namespace default --env-id test123 down
 ```
-```
+
+```bash
 kube-compose up -n default -e test123
 
 kube-compose down -n default -e test123
 
 ```
+
 If environment variables are already set.
-```
+
+```bash
 kube-compose up
 
 kube-compose down
 ```
+
 Start individual services defined in docker-compose.yml
-```
-```
+
+```bash
 kube-compose up service-1
 
 kube-compose up service-1 service-2
-
 ```
-
-
 
 ### Detach mode
-```
+
+```bash
 kube-compose --namespace default --env-id test123 up --detach
 ```
-```
+
+```bash
 kube-compose up -n default -e test123 -d
 ```
+
 If environment variables are already set.
-```
+
+```bash
 kube-compose up -d
 ```
 
@@ -172,4 +180,3 @@ Although [kompose](https://github.com/kubernetes/kompose) can already convert do
 If you require that an application is not started until one of its dependencies is healthy, you can add `condition: service_healthy` to the `depends_on`, and give the dependency a [Docker healthchecks](https://docs.docker.com/engine/reference/builder#healthcheck).
 
 Docker healthchecks are converted into [Readiness Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/).
-
