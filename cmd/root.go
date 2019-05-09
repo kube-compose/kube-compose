@@ -24,6 +24,7 @@ func Execute() {
 // This method is generated when cobra is initialized.
 // Flags and configuration settings are meant to be
 // configured here.
+// nolint
 func init() {
 	env := &struct {
 		namespace string
@@ -42,6 +43,6 @@ func init() {
 		env.envID = viper.GetString("envid")
 
 	} else {
-		rootCmd.MarkPersistentFlagRequired("env-id")
+		_ = rootCmd.MarkPersistentFlagRequired("env-id")
 	}
 }
