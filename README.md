@@ -93,6 +93,14 @@ Available Commands:
 
 The `kube-compose up` command behaves in the same manner `docker-compose up` would be expected, however kube-compose loads the traditional docker-compose.yml file and translates the definition into kubernetes native manifests that allow the services to be created while respecting all docker-compose routing and functionality while utilizing kubernetes resources behind the scenes.
 
+## Environment Variables
+
+kube-compose currently supports 2 environment variables. If this environment variables are set, you need not pass as flag to kube-compose command.
+```
+KUBECOMPOSE_NAMESPACE
+KUBECOMPOSE_ENVID
+```
+
 ## Examples
 
 kube-compose loads pod and services definitions implicitly defined in a docker compose file, and creates them in a target namespace via the following command:
@@ -100,11 +108,52 @@ kube-compose loads pod and services definitions implicitly defined in a docker c
 kube-compose -e mybuildid up
 ```
 
-The target namespace and service account token are loaded from the context set in `~/.kube/config`. This means that Openshift Origin Client Tools' `oc login` and `oc project` commands can be used to configure kube-compose's target namespace and service account.
+The target namespace and service account token are loaded from the context set in `~/.kube/config`. This means that k8s Client Tools kubectl commands can be used to configure kube-compose's target namespace and service account.
 
 If no `~/.kube/config` exists and kube-compose is run inside a pod in Kubernetes, the pod's namespace becomes the target namespace, and the service account used to create pods and services is the pod's service account.
 
 The namespace can be overridden via the `--namespace` option, for example: `kube-compose --namespace ci up`.
+
+### Foreground mode to view the logs of running pods
+```
+kube-compose --namespace default --env-id test123 up 
+
+kube-compose --namespace default --env-id test123 down
+```
+```
+kube-compose up -n default -e test123
+
+kube-compose down -n default -e test123
+
+```
+If environment variables are already set.
+```
+kube-compose up
+
+kube-compose down
+```
+Start individual services defined in docker-compose.yml
+```
+```
+kube-compose up service-1
+
+kube-compose up service-1 service-2
+
+```
+
+
+
+### Detach mode
+```
+kube-compose --namespace default --env-id test123 up --detach
+```
+```
+kube-compose up -n default -e test123 -d
+```
+If environment variables are already set.
+```
+kube-compose up -d
+```
 
 ## Why another tool
 
