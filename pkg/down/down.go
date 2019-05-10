@@ -53,6 +53,9 @@ func (d *downRunner) deleteCommon(errorChannel chan<- error, kind string, lister
 	}
 }
 
+// Duplication with deletePods error is ignored as these functions serve a seperate purpose. Will address in future.
+// TODO: https://github.com/jbrekelmans/kube-compose/issues/65
+// nolint
 func (d *downRunner) deleteServices(errorChannel chan<- error) {
 	lister := func(listOptions metav1.ListOptions) ([]*v1.ObjectMeta, error) {
 		serviceList, err := d.k8sServiceClient.List(listOptions)
@@ -68,6 +71,9 @@ func (d *downRunner) deleteServices(errorChannel chan<- error) {
 	d.deleteCommon(errorChannel, "Service", lister, d.k8sServiceClient.Delete)
 }
 
+// Duplication with deleteServices error is ignored as these functions serve a seperate purpose. Will address in future.
+// TODO: https://github.com/jbrekelmans/kube-compose/issues/65
+// nolint
 func (d *downRunner) deletePods(errorChannel chan<- error) {
 	lister := func(listOptions metav1.ListOptions) ([]*v1.ObjectMeta, error) {
 		podList, err := d.k8sPodClient.List(listOptions)

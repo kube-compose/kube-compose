@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"io"
 	"strings"
 )
 
@@ -27,8 +28,8 @@ func EncodeName(input string) string {
 	return sb.String()
 }
 
-func escapeByte(sb *strings.Builder, b byte) {
-	sb.WriteByte(0x39)
-	sb.WriteByte(chars[b/36])
-	sb.WriteByte(chars[b%36])
+func escapeByte(sb io.ByteWriter, b byte) {
+	_ = sb.WriteByte(0x39)
+	_ = sb.WriteByte(chars[b/36])
+	_ = sb.WriteByte(chars[b%36])
 }

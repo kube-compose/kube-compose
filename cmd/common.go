@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"github.com/jbrekelmans/kube-compose/pkg/config"
+
+	// Plugin does not export any functions therefore it is ignored IE. "_"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/tools/clientcmd"
 )
