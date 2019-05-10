@@ -60,13 +60,13 @@ type Config struct {
 	Detach               bool
 }
 
-func New(File string) (*Config, error) {
+func New(file string) (*Config, error) {
 	fileName := "docker-compose.yaml"
 	if File != "" {
-		if _, err := os.Stat(File); os.IsNotExist(err) {
-			return nil, fmt.Errorf("docker-compose file does not exist at %#v", File)
+		if _, err := os.Stat(file); os.IsNotExist(err) {
+			return nil, fmt.Errorf("docker-compose file does not exist at %#v", file)
 		}
-		fileName = File
+		fileName = file
 	}
 	data, err := ioutil.ReadFile(fileName)
 	if err != nil {
