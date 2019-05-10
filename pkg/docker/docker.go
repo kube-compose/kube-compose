@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 
 	dockerTypes "github.com/docker/docker/api/types"
 	dockerClient "github.com/docker/docker/client"
@@ -29,7 +30,12 @@ func PullImage(ctx context.Context, dc *dockerClient.Client, image, registryAuth
 	if err != nil {
 		return "", err
 	}
-	defer readCloser.Close()
+	defer func() {
+		err = readCloser.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+	}()
 	pull := NewPull(readCloser)
 	return pull.Wait(onUpdate)
 }
@@ -42,7 +48,12 @@ func PushImage(ctx context.Context, dc *dockerClient.Client, image, registryAuth
 	if err != nil {
 		return "", err
 	}
-	defer readCloser.Close()
+	defer func() {
+		err = readCloser.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+	}()
 	push := NewPush(readCloser)
 	return push.Wait(onUpdate)
 }
