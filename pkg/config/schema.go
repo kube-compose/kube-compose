@@ -237,7 +237,7 @@ func (p *port) Decode(into mapdecode.Into) error {
 }
 
 type service2_1 struct {
-	Build struct {
+	Build *struct {
 		Context    string `mapdecode:"context"`
 		Dockerfile string `mapdecode:"dockerfile"`
 	} `mapdecode:"build"`
@@ -248,6 +248,7 @@ type service2_1 struct {
 	Healthcheck *ServiceHealthcheck `mapdecode:"healthcheck"`
 	Image       string              `mapdecode:"image"`
 	Ports       []port              `mapdecode:"ports"`
+	User				*string							`mapdecode:"user"`
 	Volumes     []string            `mapdecode:"volumes"`
 	WorkingDir  string              `mapdecode:"working_dir"`
 }
