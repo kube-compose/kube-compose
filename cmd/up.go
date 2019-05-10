@@ -32,6 +32,10 @@ func upCommand(cmd *cobra.Command, args []string) {
 	}
 }
 
+// This method is generated when cobra is initialized.
+// Flags and configuration settings are meant to be
+// configured here.
+// nolint
 func init() {
 	rootCmd.AddCommand(upCmd)
 	upCmd.PersistentFlags().BoolP("detach", "d", false, "Detached mode: Run containers in the background")

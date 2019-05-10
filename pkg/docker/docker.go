@@ -21,11 +21,11 @@ func EncodeRegistryAuth(username, password string) (string, error) {
 	return base64.StdEncoding.EncodeToString(authConfigBytes), nil
 }
 
-func PullImage(ctx context.Context, dockerClient *dockerClient.Client, image, registryAuth string, onUpdate func(*PullOrPush)) (string, error) {
+func PullImage(ctx context.Context, dc *dockerClient.Client, image, registryAuth string, onUpdate func(*PullOrPush)) (string, error) {
 	pullOptions := dockerTypes.ImagePullOptions{
 		RegistryAuth: registryAuth,
 	}
-	readCloser, err := dockerClient.ImagePull(ctx, image, pullOptions)
+	readCloser, err := dc.ImagePull(ctx, image, pullOptions)
 	if err != nil {
 		return "", err
 	}
@@ -34,11 +34,11 @@ func PullImage(ctx context.Context, dockerClient *dockerClient.Client, image, re
 	return pull.Wait(onUpdate)
 }
 
-func PushImage(ctx context.Context, dockerClient *dockerClient.Client, image, registryAuth string, onUpdate func(*PullOrPush)) (string, error) {
+func PushImage(ctx context.Context, dc *dockerClient.Client, image, registryAuth string, onUpdate func(*PullOrPush)) (string, error) {
 	pushOptions := dockerTypes.ImagePushOptions{
 		RegistryAuth: registryAuth,
 	}
-	readCloser, err := dockerClient.ImagePush(ctx, image, pushOptions)
+	readCloser, err := dc.ImagePush(ctx, image, pushOptions)
 	if err != nil {
 		return "", err
 	}
