@@ -262,7 +262,7 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 				return errors.Wrap(err, fmt.Sprintf("service %s in the docker-compose file has an invalid user", app.name))
 			}
 		}
-		if user.UID == nil || (user.Group != "" && user.Gid == nil) {
+		if user.UID == nil || (user.Group != "" && user.GID == nil) {
 			// TODO https://github.com/jbrekelmans/kube-compose/issues/70 confirm whether docker and our pod spec will produce the same default
 			// group if a UID is set but no GID
 			err = getUserinfoFromImage(u.ctx, u.dockerClient, sourceImageID, user)
@@ -550,8 +550,8 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 		securityContext = &v1.PodSecurityContext{
 			RunAsUser: app.imageInfo.user.UID,
 		}
-		if app.imageInfo.user.Gid != nil {
-			securityContext.RunAsGroup = app.imageInfo.user.Gid
+		if app.imageInfo.user.GID != nil {
+			securityContext.RunAsGroup = app.imageInfo.user.GID
 		}
 	}
 	pod := &v1.Pod{

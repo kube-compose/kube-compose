@@ -193,7 +193,7 @@ func getUserinfoFromImage(ctx context.Context, dc *dockerClient.Client, image st
 		}
 		user.UID = uid
 	}
-	if user.Gid == nil && user.Group != "" {
+	if user.GID == nil && user.Group != "" {
 		err = copyFileFromContainer(ctx, dc, resp.ID, "/etc/group", tmpDir)
 		if err != nil {
 			return err
@@ -206,7 +206,7 @@ func getUserinfoFromImage(ctx context.Context, dc *dockerClient.Client, image st
 		if gid == nil {
 			return fmt.Errorf("linux spec user: unable to find group %s no matching entries in group file", user.Group)
 		}
-		user.Gid = gid
+		user.GID = gid
 	}
 	return nil
 }
