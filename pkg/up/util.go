@@ -4,10 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math"
+	"os"
+	"path"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/docker/distribution/digestset"
+	dockerArchive "github.com/docker/docker/pkg/archive"
+	dockerContainers "github.com/docker/docker/api/types/container"
 	dockerRef "github.com/docker/distribution/reference"
 	dockerTypes "github.com/docker/docker/api/types"
 	dockerFilters "github.com/docker/docker/api/types/filters"
@@ -76,6 +82,7 @@ type hasTag interface {
 }
 
 func inspectImageRawParseHealthcheck(inspectRaw []byte) (*config.Healthcheck, error) {
+	// imageInspect is similar to dockerClient.ImageInspect, but it allows us to detect absent fields so we can apply default values.
 	var inspectInfo struct {
 		Config struct {
 			Healthcheck struct {
@@ -112,6 +119,94 @@ func inspectImageRawParseHealthcheck(inspectRaw []byte) (*config.Healthcheck, er
 		healthcheck.Retries = *inspectInfo.Config.Healthcheck.Retries
 	}
 	return healthcheck, nil
+}
+
+func copyFileFromContainer(ctx context.Context, dc *dockerClient.Client, containerID, srcFile, dstFile string) error {
+	readCloser, stat, err := dc.CopyFromContainer(ctx, containerID, srcFile)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = readCloser.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+	}()
+	if (stat.Mode & os.ModeType) != 0 {
+		// TODO https://github.com/jbrekelmans/kube-compose/issues/70 we should follow symlinks
+		return fmt.Errorf("could not copy %#v because it is not a regular file", srcFile)
+	}
+	srcInfo := dockerArchive.CopyInfo{
+		Path: srcFile,
+		Exists: true,
+		IsDir: false,
+		RebaseName: "",
+	}
+	err = dockerArchive.CopyTo(readCloser, srcInfo, dstFile)
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("error while copying image file %#v to local file %#v", srcFile, dstFile))
+	}
+	return nil
+}
+
+func getUserinfoFromImage(ctx context.Context, dc *dockerClient.Client, image string, user *userinfo) error {
+	containerConfig := &dockerContainers.Config{
+		Entrypoint: []string{"sh"},
+		Image: image,
+		WorkingDir: "/",
+	}
+	resp, err := dc.ContainerCreate(ctx, containerConfig, nil, nil, "")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = dc.ContainerRemove(ctx, resp.ID, dockerTypes.ContainerRemoveOptions{})
+		if err != nil {
+			fmt.Println(err)
+		}
+	}()
+	tmpDir, err := ioutil.TempDir("", "kube-compose-")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = os.RemoveAll(tmpDir)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}()
+	// TODO https://github.com/jbrekelmans/kube-compose/issues/70 this is not correct for non-Linux containers
+	if user.Uid == nil {
+		err = copyFileFromContainer(ctx, dc, resp.ID, "/etc/passwd", tmpDir)
+		if err != nil {
+			return err
+		}
+		var uid *int64
+		uid, err = findUserInPasswd(path.Join(tmpDir, "passwd"), user.User)
+		if err != nil {
+			return err
+		}
+		if uid == nil {
+			return fmt.Errorf("linux spec user: unable to find user %s no matching entries in passwd file", user.User)
+		}
+		user.Uid = uid
+	}
+	if user.Gid == nil && user.Group != "" {
+		err = copyFileFromContainer(ctx, dc, resp.ID, "/etc/group", tmpDir)
+		if err != nil {
+			return err
+		}
+		var gid *int64
+		gid, err = findUserInPasswd(path.Join(tmpDir, "group"), user.Group)
+		if err != nil {
+			return err
+		}
+		if gid == nil {
+			return fmt.Errorf("linux spec user: unable to find group %s no matching entries in group file", user.Group)
+		}
+		user.Gid = gid
+	}
+	return nil
 }
 
 // resolveLocalImageID resolves an image ID against a cached list (like the one output by the command "docker images").
