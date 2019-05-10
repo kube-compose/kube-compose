@@ -56,7 +56,7 @@ Run `kube-compose` with the test [docker-compose.yml](test/docker-compose.yml):
 (cd test && ../kube-compose --env-id test123 up)
 ```
 
-This writes to the directory `test/output` the created Kubernetes resources.
+This writes the created Kubernetes resources to the directory test/output.
 
 To clean up after the test:
 
@@ -74,7 +74,7 @@ Using Go:
 go build -o kube-compose .
 ```
 
-Using Docker-compose
+Using Docker-compose:
 
 ```bash
 docker-compose build
@@ -165,7 +165,7 @@ kube-compose up -d
 
 ## Why another tool
 
-Although [kompose](https://github.com/kubernetes/kompose) can already convert docker compose files into Kubernetes resources. The main differences between kube-compose and Kompose are:
+Although [kompose](https://github.com/kubernetes/kompose) can already convert docker compose files into Kubernetes resources, the main differences between kube-compose and Kompose are:
 
 1. kube-compose generates Kubernetes resource names and selectors that are unique for each build to support shared namespaces and scaling to many concurrent CI environments.
 
@@ -177,6 +177,6 @@ Although [kompose](https://github.com/kubernetes/kompose) can already convert do
 
 ## Advanced Usage
 
-If you require that an application is not started until one of its dependencies is healthy, you can add `condition: service_healthy` to the `depends_on`, and give the dependency a [Docker healthchecks](https://docs.docker.com/engine/reference/builder#healthcheck).
+If you require that an application is not started until one of its dependencies is healthy, you can add `condition: service_healthy` to the `depends_on`, and give the dependency a [Docker healthcheck](https://docs.docker.com/engine/reference/builder#healthcheck).
 
 Docker healthchecks are converted into [Readiness Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/).
