@@ -8,7 +8,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-func newConfigFromEnv(file string) (*config.Config, error) {
+func newConfigFromEnv(file *string) (*config.Config, error) {
 	cfg, err := config.New(file)
 	if err != nil {
 		return nil, err

@@ -15,8 +15,19 @@ var upCmd = &cobra.Command{
 }
 
 func upCommand(cmd *cobra.Command, args []string) {
-	composeFile, _ := cmd.Flags().GetString("file")
-	cfg, err := newConfigFromEnv(composeFile)
+	var fileName *string
+	if cmd.Flags().Changed("file") {
+		fileFlag := &struct {
+			x string
+		}{}
+		file, err := cmd.Flags().GetString("file")
+		fileFlag.x = file
+		fileName = &fileFlag.x
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	cfg, err := newConfigFromEnv(fileName)
 	if err != nil {
 		log.Fatal(err)
 	}

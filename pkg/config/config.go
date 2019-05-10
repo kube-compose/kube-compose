@@ -64,25 +64,32 @@ type Config struct {
 
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
-func New(file string) (*Config, error) {
-	fileName := "docker-compose.yaml"
-	if File != "" {
-		if _, err := os.Stat(file); os.IsNotExist(err) {
-			return nil, fmt.Errorf("docker-compose file does not exist at %#v", file)
+func New(file *string) (*Config, error) {
+	var data []byte
+	var err error
+	var fileName string
+	if file != nil {
+		if *file == "" {
+			return nil, fmt.Errorf("docker-compose file flag cannot be empty string")
 		}
-		fileName = file
-	}
-	data, err := ioutil.ReadFile(fileName)
-	if err != nil {
+		data, err = ioutil.ReadFile(*file)
 		if os.IsNotExist(err) {
-			fileName = "docker-compose.yaml"
-			data, err = ioutil.ReadFile(fileName)
+			return nil, fmt.Errorf("docker-compose file does not exist at %#v", *file)
 		}
+		fileName = *file
+	} else {
+		fileName = "docker-compose.yaml"
+		data, err = ioutil.ReadFile(fileName)
 		if err != nil {
-			return nil, err
+			if os.IsNotExist(err) {
+				fileName = "docker-compose.yaml"
+				data, err = ioutil.ReadFile(fileName)
+			}
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
-
 	var dataMap genericMap
 	err = yaml.Unmarshal(data, &dataMap)
 	if err != nil {
