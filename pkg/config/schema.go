@@ -248,7 +248,7 @@ type service2_1 struct {
 	Healthcheck *ServiceHealthcheck `mapdecode:"healthcheck"`
 	Image       string              `mapdecode:"image"`
 	Ports       []port              `mapdecode:"ports"`
-	User				*string							`mapdecode:"user"`
+	User        *string             `mapdecode:"user"`
 	Volumes     []string            `mapdecode:"volumes"`
 	WorkingDir  string              `mapdecode:"working_dir"`
 }

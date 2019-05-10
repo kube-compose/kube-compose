@@ -38,7 +38,7 @@ type Service struct {
 	Image               string
 	Ports               []PortBinding
 	ServiceName         string
-	User								*string
+	User                *string
 	WorkingDir          string
 
 	// helpers for ensureNoDependsOnCycle
@@ -61,10 +61,10 @@ type Config struct {
 	PushImages       *PushImagesConfig
 
 	// True Set runAsUser/runAsGroup for each pod based on the "user" key in docker-compose services and the image's user
-	RunAsUser			 	 bool
+	RunAsUser bool
 
-	Services         []string
-	Detach           bool
+	Services []string
+	Detach   bool
 }
 
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
@@ -255,7 +255,7 @@ func parseServiceYAML2_1(serviceYAML *service2_1) (*Service, error) {
 	service := &Service{
 		Entrypoint: serviceYAML.Entrypoint.Values,
 		Image:      serviceYAML.Image,
-		User:			  serviceYAML.User,
+		User:       serviceYAML.User,
 		WorkingDir: serviceYAML.WorkingDir,
 	}
 

@@ -57,9 +57,9 @@ func (podStatus *podStatus) String() string {
 type appImageInfo struct {
 	err              error
 	imageHealthcheck *config.Healthcheck
-	once						 *sync.Once
+	once             *sync.Once
 	podImage         string
-	user						 *userinfo
+	user             *userinfo
 }
 
 type app struct {
@@ -80,7 +80,7 @@ type hostAliasesOrError struct {
 type localImagesCache struct {
 	imageIDSet *digestset.Set
 	images     []dockerTypes.ImageSummary
-	once			 *sync.Once
+	once       *sync.Once
 	err        error
 }
 
@@ -237,7 +237,7 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 	} else if podImage == "" {
 		if !sourceImageIsNamed {
 			// TODO https://github.com/jbrekelmans/kube-compose/issues/6
-			return fmt.Errorf("image reference %s is likely unstable, please enable pushing of images or use named image references to " +
+			return fmt.Errorf("image reference %s is likely unstable, please enable pushing of images or use named image references to "+
 				"improve reliability", sourceImage)
 		}
 		podImage = sourceImage
@@ -262,9 +262,9 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 				return errors.Wrap(err, fmt.Sprintf("service %s in the docker-compose file has an invalid user", app.name))
 			}
 		}
-		if user.Uid == nil || (user.Group != "" && user.Gid == nil) {
+		if user.UID == nil || (user.Group != "" && user.Gid == nil) {
 			// TODO https://github.com/jbrekelmans/kube-compose/issues/70 confirm whether docker and our pod spec will produce the same default
-			// group if a UID is set but no GID 
+			// group if a UID is set but no GID
 			err = getUserinfoFromImage(u.ctx, u.dockerClient, sourceImageID, user)
 			if err != nil {
 				return errors.Wrap(err, fmt.Sprintf("error getting uid/gid from file system of image %s", sourceImageRef.String()))
@@ -548,7 +548,7 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	var securityContext *v1.PodSecurityContext
 	if u.cfg.RunAsUser {
 		securityContext = &v1.PodSecurityContext{
-			RunAsUser: app.imageInfo.user.Uid,
+			RunAsUser: app.imageInfo.user.UID,
 		}
 		if app.imageInfo.user.Gid != nil {
 			securityContext.RunAsGroup = app.imageInfo.user.Gid
@@ -569,8 +569,8 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 					WorkingDir:      dcService.WorkingDir,
 				},
 			},
-			HostAliases:   	 hostAliases,
-			RestartPolicy: 	 v1.RestartPolicyNever,
+			HostAliases:     hostAliases,
+			RestartPolicy:   v1.RestartPolicyNever,
 			SecurityContext: securityContext,
 		},
 	}
@@ -868,9 +868,9 @@ func (u *upRunner) checkIfPodsReady() bool {
 func Run(cfg *config.Config) error {
 	// TODO https://github.com/jbrekelmans/kube-compose/issues/2 accept context as a parameter
 	u := &upRunner{
-		cfg:                  cfg,
-		ctx:                  context.Background(),
-		hostAliasesOnce:      &sync.Once{},
+		cfg:             cfg,
+		ctx:             context.Background(),
+		hostAliasesOnce: &sync.Once{},
 	}
 	u.localImagesCache.once = &sync.Once{}
 	return u.run()

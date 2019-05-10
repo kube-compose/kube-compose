@@ -10,16 +10,16 @@ import (
 	"path"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/docker/distribution/digestset"
-	dockerArchive "github.com/docker/docker/pkg/archive"
-	dockerContainers "github.com/docker/docker/api/types/container"
 	dockerRef "github.com/docker/distribution/reference"
 	dockerTypes "github.com/docker/docker/api/types"
+	dockerContainers "github.com/docker/docker/api/types/container"
 	dockerFilters "github.com/docker/docker/api/types/filters"
 	dockerClient "github.com/docker/docker/client"
+	dockerArchive "github.com/docker/docker/pkg/archive"
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	"github.com/jbrekelmans/kube-compose/pkg/docker"
+	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -82,7 +82,7 @@ type hasTag interface {
 }
 
 func inspectImageRawParseHealthcheck(inspectRaw []byte) (*config.Healthcheck, error) {
-	// imageInspect is similar to dockerClient.ImageInspect, but it allows us to detect absent fields so we can apply default values.
+	// inspectInfo's type is similar to dockerClient.ImageInspect, but it allows us to detect absent fields so we can apply default values.
 	var inspectInfo struct {
 		Config struct {
 			Healthcheck struct {
@@ -137,9 +137,9 @@ func copyFileFromContainer(ctx context.Context, dc *dockerClient.Client, contain
 		return fmt.Errorf("could not copy %#v because it is not a regular file", srcFile)
 	}
 	srcInfo := dockerArchive.CopyInfo{
-		Path: srcFile,
-		Exists: true,
-		IsDir: false,
+		Path:       srcFile,
+		Exists:     true,
+		IsDir:      false,
 		RebaseName: "",
 	}
 	err = dockerArchive.CopyTo(readCloser, srcInfo, dstFile)
@@ -149,10 +149,12 @@ func copyFileFromContainer(ctx context.Context, dc *dockerClient.Client, contain
 	return nil
 }
 
+// Cyclomatic complexity of this function is too high
+// nolint
 func getUserinfoFromImage(ctx context.Context, dc *dockerClient.Client, image string, user *userinfo) error {
 	containerConfig := &dockerContainers.Config{
 		Entrypoint: []string{"sh"},
-		Image: image,
+		Image:      image,
 		WorkingDir: "/",
 	}
 	resp, err := dc.ContainerCreate(ctx, containerConfig, nil, nil, "")
@@ -176,7 +178,7 @@ func getUserinfoFromImage(ctx context.Context, dc *dockerClient.Client, image st
 		}
 	}()
 	// TODO https://github.com/jbrekelmans/kube-compose/issues/70 this is not correct for non-Linux containers
-	if user.Uid == nil {
+	if user.UID == nil {
 		err = copyFileFromContainer(ctx, dc, resp.ID, "/etc/passwd", tmpDir)
 		if err != nil {
 			return err
@@ -189,7 +191,7 @@ func getUserinfoFromImage(ctx context.Context, dc *dockerClient.Client, image st
 		if uid == nil {
 			return fmt.Errorf("linux spec user: unable to find user %s no matching entries in passwd file", user.User)
 		}
-		user.Uid = uid
+		user.UID = uid
 	}
 	if user.Gid == nil && user.Group != "" {
 		err = copyFileFromContainer(ctx, dc, resp.ID, "/etc/group", tmpDir)
