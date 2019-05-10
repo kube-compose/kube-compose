@@ -10,7 +10,7 @@ import (
 type userinfo struct {
 	UID   *int64
 	User  string
-	Gid   *int64
+	GID   *int64
 	Group string
 }
 
@@ -47,8 +47,8 @@ func parseUserinfo(userinfoRaw string) (*userinfo, error) {
 	}
 	if i >= 0 {
 		r.Group = userinfoRaw[i+1:]
-		r.Gid = tryParseUID(r.Group)
-		if r.Gid != nil && (*r.Gid > math.MaxInt32 || *r.Gid < 0) {
+		r.GID = tryParseUID(r.Group)
+		if r.GID != nil && (*r.GID > math.MaxInt32 || *r.GID < 0) {
 			return nil, fmt.Errorf("linux spec user: uids and gids must be in range 0-2147483647")
 		}
 	}
