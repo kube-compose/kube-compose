@@ -241,3 +241,13 @@ func contains(arr []string, str string) bool {
 	}
 	return false
 }
+
+func getMaxLenOfServiceName(podsName []string) int {
+	max := len(podsName[0])
+	for _, y := range podsName {
+		if len(y) > max {
+			max = len(y)
+		}
+	}
+	return max
+}

@@ -97,6 +97,7 @@ type upRunner struct {
 	hostAliasesOnce       *sync.Once
 	hostAliases           hostAliasesOrError
 	completedChannels     []chan interface{}
+	maxServiceNameLength  int
 }
 
 func (u *upRunner) initKubernetesClientset() error {
@@ -136,6 +137,7 @@ func (u *upRunner) initAppsToBeStarted() error {
 			delete(u.appsWithoutPods, app)
 		}
 	}
+	u.maxServiceNameLength = getMaxLenOfServiceName(podsRequired)
 	return nil
 }
 
@@ -634,8 +636,7 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 					}()
 					scanner := bufio.NewScanner(bodyReader)
 					for scanner.Scan() {
-						logline := app.name + " | " + scanner.Text()
-						fmt.Println(logline)
+						fmt.Printf("%-*s| %s\n", u.maxServiceNameLength+3, app.name, scanner.Text())
 					}
 					close(completedChannel)
 				}()
