@@ -15,7 +15,8 @@ var upCmd = &cobra.Command{
 }
 
 func upCommand(cmd *cobra.Command, args []string) {
-	cfg, err := newConfigFromEnv()
+	composeFile, _ := cmd.Flags().GetString("file")
+	cfg, err := newConfigFromEnv(composeFile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -33,5 +34,5 @@ func upCommand(cmd *cobra.Command, args []string) {
 
 func init() {
 	rootCmd.AddCommand(upCmd)
-	upCmd.PersistentFlags().BoolP("detach", "d", false, "Detach mode")
+	upCmd.PersistentFlags().BoolP("detach", "d", false, "Detached mode: Run containers in the background")
 }

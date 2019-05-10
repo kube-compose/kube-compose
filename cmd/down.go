@@ -15,7 +15,8 @@ var downCmd = &cobra.Command{
 }
 
 func downCommand(cmd *cobra.Command, args []string) {
-	cfg, err := newConfigFromEnv()
+	composeFile, _ := cmd.Flags().GetString("file")
+	cfg, err := newConfigFromEnv(composeFile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -31,4 +32,5 @@ func downCommand(cmd *cobra.Command, args []string) {
 
 func init() {
 	rootCmd.AddCommand(downCmd)
+	upCmd.PersistentFlags().StringP("file", "f", "", "Specify an alternate compose file")
 }
