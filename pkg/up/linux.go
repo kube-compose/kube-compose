@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func findUserInPasswd(file string, user string) (*int64, error) {
+func findUserInPasswd(file, user string) (*int64, error) {
 	fd, err := os.Open(file)
 	if err != nil {
 		return nil, err
@@ -24,7 +24,7 @@ func findUserInPasswd(file string, user string) (*int64, error) {
 		parts := strings.SplitN(line, ":", 4)
 		if parts[0] == user {
 			user := parts[2]
-			uid := tryParseUid(user)
+			uid := tryParseUID(user)
 			if uid == nil || *uid < 0 {
 				return nil, fmt.Errorf("unexpected file format")
 			}
