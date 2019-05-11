@@ -31,8 +31,8 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(namespace, "namespace", "n", "", "namespace for environment")
 	rootCmd.PersistentFlags().StringP("file", "f", "", "Specify an alternate compose file")
 	envID := new(string)
-	rootCmd.PersistentFlags().StringVarP(envID, "env-id", "e", "", "used to isolate environments deployed to a shared namespace, "+
-		"by (1) using this value as a suffix of pod and service names and (2) using this value to isolate selectors(required)")
+	rootCmd.PersistentFlags().StringVarP(envID, "env-id", "e", "", "(required) used to isolate environments deployed to a shared namespace, "+
+		"by (1) using this value as a suffix of pod and service names and (2) using this value to isolate selectors")
 	viper.AutomaticEnv()
 	if *namespace == "" && viper.GetString("namespace") != "" {
 		// check if environment variable is set

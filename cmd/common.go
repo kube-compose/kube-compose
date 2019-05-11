@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	"github.com/spf13/cobra"
 
@@ -57,5 +59,10 @@ func upOrDownCommandCommon(cmd *cobra.Command, args []string) (*config.Config, e
 		cfg.Namespace = namespace
 	}
 	cfg.Services = args
+	for _, serviceName := range cfg.Services {
+		if _, ok := cfg.CanonicalComposeFile.Services[serviceName]; !ok {
+			return nil, fmt.Errorf("service %#v does not exist in the docker-compose config", serviceName)
+		}
+	}
 	return cfg, nil
 }
