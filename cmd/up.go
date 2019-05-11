@@ -20,6 +20,7 @@ func upCommand(cmd *cobra.Command, args []string) {
 		log.Fatal(err)
 	}
 	cfg.Detach, _ = cmd.Flags().GetBool("detach")
+	cfg.RunAsUser, _ = cmd.Flags().GetBool("run-as-user")
 	err = up.Run(cfg)
 	if err != nil {
 		log.Fatal(err)
@@ -33,4 +34,6 @@ func upCommand(cmd *cobra.Command, args []string) {
 func init() {
 	rootCmd.AddCommand(upCmd)
 	upCmd.PersistentFlags().BoolP("detach", "d", false, "Detached mode: Run containers in the background")
+	upCmd.PersistentFlags().BoolP("run-as-user", "", false, "When set, the runAsUser/runAsGroup will be set for each pod based on the "+
+		"user of the pod's image and the \"user\" key of the pod's docker-compose service")
 }
