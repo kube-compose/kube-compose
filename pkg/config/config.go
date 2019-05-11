@@ -73,6 +73,9 @@ func New(file *string) (*Config, error) {
 		if os.IsNotExist(err) {
 			return nil, errors.Wrap(err, fmt.Sprintf("error loading docker-compose file at %#v", fileName))
 		}
+		if err != nil {
+			return nil, err
+		}
 		fileName = *file
 	} else {
 		fileName = "docker-compose.yml"
