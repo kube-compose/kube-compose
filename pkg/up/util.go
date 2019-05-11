@@ -335,3 +335,13 @@ func contains(arr []string, str string) bool {
 	}
 	return false
 }
+
+func getMaxLenOfServiceName(serviceNames []string) int {
+	max := len(serviceNames[0])
+	for i := 1; i < len(serviceNames); i++ {
+		if len(serviceNames[i]) > max {
+			max = len(serviceNames[i])
+		}
+	}
+	return max
+}
