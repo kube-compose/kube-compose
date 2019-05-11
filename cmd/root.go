@@ -38,6 +38,8 @@ func init() {
 		// check if environment variable is set
 		*namespace = viper.GetString("namespace")
 	}
+	// TODO https://github.com/jbrekelmans/kube-compose/issues/80 this does not have a hyphen whereas the flag does. What does AutomaticEnv
+	// do?
 	if *envID == "" && viper.GetString("envid") != "" {
 		*envID = viper.GetString("envid")
 	} else {

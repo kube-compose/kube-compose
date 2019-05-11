@@ -9,11 +9,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-func newConfigFromEnv(file *string) (*config.Config, error) {
-	cfg, err := config.New(file)
-	if err != nil {
-		return nil, err
-	}
+func setFromKubeConfig(cfg *config.Config) error {
 	loader := clientcmd.NewDefaultClientConfigLoadingRules()
 	overrides := clientcmd.ConfigOverrides{}
 	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loader, &overrides)
@@ -48,7 +44,11 @@ func upOrDownCommandCommon(cmd *cobra.Command, args []string) (*config.Config, e
 	if err != nil {
 		return nil, err
 	}
-	cfg, err := newConfigFromEnv(file)
+	cfg, err := config.New(file)
+	if err != nil {
+		return nil, err
+	}
+	err = setFromKubeConfig(cfg)
 	if err != nil {
 		return nil, err
 	}
