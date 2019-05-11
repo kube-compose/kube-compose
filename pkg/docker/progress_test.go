@@ -52,11 +52,15 @@ func TestPullWaitUnknownError(t *testing.T) {
 
 func TestPullWaitDigest(t *testing.T) {
 	// Wait should return the image digest.
-	digestExpected := "sha256:rgqatjyh3bx91qvkto2rytlrobzfprrbyv7h0fnm1soac55hqc6rpcev5qw9b9uj"
-	reader := bytes.NewReader([]byte(fmt.Sprintf(`{"status":"%s"}`, digestExpected)))
+	digestExpected := "sha256:f0b6db8bb4b757d0c3c9e120f4ac091286be5815ad576fbd48d8b953e8d2b06d"
+	reader := bytes.NewReader([]byte(fmt.Sprintf(`{"status":"%s "}`, digestExpected)))
 	pull := NewPull(reader)
 	digestActual, err := pull.Wait(func(_ *PullOrPush) {})
-	if err != nil || digestActual != digestExpected {
+	if err != nil {
+		t.Log(err)
+		t.Fail()
+	}
+	if digestActual != digestExpected {
 		t.Fail()
 	}
 }
