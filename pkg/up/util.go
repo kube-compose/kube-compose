@@ -17,6 +17,7 @@ import (
 	dockerFilters "github.com/docker/docker/api/types/filters"
 	dockerClient "github.com/docker/docker/client"
 	dockerArchive "github.com/docker/docker/pkg/archive"
+	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	"github.com/jbrekelmans/kube-compose/pkg/docker"
 	"github.com/pkg/errors"
@@ -72,11 +73,6 @@ func createReadinessProbeFromDockerHealthcheck(healthcheck *config.Healthcheck) 
 	return probe
 }
 
-func newFalsePointer() *bool {
-	f := false
-	return &f
-}
-
 type hasTag interface {
 	Tag() string
 }
@@ -126,12 +122,7 @@ func copyFileFromContainer(ctx context.Context, dc *dockerClient.Client, contain
 	if err != nil {
 		return err
 	}
-	defer func() {
-		err = readCloser.Close()
-		if err != nil {
-			fmt.Println(err)
-		}
-	}()
+	defer util.CloseAndLogError(readCloser)
 	if (stat.Mode & os.ModeType) != 0 {
 		// TODO https://github.com/jbrekelmans/kube-compose/issues/70 we should follow symlinks
 		return fmt.Errorf("could not copy %#v because it is not a regular file", srcFile)

@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 
 	dockerTypes "github.com/docker/docker/api/types"
 	dockerClient "github.com/docker/docker/client"
+	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 )
 
 func EncodeRegistryAuth(username, password string) (string, error) {
@@ -30,12 +30,7 @@ func PullImage(ctx context.Context, dc *dockerClient.Client, image, registryAuth
 	if err != nil {
 		return "", err
 	}
-	defer func() {
-		err = readCloser.Close()
-		if err != nil {
-			fmt.Println(err)
-		}
-	}()
+	defer util.CloseAndLogError(readCloser)
 	pull := NewPull(readCloser)
 	return pull.Wait(onUpdate)
 }
@@ -48,12 +43,7 @@ func PushImage(ctx context.Context, dc *dockerClient.Client, image, registryAuth
 	if err != nil {
 		return "", err
 	}
-	defer func() {
-		err = readCloser.Close()
-		if err != nil {
-			fmt.Println(err)
-		}
-	}()
+	defer util.CloseAndLogError(readCloser)
 	push := NewPush(readCloser)
 	return push.Wait(onUpdate)
 }

@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 )
 
 func findUserInPasswd(file, user string) (*int64, error) {
@@ -13,12 +15,7 @@ func findUserInPasswd(file, user string) (*int64, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		err = fd.Close()
-		if err != nil {
-			fmt.Println(err)
-		}
-	}()
+	defer util.CloseAndLogError(fd)
 	return findUserInPasswdReader(fd, user)
 }
 

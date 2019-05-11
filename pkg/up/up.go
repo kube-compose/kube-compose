@@ -12,6 +12,7 @@ import (
 	dockerRef "github.com/docker/distribution/reference"
 	dockerTypes "github.com/docker/docker/api/types"
 	dockerClient "github.com/docker/docker/client"
+	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	k8sUtil "github.com/jbrekelmans/kube-compose/pkg/k8s"
 	goDigest "github.com/opencontainers/go-digest"
@@ -19,7 +20,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
 	k8swatch "k8s.io/apimachinery/pkg/watch"
 
 	"k8s.io/client-go/kubernetes"
@@ -556,7 +556,8 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	}
 	pod := &v1.Pod{
 		Spec: v1.PodSpec{
-			AutomountServiceAccountToken: newFalsePointer(),
+			// new(bool) allocates a bool, sets it to false, and returns a pointer to it.
+			AutomountServiceAccountToken: new(bool),
 			Containers: []v1.Container{
 				{
 					Command:         dcService.Entrypoint,
@@ -660,12 +661,7 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 					if err != nil {
 						panic(err)
 					}
-					defer func() {
-						err = bodyReader.Close()
-						if err != nil {
-							fmt.Println(err)
-						}
-					}()
+					defer util.CloseAndLogError(bodyReader)
 					scanner := bufio.NewScanner(bodyReader)
 					for scanner.Scan() {
 						logline := app.name + " | " + scanner.Text()
