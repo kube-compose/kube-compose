@@ -69,16 +69,13 @@ func New(file *string) (*Config, error) {
 	var err error
 	var fileName string
 	if file != nil {
-		if *file == "" {
-			return nil, fmt.Errorf("docker-compose file flag cannot be empty string")
-		}
 		data, err = ioutil.ReadFile(*file)
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("docker-compose file does not exist at %#v", *file)
+			return nil, errors.Wrap(err, fmt.Sprintf("error loading docker-compose file at %#v", fileName))
 		}
 		fileName = *file
 	} else {
-		fileName = "docker-compose.yaml"
+		fileName = "docker-compose.yml"
 		data, err = ioutil.ReadFile(fileName)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -86,7 +83,7 @@ func New(file *string) (*Config, error) {
 				data, err = ioutil.ReadFile(fileName)
 			}
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, fmt.Sprintf("error loading %#v in the current working directory", fileName))
 			}
 		}
 	}
