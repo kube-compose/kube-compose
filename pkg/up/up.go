@@ -14,18 +14,16 @@ import (
 	dockerClient "github.com/docker/docker/client"
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	k8sUtil "github.com/jbrekelmans/kube-compose/pkg/k8s"
+	cmdColor "github.com/logrusorgru/aurora"
 	goDigest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
+	k8sError "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
 	k8swatch "k8s.io/apimachinery/pkg/watch"
-
 	"k8s.io/client-go/kubernetes"
 	clientV1 "k8s.io/client-go/kubernetes/typed/core/v1"
-
-	k8sError "k8s.io/apimachinery/pkg/api/errors"
 )
 
 func errorResourcesModifiedExternally() error {
@@ -622,6 +620,7 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 				completedChannel := make(chan interface{})
 				u.completedChannels = append(u.completedChannels, completedChannel)
 				go func() {
+					color := getRandomColor()
 					getLogsRequest := u.k8sPodClient.GetLogs(pod.ObjectMeta.Name, getPodLogOptions)
 					var bodyReader io.ReadCloser
 					bodyReader, err = getLogsRequest.Stream()
@@ -634,9 +633,10 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 							fmt.Println(err)
 						}
 					}()
+
 					scanner := bufio.NewScanner(bodyReader)
 					for scanner.Scan() {
-						fmt.Printf("%-*s| %s\n", u.maxServiceNameLength+3, app.name, scanner.Text())
+						fmt.Printf("%-*s| %s\n", u.maxServiceNameLength+3, cmdColor.Colorize(app.name, color), scanner.Text())
 					}
 					close(completedChannel)
 				}()

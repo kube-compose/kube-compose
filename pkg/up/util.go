@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/rand"
 	"time"
 
 	"github.com/docker/distribution/digestset"
@@ -14,8 +15,11 @@ import (
 	dockerClient "github.com/docker/docker/client"
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	"github.com/jbrekelmans/kube-compose/pkg/docker"
+	cmdColor "github.com/logrusorgru/aurora"
 	v1 "k8s.io/api/core/v1"
 )
+
+var color = []cmdColor.Color{409600, 147456, 344064, 81920, 212992, 540672, 278528, 475136}
 
 // https://docs.docker.com/engine/reference/builder/#healthcheck
 // https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
@@ -250,4 +254,9 @@ func getMaxLenOfServiceName(podsName []string) int {
 		}
 	}
 	return max
+}
+
+func getRandomColor() cmdColor.Color {
+	rand.Seed(time.Now().UnixNano())
+	return color[rand.Intn(len(color)-1)]
 }
