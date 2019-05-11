@@ -6,8 +6,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/pkg/errors"
 	version "github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
 	"github.com/uber-go/mapdecode"
 	yaml "gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -60,8 +60,8 @@ type Config struct {
 	PushImages       *PushImagesConfig
 	// A filter of the docker compose services to start. Transitive dependencies of filtered are always started, even if they themselves
 	// are not filtered. If the map is empty all services will be started.
-	Services         map[string]bool
-	Detach           bool
+	Services map[string]bool
+	Detach   bool
 }
 
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64

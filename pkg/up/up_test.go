@@ -52,9 +52,9 @@ func TestComputeDependsOnClosureSuccess(t *testing.T) {
 	appB := u.apps["b"]
 	appC := u.apps["c"]
 	appD := u.apps["d"]
-	
+
 	result := map[*app]bool{}
-	
+
 	// Since appA depends on appB, and appB depends on appC and appD, we expect the result to contain all 4 apps.
 	u.computeDependsOnClosure(appA, result)
 	_, resultContainsAppA := result[appA]
@@ -71,7 +71,7 @@ func TestComputeDependsOnClosureDoesNotRecompute(t *testing.T) {
 	u.initApps()
 	appA := u.apps["a"]
 	appB := u.apps["b"]
-	
+
 	result := map[*app]bool{}
 
 	// computeDependsOnClosure assumes that if an app is already included in result, then it was from a previous call to
@@ -109,11 +109,11 @@ func TestInitAppToBeStartedNonEmpty(t *testing.T) {
 		"c": true,
 	}
 	u.initAppsToBeStarted()
-	
+
 	if len(u.appsToBeStarted) != 1 {
 		t.Fail()
 	}
 	if _, ok := u.appsToBeStarted[appC]; !ok {
-		t.Fail()	
+		t.Fail()
 	}
 }
