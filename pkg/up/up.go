@@ -188,8 +188,8 @@ func (u *upRunner) initResourceObjectMeta(objectMeta *metav1.ObjectMeta, nameEnc
 func (u *upRunner) getAppImage(app *app) (*config.Healthcheck, string, error) {
 	sourceImage := u.cfg.CanonicalComposeFile.Services[app.name].Image
 	if sourceImage == "" {
-		return nil, "", fmt.Errorf("docker compose service %s has no image or is a empty string, and building images is not supported",
-			app.name)
+		return nil, "", fmt.Errorf("docker compose service %s has no image or its image is the empty string, and building images is not "+
+			"supported", app.name)
 	}
 	localImageIDSet, err := u.getLocalImageIDSet()
 	if err != nil {
@@ -198,7 +198,7 @@ func (u *upRunner) getAppImage(app *app) (*config.Healthcheck, string, error) {
 	// Use the same interpretation of images as docker-compose (use ParseAnyReferenceWithSet)
 	sourceImageRef, err := dockerRef.ParseAnyReferenceWithSet(sourceImage, localImageIDSet)
 	if err != nil {
-		return nil, "", errors.Wrap(err, fmt.Sprintf("error while parsing image %s", sourceImage))
+		return nil, "", errors.Wrap(err, fmt.Sprintf("error while parsing image %#v", sourceImage))
 	}
 
 	// We need the image locally always, so we can parse its healthcheck
@@ -208,7 +208,7 @@ func (u *upRunner) getAppImage(app *app) (*config.Healthcheck, string, error) {
 	var podImage string
 	if sourceImageID == "" {
 		if !sourceImageIsNamed {
-			return nil, "", fmt.Errorf("could not find image %s locally, and building images is not supported", sourceImage)
+			return nil, "", fmt.Errorf("could not find image %#v locally, and building images is not supported", sourceImage)
 		}
 		var digest string
 		digest, err = pullImageWithLogging(u.ctx, u.dockerClient, app.name, sourceImageRef.String())
@@ -220,7 +220,7 @@ func (u *upRunner) getAppImage(app *app) (*config.Healthcheck, string, error) {
 			return nil, "", err
 		}
 		if sourceImageID == "" {
-			return nil, "", fmt.Errorf("could get ID of image %s, "+
+			return nil, "", fmt.Errorf("could get ID of image %#v, "+
 				"this is either a bug or images were removed by an external process (please try again)", sourceImage)
 		}
 		// len(podImage) > 0 by definition of resolveLocalImageAfterPull
@@ -247,8 +247,8 @@ func (u *upRunner) getAppImage(app *app) (*config.Healthcheck, string, error) {
 	} else if podImage == "" {
 		if !sourceImageIsNamed {
 			// TODO https://github.com/jbrekelmans/kube-compose/issues/6
-			return nil, "", fmt.Errorf("image reference %s is likely unstable, "+
-				"please enable pushing of images or use named image references to improve reliability", sourceImage)
+			return nil, "", fmt.Errorf("image reference %#v is likely unstable, "+
+				"please enable pushing of images or use named image references to improve consistency across hosts", sourceImage)
 		}
 		podImage = sourceImage
 	}
@@ -327,11 +327,10 @@ func (u *upRunner) waitForServiceClusterIP(expected int) error {
 		}
 	}
 	remaining := u.waitForServiceClusterIPCountRemaining()
+	fmt.Printf("waiting for cluster IP assignment (%d/%d)\n", expected-remaining, expected)
 	if remaining == 0 {
-		fmt.Printf("waiting for cluster IP assignment (%d/%d)\n", expected, expected)
 		return nil
 	}
-	fmt.Printf("waiting for cluster IP assignment (%d/%d)\n", expected-remaining, expected)
 	listOptions.ResourceVersion = serviceList.ResourceVersion
 	listOptions.Watch = true
 	watch, err := u.k8sServiceClient.Watch(listOptions)
@@ -402,8 +401,7 @@ func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) 
 					"app":                  app.nameEncoded,
 					u.cfg.EnvironmentLabel: u.cfg.EnvironmentID,
 				},
-				// This is the default value.
-				// Type: v1.ServiceType("ClusterIP"),
+				Type: v1.ServiceType("ClusterIP"),
 			},
 		}
 		u.initResourceObjectMeta(&service.ObjectMeta, app.nameEncoded, app.name)
@@ -414,7 +412,7 @@ func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) 
 		case err != nil:
 			return nil, err
 		default:
-			fmt.Printf("app %s: created service %s\n", app.name, service.ObjectMeta.Name)
+			fmt.Printf("app %s: service %s created\n", app.name, service.ObjectMeta.Name)
 		}
 	}
 	if expectedServiceCount == 0 {
