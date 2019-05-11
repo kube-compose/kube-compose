@@ -67,28 +67,19 @@ type Config struct {
 func New(file *string) (*Config, error) {
 	var data []byte
 	var err error
-	var fileName string
 	if file != nil {
 		data, err = ioutil.ReadFile(*file)
-		if os.IsNotExist(err) {
-			return nil, errors.Wrap(err, fmt.Sprintf("error loading docker-compose file at %#v", fileName))
-		}
-		if err != nil {
-			return nil, err
-		}
-		fileName = *file
 	} else {
-		fileName = "docker-compose.yml"
-		data, err = ioutil.ReadFile(fileName)
-		if err != nil {
-			if os.IsNotExist(err) {
-				fileName = "docker-compose.yaml"
-				data, err = ioutil.ReadFile(fileName)
-			}
-			if err != nil {
-				return nil, errors.Wrap(err, fmt.Sprintf("error loading %#v in the current working directory", fileName))
-			}
+		file = new(string)
+		*file = "docker-compose.yml"
+		data, err = ioutil.ReadFile(*file)
+		if os.IsNotExist(err) {
+			*file = "docker-compose.yaml"
+			data, err = ioutil.ReadFile(*file)
 		}
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("error loading file %#v", *file))
 	}
 	var dataMap genericMap
 	err = yaml.Unmarshal(data, &dataMap)
@@ -103,14 +94,14 @@ func New(file *string) (*Config, error) {
 	} else if verStr, ok := verRaw.(string); ok {
 		ver, err = version.NewVersion(verStr)
 		if err != nil {
-			return nil, fmt.Errorf("file %#v has an invalid version: %#v", fileName, verStr)
+			return nil, fmt.Errorf("file %#v has an invalid version: %#v", *file, verStr)
 		}
 	} else {
-		return nil, fmt.Errorf("file %#v has a version that is not a string", fileName)
+		return nil, fmt.Errorf("file %#v has a version that is not a string", *file)
 	}
 
 	// Substitute variables with environment variables.
-	err = InterpolateConfig(fileName, dataMap, func(name string) (string, bool) {
+	err = InterpolateConfig(*file, dataMap, func(name string) (string, bool) {
 		val, found := os.LookupEnv(name)
 		return val, found
 	}, ver)
@@ -121,7 +112,7 @@ func New(file *string) (*Config, error) {
 	var composeFile composeFile2_1
 	err = mapdecode.Decode(&composeFile, dataMap, mapdecode.IgnoreUnused(true))
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("error while parsing docker compose %#v", fileName))
+		return nil, errors.Wrap(err, fmt.Sprintf("error while parsing docker compose %#v", *file))
 	}
 
 	var custom struct {
@@ -131,7 +122,7 @@ func New(file *string) (*Config, error) {
 	}
 	err = mapdecode.Decode(&custom, dataMap, mapdecode.IgnoreUnused(true))
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("error while parsing x-kube-compose of %#v", fileName))
+		return nil, errors.Wrap(err, fmt.Sprintf("error while parsing x-kube-compose of %#v", *file))
 	}
 
 	cfg := &Config{

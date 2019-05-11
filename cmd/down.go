@@ -15,11 +15,11 @@ var downCmd = &cobra.Command{
 }
 
 func downCommand(cmd *cobra.Command, _ []string) {
-	fileName, err := checkFileFlag(cmd)
+	file, err := getFileFlag(cmd)
 	if err != nil {
 		log.Fatal(err)
 	}
-	cfg, err := newConfigFromEnv(fileName)
+	cfg, err := newConfigFromEnv(file)
 	if err != nil {
 		log.Fatal(err)
 	}

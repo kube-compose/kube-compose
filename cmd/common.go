@@ -30,18 +30,15 @@ func newConfigFromEnv(file *string) (*config.Config, error) {
 	return cfg, nil
 }
 
-func checkFileFlag(cmd *cobra.Command) (*string, error) {
-	var fileName *string
+func getFileFlag(cmd *cobra.Command) (*string, error) {
+	var file *string
 	if cmd.Flags().Changed("file") {
-		fileFlag := &struct {
-			x string
-		}{}
-		file, err := cmd.Flags().GetString("file")
-		fileFlag.x = file
-		fileName = &fileFlag.x
+		fileStr, err := cmd.Flags().GetString("file")
 		if err != nil {
-			return fileName, err
+			return nil, err
 		}
+		file = new(string)
+		*file = fileStr
 	}
-	return fileName, nil
+	return file, nil
 }
