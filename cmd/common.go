@@ -15,15 +15,15 @@ func setFromKubeConfig(cfg *config.Config) error {
 	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loader, &overrides)
 	kubeConfig, err := clientConfig.ClientConfig()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	namespace, _, err := clientConfig.Namespace()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	cfg.KubeConfig = kubeConfig
 	cfg.Namespace = namespace
-	return cfg, nil
+	return nil
 }
 
 func getFileFlag(cmd *cobra.Command) (*string, error) {
