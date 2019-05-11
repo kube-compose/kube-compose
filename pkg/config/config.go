@@ -60,7 +60,7 @@ type Config struct {
 	Namespace        string
 	PushImages       *PushImagesConfig
 
-	// True to set runAsUser/runAsGroup for each pod based on the "user" key in docker-compose services and the image's user.
+	// True to set runAsUser/runAsGroup for each pod based on the user of the pod's image and the "user" key of the pod's docker-compose service.
 	RunAsUser bool
 
 	Services []string

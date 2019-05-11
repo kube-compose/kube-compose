@@ -39,6 +39,5 @@ func upCommand(cmd *cobra.Command, args []string) {
 func init() {
 	rootCmd.AddCommand(upCmd)
 	upCmd.PersistentFlags().BoolP("detach", "d", false, "Detach mode")
-	upCmd.PersistentFlags().BoolP("run-as-user", "", false, "When set, the runAsUser/runAsGroup will be set for each pod based on the " +
-		"\"user\" key in docker-compose services and the image's user")
+	upCmd.PersistentFlags().BoolP("run-as-user", "", false, "When set, the runAsUser/runAsGroup will be set for each pod based on the user of the pod's image and the \"user\" key of the pod's docker-compose service")
 }
