@@ -287,8 +287,8 @@ func parseServiceYAML2_1(serviceYAML *service2_1) (*Service, error) {
 			}
 		case pair.Value.StringValue != nil:
 			value = *pair.Value.StringValue
-		case pair.Value.IntValue != nil:
-			value = strconv.Itoa(*pair.Value.IntValue)
+		case pair.Value.Int64Value != nil:
+			value = strconv.FormatInt(*pair.Value.Int64Value, 10)
 		case pair.Value.FloatValue != nil:
 			value = strconv.FormatFloat(*pair.Value.FloatValue, 'g', -1, 64)
 		default:

@@ -126,7 +126,7 @@ type environmentNameValuePair struct {
 // See https://github.com/docker/compose/blob/master/compose/config/config_schema_v2.1.json#L418
 type environmentValue struct {
 	FloatValue  *float64
-	IntValue    *int
+	Int64Value  *int64
 	StringValue *string
 }
 
@@ -135,8 +135,8 @@ func (v *environmentValue) Decode(into mapdecode.Into) error {
 	err := into(&f)
 	if err == nil {
 		if -9223372036854775000.0 <= f && f <= 9223372036854775000.0 && math.Floor(f) == f {
-			v.IntValue = new(int)
-			*v.IntValue = int(f)
+			v.Int64Value = new(int64)
+			*v.Int64Value = int64(f)
 			return nil
 		}
 		v.FloatValue = new(float64)

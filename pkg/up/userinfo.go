@@ -21,9 +21,7 @@ func tryParseUID(s string) *int64 {
 		// we can look in /etc/passwd and /etc/group). This is exactly the behavior of docker.
 		return nil
 	}
-	pi := new(int64)
-	*pi = i
-	return pi
+	return &i
 }
 
 // parseUserinfo parses a string into a user and group. The string is interpreted exactly as the docker run command would interpret it.
