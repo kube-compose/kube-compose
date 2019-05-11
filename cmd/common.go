@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/jbrekelmans/kube-compose/pkg/config"
+	"github.com/spf13/cobra"
 
 	// Plugin does not export any functions therefore it is ignored IE. "_"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -27,4 +28,20 @@ func newConfigFromEnv(file *string) (*config.Config, error) {
 	cfg.KubeConfig = kubeConfig
 	cfg.Namespace = namespace
 	return cfg, nil
+}
+
+func checkFileFlag(cmd *cobra.Command) (*string, error) {
+	var fileName *string
+	if cmd.Flags().Changed("file") {
+		fileFlag := &struct {
+			x string
+		}{}
+		file, err := cmd.Flags().GetString("file")
+		fileFlag.x = file
+		fileName = &fileFlag.x
+		if err != nil {
+			return fileName, err
+		}
+	}
+	return fileName, nil
 }
