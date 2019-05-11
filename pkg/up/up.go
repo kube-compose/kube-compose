@@ -267,7 +267,7 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 			// group if a UID is set but no GID
 			err = getUserinfoFromImage(u.ctx, u.dockerClient, sourceImageID, user)
 			if err != nil {
-				return errors.Wrap(err, fmt.Sprintf("error getting uid/gid from file system of image %s", sourceImageRef.String()))
+				return errors.Wrap(err, fmt.Sprintf("error getting uid/gid from image %s", sourceImageRef.String()))
 			}
 		}
 		app.imageInfo.user = user
