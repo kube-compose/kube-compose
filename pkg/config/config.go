@@ -58,7 +58,9 @@ type Config struct {
 	KubeConfig       *rest.Config
 	Namespace        string
 	PushImages       *PushImagesConfig
-	Services         []string
+	// A filter of the docker compose services to start. Transitive dependencies of filtered are always started, even if they themselves
+	// are not filtered. If the map is empty all services will be started.
+	Services         map[string]bool
 	Detach           bool
 }
 

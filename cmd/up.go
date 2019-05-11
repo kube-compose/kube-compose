@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"log"
 
 	"github.com/jbrekelmans/kube-compose/pkg/up"
@@ -23,9 +24,12 @@ func upCommand(cmd *cobra.Command, args []string) {
 	if x, _ := cmd.Flags().GetString("namespace"); x != "" {
 		cfg.Namespace, _ = cmd.Flags().GetString("namespace")
 	}
-	cfg.Services = args
+	cfg.Services = map[string]bool{}
+	for _, arg := range args {
+		cfg.Services[arg] = true
+	}
 	cfg.Detach, _ = cmd.Flags().GetBool("detach")
-	err = up.Run(cfg)
+	err = up.Run(context.Background(), cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
