@@ -39,5 +39,5 @@ func downCommand(cmd *cobra.Command, _ []string) {
 // nolint
 func init() {
 	rootCmd.AddCommand(downCmd)
-	upCmd.PersistentFlags().StringP("file", "f", "", "Specify an alternate compose file")
+	downCmd.PersistentFlags().StringP("file", "f", "", "Specify an alternate compose file")
 }
