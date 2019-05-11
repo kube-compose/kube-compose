@@ -38,6 +38,7 @@ type Service struct {
 	Image               string
 	Ports               []PortBinding
 	ServiceName         string
+	User                *string
 	WorkingDir          string
 
 	// helpers for ensureNoDependsOnCycle
@@ -58,8 +59,13 @@ type Config struct {
 	KubeConfig       *rest.Config
 	Namespace        string
 	PushImages       *PushImagesConfig
-	Services         []string
-	Detach           bool
+
+	// True to set runAsUser/runAsGroup for each pod based on the user of the pod's image and the "user" key of the pod's docker-compose
+	// service.
+	RunAsUser bool
+
+	Services []string
+	Detach   bool
 }
 
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
@@ -254,6 +260,7 @@ func parseServiceYAML2_1(serviceYAML *service2_1) (*Service, error) {
 	service := &Service{
 		Entrypoint: serviceYAML.Entrypoint.Values,
 		Image:      serviceYAML.Image,
+		User:       serviceYAML.User,
 		WorkingDir: serviceYAML.WorkingDir,
 	}
 
@@ -284,8 +291,8 @@ func parseServiceYAML2_1(serviceYAML *service2_1) (*Service, error) {
 			}
 		case pair.Value.StringValue != nil:
 			value = *pair.Value.StringValue
-		case pair.Value.IntValue != nil:
-			value = strconv.Itoa(*pair.Value.IntValue)
+		case pair.Value.Int64Value != nil:
+			value = strconv.FormatInt(*pair.Value.Int64Value, 10)
 		case pair.Value.FloatValue != nil:
 			value = strconv.FormatFloat(*pair.Value.FloatValue, 'g', -1, 64)
 		default:
