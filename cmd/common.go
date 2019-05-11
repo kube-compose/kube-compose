@@ -56,6 +56,9 @@ func upOrDownCommandCommon(cmd *cobra.Command, args []string) (*config.Config, e
 	if namespace, _ := cmd.Flags().GetString("namespace"); namespace != "" {
 		cfg.Namespace = namespace
 	}
-	cfg.Services = args
+	cfg.Services = map[string]bool{}
+	for _, arg := range args {
+		cfg.Services[arg] = true
+	}
 	return cfg, nil
 }
