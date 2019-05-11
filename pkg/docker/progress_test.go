@@ -12,7 +12,7 @@ func TestPullProgress(t *testing.T) {
 	pull := NewPull(reader)
 	var progress float64
 	count := 0
-	pull.Wait(func(_ *PullOrPush) {
+	_, _ = pull.Wait(func(_ *PullOrPush) {
 		progress = pull.Progress()
 		count++
 	})
@@ -67,7 +67,7 @@ func TestPushProgress(t *testing.T) {
 	// If there is 1 layer that is only observed to be already pushed then there should be 1 progress update of 100%.
 	var progress float64
 	count := 0
-	push.Wait(func(_ *PullOrPush) {
+	_, _ = push.Wait(func(_ *PullOrPush) {
 		progress = push.Progress()
 		count++
 	})
