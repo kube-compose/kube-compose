@@ -126,7 +126,7 @@ func (u *upRunner) initAppsToBeStarted() {
 		}
 	}
 	colorIndex := 0
-	for _, app := range u.appsToBeStarted {
+	for app := range u.appsToBeStarted {
 		if colorIndex < len(colorSupported) {
 			app.color = colorSupported[colorIndex]
 			colorIndex++
