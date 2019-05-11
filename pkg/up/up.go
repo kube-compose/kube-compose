@@ -15,17 +15,16 @@ import (
 	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	k8sUtil "github.com/jbrekelmans/kube-compose/pkg/k8s"
+	cmdColor "github.com/logrusorgru/aurora"
 	goDigest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
+	k8sError "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	k8swatch "k8s.io/apimachinery/pkg/watch"
-
 	"k8s.io/client-go/kubernetes"
 	clientV1 "k8s.io/client-go/kubernetes/typed/core/v1"
-
-	k8sError "k8s.io/apimachinery/pkg/api/errors"
 )
 
 func errorResourcesModifiedExternally() error {
@@ -41,6 +40,8 @@ const (
 	podStatusOther     podStatus = 0
 	podStatusCompleted podStatus = 3
 )
+
+var colorSupported = []cmdColor.Color{409600, 147456, 344064, 81920, 212992, 278528, 475136}
 
 func (podStatus *podStatus) String() string {
 	switch *podStatus {
@@ -70,6 +71,7 @@ type app struct {
 	name                                 string
 	nameEncoded                          string
 	containersForWhichWeAreStreamingLogs map[string]bool
+	color                                cmdColor.Color
 }
 
 type hostAliasesOrError struct {
@@ -98,6 +100,7 @@ type upRunner struct {
 	hostAliasesOnce       *sync.Once
 	hostAliases           hostAliasesOrError
 	completedChannels     []chan interface{}
+	maxServiceNameLength  int
 }
 
 func (u *upRunner) initKubernetesClientset() error {
@@ -114,6 +117,7 @@ func (u *upRunner) initKubernetesClientset() error {
 func (u *upRunner) initAppsToBeStarted() error {
 	appNames := make([]string, len(u.apps))
 	podsRequired := []string{}
+	var colorIndex int
 	n := 0
 	for _, app := range u.apps {
 		if contains(u.cfg.Services, app.name) {
@@ -135,8 +139,16 @@ func (u *upRunner) initAppsToBeStarted() error {
 	for app := range u.appsWithoutPods {
 		if !contains(podsRequired, app.name) {
 			delete(u.appsWithoutPods, app)
+		} else {
+			if colorIndex < len(colorSupported) {
+				app.color = colorSupported[colorIndex]
+				colorIndex++
+			} else {
+				colorIndex = 0
+			}
 		}
 	}
+	u.maxServiceNameLength = getMaxLenOfServiceName(podsRequired)
 	return nil
 }
 
@@ -664,8 +676,7 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 					defer util.CloseAndLogError(bodyReader)
 					scanner := bufio.NewScanner(bodyReader)
 					for scanner.Scan() {
-						logline := app.name + " | " + scanner.Text()
-						fmt.Println(logline)
+						fmt.Printf("%-*s| %s\n", u.maxServiceNameLength+3, cmdColor.Colorize(app.name, app.color), scanner.Text())
 					}
 					if err = scanner.Err(); err != nil {
 						fmt.Println(err)
