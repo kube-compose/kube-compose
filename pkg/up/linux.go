@@ -3,6 +3,7 @@ package up
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 )
@@ -18,7 +19,11 @@ func findUserInPasswd(file, user string) (*int64, error) {
 			fmt.Println(err)
 		}
 	}()
-	scanner := bufio.NewScanner(fd)
+	return findUserInPasswdReader(fd, user)
+}
+
+func findUserInPasswdReader(reader io.Reader, user string) (*int64, error) {
+	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := scanner.Text()
 		parts := strings.SplitN(line, ":", 4)

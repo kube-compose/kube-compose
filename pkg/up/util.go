@@ -73,8 +73,9 @@ func createReadinessProbeFromDockerHealthcheck(healthcheck *config.Healthcheck) 
 }
 
 func newFalsePointer() *bool {
-	f := false
-	return &f
+	f := new(bool)
+	*f = false
+	return f
 }
 
 type hasTag interface {
