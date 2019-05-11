@@ -14,7 +14,7 @@ func TestPullProgress(t *testing.T) {
 	count := 0
 	pull.Wait(func (_ *PullOrPush) {
 		progress = pull.Progress()
-		count += 1
+		count++
 	})
 	if count != 1 || progress != 1.0 {
 		t.Fail()
@@ -69,7 +69,7 @@ func TestPushProgress(t *testing.T) {
 	count := 0
 	push.Wait(func (_ *PullOrPush) {
 		progress = push.Progress()
-		count += 1
+		count++
 	})
 	if count != 1 || progress != 1.0 {
 		t.Fail()

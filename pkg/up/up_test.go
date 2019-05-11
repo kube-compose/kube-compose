@@ -3,9 +3,8 @@ package up
 import (
 	"testing"
 
-	"github.com/jbrekelmans/kube-compose/pkg/config"
-	
 	version "github.com/hashicorp/go-version"
+	"github.com/jbrekelmans/kube-compose/pkg/config"
 )
 
 func newTestUpRunner() *upRunner {

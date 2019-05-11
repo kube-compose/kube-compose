@@ -6,8 +6,8 @@ import (
 	"os"
 	"strconv"
 
-	version "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
+	version "github.com/hashicorp/go-version"
 	"github.com/uber-go/mapdecode"
 	yaml "gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/util/validation"
