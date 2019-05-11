@@ -16,17 +16,9 @@ var upCmd = &cobra.Command{
 }
 
 func upCommand(cmd *cobra.Command, args []string) {
-	cfg, err := newConfigFromEnv()
+	cfg, err := upOrDownCommandCommon(cmd, args)
 	if err != nil {
 		log.Fatal(err)
-	}
-	cfg.EnvironmentID, _ = cmd.Flags().GetString("env-id")
-	if x, _ := cmd.Flags().GetString("namespace"); x != "" {
-		cfg.Namespace, _ = cmd.Flags().GetString("namespace")
-	}
-	cfg.Services = map[string]bool{}
-	for _, arg := range args {
-		cfg.Services[arg] = true
 	}
 	cfg.Detach, _ = cmd.Flags().GetBool("detach")
 	err = up.Run(context.Background(), cfg)
@@ -41,5 +33,5 @@ func upCommand(cmd *cobra.Command, args []string) {
 // nolint
 func init() {
 	rootCmd.AddCommand(upCmd)
-	upCmd.PersistentFlags().BoolP("detach", "d", false, "Detach mode")
+	upCmd.PersistentFlags().BoolP("detach", "d", false, "Detached mode: Run containers in the background")
 }
