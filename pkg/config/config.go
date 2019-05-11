@@ -38,6 +38,7 @@ type Service struct {
 	Image               string
 	Ports               []PortBinding
 	ServiceName         string
+	User                *string
 	WorkingDir          string
 
 	// helpers for ensureNoDependsOnCycle
@@ -51,28 +52,45 @@ type PushImagesConfig struct {
 
 type Config struct {
 	CanonicalComposeFile CanonicalComposeFile
-	EnvironmentID        string // All Kubernetes resources are named with "-"+EnvironmentID as a suffix, and have an additional label "env="+EnvironmentID so that namespaces can be shared.
-	EnvironmentLabel     string
-	KubeConfig           *rest.Config
-	Namespace            string
-	PushImages           *PushImagesConfig
-	Services             []string
-	Detach               bool
+
+	Detach bool
+
+	// All Kubernetes resources are named with "-"+EnvironmentID as a suffix,
+	// and have an additional label "env="+EnvironmentID so that namespaces can be shared.
+	EnvironmentID    string
+	EnvironmentLabel string
+	KubeConfig       *rest.Config
+	Namespace        string
+	PushImages       *PushImagesConfig
+
+	// True to set runAsUser/runAsGroup for each pod based on the user of the pod's image and the "user" key of the pod's docker-compose
+	// service.
+	RunAsUser bool
+
+	// A filter of the docker compose services to start. Transitive dependencies of filtered are always started, even if they themselves
+	// are not filtered. If the map is empty all services will be started.
+	Services map[string]bool
 }
 
-func New() (*Config, error) {
-	fileName := "docker-compose.yml"
-	data, err := ioutil.ReadFile(fileName)
-	if err != nil {
+// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
+// nolint
+func New(file *string) (*Config, error) {
+	var data []byte
+	var err error
+	if file != nil {
+		data, err = ioutil.ReadFile(*file)
+	} else {
+		file = new(string)
+		*file = "docker-compose.yml"
+		data, err = ioutil.ReadFile(*file)
 		if os.IsNotExist(err) {
-			fileName = "docker-compose.yaml"
-			data, err = ioutil.ReadFile(fileName)
-		}
-		if err != nil {
-			return nil, err
+			*file = "docker-compose.yaml"
+			data, err = ioutil.ReadFile(*file)
 		}
 	}
-
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("error loading file %#v", *file))
+	}
 	var dataMap genericMap
 	err = yaml.Unmarshal(data, &dataMap)
 	if err != nil {
@@ -86,14 +104,14 @@ func New() (*Config, error) {
 	} else if verStr, ok := verRaw.(string); ok {
 		ver, err = version.NewVersion(verStr)
 		if err != nil {
-			return nil, fmt.Errorf("file %#v has an invalid version: %#v", fileName, verStr)
+			return nil, fmt.Errorf("file %#v has an invalid version: %#v", *file, verStr)
 		}
 	} else {
-		return nil, fmt.Errorf("file %#v has a version that is not a string", fileName)
+		return nil, fmt.Errorf("file %#v has a version that is not a string", *file)
 	}
 
 	// Substitute variables with environment variables.
-	err = InterpolateConfig(fileName, dataMap, func(name string) (string, bool) {
+	err = InterpolateConfig(*file, dataMap, func(name string) (string, bool) {
 		val, found := os.LookupEnv(name)
 		return val, found
 	}, ver)
@@ -104,7 +122,7 @@ func New() (*Config, error) {
 	var composeFile composeFile2_1
 	err = mapdecode.Decode(&composeFile, dataMap, mapdecode.IgnoreUnused(true))
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("error while parsing docker compose %#v", fileName))
+		return nil, errors.Wrap(err, fmt.Sprintf("error while parsing docker compose %#v", *file))
 	}
 
 	var custom struct {
@@ -114,7 +132,7 @@ func New() (*Config, error) {
 	}
 	err = mapdecode.Decode(&custom, dataMap, mapdecode.IgnoreUnused(true))
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("error while parsing x-kube-compose of %#v", fileName))
+		return nil, errors.Wrap(err, fmt.Sprintf("error while parsing x-kube-compose of %#v", *file))
 	}
 
 	cfg := &Config{
@@ -129,8 +147,8 @@ func New() (*Config, error) {
 	}
 
 	for name := range cfg.CanonicalComposeFile.Services {
-		if errors := validation.IsDNS1123Subdomain(name); len(errors) > 0 {
-			return nil, fmt.Errorf("sorry, we do not support the potentially valid docker-compose service named %s: %s", name, errors[0])
+		if e := validation.IsDNS1123Subdomain(name); len(e) > 0 {
+			return nil, fmt.Errorf("sorry, we do not support the potentially valid docker-compose service named %s: %s", name, e[0])
 		}
 	}
 
@@ -158,19 +176,22 @@ func ensureNoDependsOnCycle(service *Service) error {
 				return err
 			}
 		} else if dep.recStack {
-			return fmt.Errorf("service %s depends on %s, but this means there is a cyclic dependency, aborting", service.ServiceName, dep.ServiceName)
+			return fmt.Errorf("service %s depends on %s, but this means there is a cyclic dependency, aborting",
+				service.ServiceName, dep.ServiceName)
 		}
 	}
 	return nil
 }
 
 // https://github.com/docker/compose/blob/master/compose/config/config_schema_v2.1.json
+// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
+// nolint
 func parseCompose2_1(composeYAML *composeFile2_1, dockerComposeFile *CanonicalComposeFile) error {
 	n := len(composeYAML.Services)
 	if n > 0 {
 		dockerComposeFile.Services = make(map[string]*Service, n)
 		for name, serviceYAML := range composeYAML.Services {
-			service, err := parseServiceYAML2_1(&serviceYAML)
+			service, err := parseServiceYAML2_1(serviceYAML)
 			if err != nil {
 				return err
 			}
@@ -237,10 +258,13 @@ func parseCompose2_1(composeYAML *composeFile2_1, dockerComposeFile *CanonicalCo
 	return nil
 }
 
+// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
+// nolint
 func parseServiceYAML2_1(serviceYAML *service2_1) (*Service, error) {
 	service := &Service{
 		Entrypoint: serviceYAML.Entrypoint.Values,
 		Image:      serviceYAML.Image,
+		User:       serviceYAML.User,
 		WorkingDir: serviceYAML.WorkingDir,
 	}
 
@@ -260,22 +284,22 @@ func parseServiceYAML2_1(serviceYAML *service2_1) (*Service, error) {
 	service.Environment = make(map[string]string, len(serviceYAML.Environment.Values))
 	for _, pair := range serviceYAML.Environment.Values {
 		var value string
-		if len(pair.Name) == 0 {
+		if pair.Name == "" {
 			return nil, fmt.Errorf("invalid environment variable: %s", pair.Name)
 		}
-		if pair.Value == nil {
+		switch {
+		case pair.Value == nil:
 			var ok bool
-			value, ok = os.LookupEnv(pair.Name)
-			if !ok {
+			if value, ok = os.LookupEnv(pair.Name); !ok {
 				continue
 			}
-		} else if pair.Value.StringValue != nil {
+		case pair.Value.StringValue != nil:
 			value = *pair.Value.StringValue
-		} else if pair.Value.IntValue != nil {
-			value = strconv.Itoa(*pair.Value.IntValue)
-		} else if pair.Value.FloatValue != nil {
+		case pair.Value.Int64Value != nil:
+			value = strconv.FormatInt(*pair.Value.Int64Value, 10)
+		case pair.Value.FloatValue != nil:
 			value = strconv.FormatFloat(*pair.Value.FloatValue, 'g', -1, 64)
-		} else {
+		default:
 			// Environment variables with null values in the YAML are ignored.
 			// This was tested with docker-compose.null-env.yml.
 			continue

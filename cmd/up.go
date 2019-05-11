@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"log"
 
 	"github.com/jbrekelmans/kube-compose/pkg/up"
@@ -15,23 +16,25 @@ var upCmd = &cobra.Command{
 }
 
 func upCommand(cmd *cobra.Command, args []string) {
-	cfg, err := newConfigFromEnv()
+	cfg, err := upOrDownCommandCommon(cmd, args)
 	if err != nil {
 		log.Fatal(err)
 	}
-	cfg.EnvironmentID, _ = cmd.Flags().GetString("env-id")
-	if x, _ := cmd.Flags().GetString("namespace"); x != "" {
-		cfg.Namespace, _ = cmd.Flags().GetString("namespace")
-	}
-	cfg.Services = args
 	cfg.Detach, _ = cmd.Flags().GetBool("detach")
-	err = up.Run(cfg)
+	cfg.RunAsUser, _ = cmd.Flags().GetBool("run-as-user")
+	err = up.Run(context.Background(), cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
+// This method is generated when cobra is initialized.
+// Flags and configuration settings are meant to be
+// configured here.
+// nolint
 func init() {
 	rootCmd.AddCommand(upCmd)
-	upCmd.PersistentFlags().BoolP("detach", "d", false, "Detach mode")
+	upCmd.PersistentFlags().BoolP("detach", "d", false, "Detached mode: Run containers in the background")
+	upCmd.PersistentFlags().BoolP("run-as-user", "", false, "When set, the runAsUser/runAsGroup will be set for each pod based on the "+
+		"user of the pod's image and the \"user\" key of the pod's docker-compose service")
 }
