@@ -74,9 +74,10 @@ type app struct {
 	color                                cmdColor.Color
 }
 
-type hostAliasesOrError struct {
-	v   []v1.HostAlias
-	err error
+type hostAliases struct {
+	v    []v1.HostAlias
+	once *sync.Once
+	err  error
 }
 
 type localImagesCache struct {
@@ -89,7 +90,7 @@ type localImagesCache struct {
 type upRunner struct {
 	apps                  map[string]*app
 	appsThatNeedToBeReady map[*app]bool
-	appsWithoutPods       map[*app]bool
+	appsToBeStarted       map[*app]bool
 	cfg                   *config.Config
 	ctx                   context.Context
 	dockerClient          *dockerClient.Client
@@ -97,8 +98,7 @@ type upRunner struct {
 	k8sClientset          *kubernetes.Clientset
 	k8sServiceClient      clientV1.ServiceInterface
 	k8sPodClient          clientV1.PodInterface
-	hostAliasesOnce       *sync.Once
-	hostAliases           hostAliasesOrError
+	hostAliases           hostAliases
 	completedChannels     []chan interface{}
 	maxServiceNameLength  int
 }
@@ -114,48 +114,62 @@ func (u *upRunner) initKubernetesClientset() error {
 	return nil
 }
 
-func (u *upRunner) initAppsToBeStarted() error {
-	appNames := make([]string, len(u.apps))
-	podsRequired := []string{}
-	var colorIndex int
-	n := 0
-	for _, app := range u.apps {
-		if contains(u.cfg.Services, app.name) {
-			appNames[n] = app.name
-			n++
-			for n > 0 {
-				appName := appNames[n-1]
-				n--
-				for dependencyApp := range u.cfg.CanonicalComposeFile.Services[appName].DependsOn {
-					appNames[n] = u.apps[dependencyApp.ServiceName].name
-					n++
-				}
-				podsRequired = append(podsRequired, appName)
+func (u *upRunner) initAppsToBeStarted() {
+	u.appsToBeStarted = map[*app]bool{}
+	if len(u.cfg.Services) == 0 {
+		for _, app := range u.apps {
+			u.appsToBeStarted[app] = true
+		}
+	} else {
+		for _, app := range u.apps {
+			if _, ok := u.cfg.Services[app.name]; ok {
+				u.computeDependsOnClosure(app, u.appsToBeStarted)
 			}
-		} else if len(u.cfg.Services) == 0 {
-			podsRequired = append(podsRequired, app.name)
 		}
 	}
-	for app := range u.appsWithoutPods {
-		if !contains(podsRequired, app.name) {
-			delete(u.appsWithoutPods, app)
+	colorIndex := 0
+	for app := range u.appsToBeStarted {
+		if colorIndex < len(colorSupported) {
+			app.color = colorSupported[colorIndex]
+			colorIndex++
 		} else {
-			if colorIndex < len(colorSupported) {
-				app.color = colorSupported[colorIndex]
-				colorIndex++
-			} else {
-				colorIndex = 0
-			}
+			colorIndex = 0
+		}
+		if len(app.name) > u.maxServiceNameLength {
+			u.maxServiceNameLength = len(app.name)
 		}
 	}
-	u.maxServiceNameLength = getMaxLenOfServiceName(podsRequired)
-	return nil
 }
 
-func (u *upRunner) initApps() error {
+func (u *upRunner) computeDependsOnClosure(app1 *app, result map[*app]bool) {
+	appQueue := []*app{
+		app1,
+	}
+	n := 1
+	for {
+		app2 := appQueue[n-1]
+		n--
+		if _, ok := result[app2]; !ok {
+			result[app2] = true
+			for service := range u.cfg.CanonicalComposeFile.Services[app2.name].DependsOn {
+				dependencyApp := u.apps[service.ServiceName]
+				if n < len(appQueue) {
+					appQueue[n] = dependencyApp
+				} else {
+					appQueue = append(appQueue, dependencyApp)
+				}
+				n++
+			}
+		}
+		if n == 0 {
+			break
+		}
+	}
+}
+
+func (u *upRunner) initApps() {
 	u.apps = make(map[string]*app, len(u.cfg.CanonicalComposeFile.Services))
 	u.appsThatNeedToBeReady = map[*app]bool{}
-	u.appsWithoutPods = make(map[*app]bool, len(u.cfg.CanonicalComposeFile.Services))
 	for name, dcService := range u.cfg.CanonicalComposeFile.Services {
 		app := &app{
 			name:                                 name,
@@ -163,15 +177,11 @@ func (u *upRunner) initApps() error {
 			containersForWhichWeAreStreamingLogs: make(map[string]bool),
 		}
 		app.imageInfo.once = &sync.Once{}
-		u.appsWithoutPods[app] = true
 		app.hasService = len(dcService.Ports) > 0
 		u.apps[name] = app
 	}
-	if err := u.initAppsToBeStarted(); err != nil {
-		return err
-	}
-	return nil
 }
+
 func (u *upRunner) initResourceObjectMeta(objectMeta *metav1.ObjectMeta, nameEncoded, name string) {
 	objectMeta.Name = nameEncoded + "-" + u.cfg.EnvironmentID
 	if objectMeta.Labels == nil {
@@ -496,12 +506,10 @@ func (u *upRunner) getLocalImageIDSet() (*digestset.Set, error) {
 }
 
 func (u *upRunner) createServicesAndGetPodHostAliasesOnce() ([]v1.HostAlias, error) {
-	u.hostAliasesOnce.Do(func() {
-		hostAliases, err := u.createServicesAndGetPodHostAliases()
-		u.hostAliases = hostAliasesOrError{
-			v:   hostAliases,
-			err: err,
-		}
+	u.hostAliases.once.Do(func() {
+		v, err := u.createServicesAndGetPodHostAliases()
+		u.hostAliases.v = v
+		u.hostAliases.err = err
 	})
 	return u.hostAliases.v, u.hostAliases.err
 }
@@ -701,7 +709,7 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
 func (u *upRunner) createPodsIfNeeded() error {
-	for app1 := range u.appsWithoutPods {
+	for app1 := range u.appsToBeStarted {
 		dependsOn := u.cfg.CanonicalComposeFile.Services[app1.name].DependsOn
 		createPod := true
 		for dcService, healthiness := range dependsOn {
@@ -738,7 +746,7 @@ func (u *upRunner) createPodsIfNeeded() error {
 				return err
 			}
 			fmt.Printf("app %s: created pod %s because %s\n", app1.name, pod.ObjectMeta.Name, reason.String())
-			delete(u.appsWithoutPods, app1)
+			delete(u.appsToBeStarted, app1)
 		}
 	}
 	return nil
@@ -747,11 +755,9 @@ func (u *upRunner) createPodsIfNeeded() error {
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
 func (u *upRunner) run() error {
-	err := u.initApps()
-	if err != nil {
-		return err
-	}
-	err = u.initKubernetesClientset()
+	u.initApps()
+	u.initAppsToBeStarted()
+	err := u.initKubernetesClientset()
 	if err != nil {
 		return err
 	}
@@ -763,7 +769,7 @@ func (u *upRunner) run() error {
 	}
 	u.dockerClient = dc
 
-	for app := range u.appsWithoutPods {
+	for app := range u.appsToBeStarted {
 		// Begin pulling and pushing images immediately...
 		//nolint
 		go u.getAppImageInfoOnce(app)
@@ -772,7 +778,7 @@ func (u *upRunner) run() error {
 	// set the hostAliases of each pod)
 	// nolint
 	go u.createServicesAndGetPodHostAliasesOnce()
-	for app := range u.appsWithoutPods {
+	for app := range u.appsToBeStarted {
 		if len(u.cfg.CanonicalComposeFile.Services[app.name].DependsOn) != 0 {
 			continue
 		}
@@ -782,8 +788,7 @@ func (u *upRunner) run() error {
 			return err
 		}
 		fmt.Printf("app %s: created pod %s because all its dependency conditions are met\n", app.name, pod.ObjectMeta.Name)
-		delete(u.appsWithoutPods, app)
-
+		delete(u.appsToBeStarted, app)
 	}
 
 	listOptions := metav1.ListOptions{
@@ -872,13 +877,13 @@ func (u *upRunner) checkIfPodsReady() bool {
 }
 
 // Run runs an operation similar docker-compose up against a Kubernetes cluster.
-func Run(cfg *config.Config) error {
+func Run(ctx context.Context, cfg *config.Config) error {
 	// TODO https://github.com/jbrekelmans/kube-compose/issues/2 accept context as a parameter
 	u := &upRunner{
-		cfg:             cfg,
-		ctx:             context.Background(),
-		hostAliasesOnce: &sync.Once{},
+		cfg: cfg,
+		ctx: context.Background(),
 	}
+	u.hostAliases.once = &sync.Once{}
 	u.localImagesCache.once = &sync.Once{}
 	return u.run()
 }
