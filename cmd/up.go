@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"log"
 
 	"github.com/jbrekelmans/kube-compose/pkg/up"
@@ -21,7 +22,7 @@ func upCommand(cmd *cobra.Command, args []string) {
 	}
 	cfg.Detach, _ = cmd.Flags().GetBool("detach")
 	cfg.RunAsUser, _ = cmd.Flags().GetBool("run-as-user")
-	err = up.Run(cfg)
+	err = up.Run(context.Background(), cfg)
 	if err != nil {
 		log.Fatal(err)
 	}

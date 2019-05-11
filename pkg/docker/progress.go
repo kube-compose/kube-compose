@@ -150,16 +150,14 @@ func (d *PullOrPush) Progress() float64 {
 	sum := 0.0
 	count := 0
 	for _, status := range d.statusFromLayer {
-		layerProgress := 0.0
-		if status.statusEnum != nil {
-			weight := status.statusEnum.weightBefore
-			if status.progress != nil && status.progress.Total > 0 {
-				statusProgress := float64(status.progress.Current) / float64(status.progress.Total)
-				weight += (statusProgress * status.statusEnum.weight)
-			}
-			layerProgress = weight / d.maxWeight
+		weight := status.statusEnum.weightBefore
+		if status.progress != nil && status.progress.Total > 0 {
+			statusProgress := float64(status.progress.Current) / float64(status.progress.Total)
+			weight += (statusProgress * status.statusEnum.weight)
+		} else {
+			weight += status.statusEnum.weight
 		}
-		sum += layerProgress
+		sum += weight / d.maxWeight
 		count++
 	}
 	return sum / float64(count)
