@@ -42,3 +42,20 @@ func getFileFlag(cmd *cobra.Command) (*string, error) {
 	}
 	return file, nil
 }
+
+func upOrDownCommandCommon(cmd *cobra.Command, args []string) (*config.Config, error) {
+	file, err := getFileFlag(cmd)
+	if err != nil {
+		return nil, err
+	}
+	cfg, err := newConfigFromEnv(file)
+	if err != nil {
+		return nil, err
+	}
+	cfg.EnvironmentID, _ = cmd.Flags().GetString("env-id")
+	if namespace, _ := cmd.Flags().GetString("namespace"); namespace != "" {
+		cfg.Namespace = namespace
+	}
+	cfg.Services = args
+	return cfg, nil
+}

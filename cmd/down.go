@@ -14,18 +14,10 @@ var downCmd = &cobra.Command{
 	Run:   downCommand,
 }
 
-func downCommand(cmd *cobra.Command, _ []string) {
-	file, err := getFileFlag(cmd)
+func downCommand(cmd *cobra.Command, args []string) {
+	cfg, err := upOrDownCommandCommon(cmd, args)
 	if err != nil {
 		log.Fatal(err)
-	}
-	cfg, err := newConfigFromEnv(file)
-	if err != nil {
-		log.Fatal(err)
-	}
-	cfg.EnvironmentID, _ = cmd.Flags().GetString("env-id")
-	if x, _ := cmd.Flags().GetString("namespace"); x != "" {
-		cfg.Namespace, _ = cmd.Flags().GetString("namespace")
 	}
 	err = down.Run(cfg)
 	if err != nil {
