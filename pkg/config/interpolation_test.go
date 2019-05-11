@@ -4,6 +4,8 @@ import (
 	"testing"
 )
 
+const testValue = "val1"
+
 func mapValueGetter(m map[string]string) ValueGetter {
 	return func(name string) (string, bool) {
 		value, found := m[name]
@@ -13,17 +15,17 @@ func mapValueGetter(m map[string]string) ValueGetter {
 
 func TestInterpolateSimple1(t *testing.T) {
 	m := map[string]string{
-		"VAR1": "val1",
+		"VAR1": testValue,
 	}
 	str, err := Interpolate("$VAR1", mapValueGetter(m), true)
-	if err != nil || str != "val1" {
+	if err != nil || str != testValue {
 		t.Fatal(str, err)
 	}
 }
 
 func TestInterpolateSimple2(t *testing.T) {
 	m := map[string]string{
-		"VAR1": "val1",
+		"VAR1": testValue,
 	}
 	str, err := Interpolate("$VAR1 ", mapValueGetter(m), true)
 	if err != nil || str != "val1 " {
@@ -72,17 +74,17 @@ func TestInterpolateUnexpectedRune(t *testing.T) {
 
 func TestInterpolateBracesSimple(t *testing.T) {
 	m := map[string]string{
-		"VAR1": "val1",
+		"VAR1": testValue,
 	}
 	str, err := Interpolate("${VAR1}", mapValueGetter(m), true)
-	if err != nil || str != "val1" {
+	if err != nil || str != testValue {
 		t.Fatal(str, err)
 	}
 }
 
 func TestInterpolateBracesEOF(t *testing.T) {
 	m := map[string]string{
-		"VAR1": "val1",
+		"VAR1": testValue,
 	}
 	_, err := Interpolate("${VAR1", mapValueGetter(m), true)
 	if err == nil {
@@ -101,7 +103,7 @@ func TestInterpolateBracesDefaultValue1(t *testing.T) {
 func TestInterpolateBracesDefaultValue2(t *testing.T) {
 	m := map[string]string{}
 	str, err := Interpolate("${VAR1-val1}", mapValueGetter(m), true)
-	if err != nil || str != "val1" {
+	if err != nil || str != testValue {
 		t.Fatal(err)
 	}
 }
@@ -111,7 +113,7 @@ func TestInterpolateBracesDefaultValue3(t *testing.T) {
 		"VAR1": "",
 	}
 	str, err := Interpolate("${VAR1:-val1}", mapValueGetter(m), true)
-	if err != nil || str != "val1" {
+	if err != nil || str != testValue {
 		t.Fatal(err)
 	}
 }
@@ -135,10 +137,10 @@ func TestInterpolateBracesError2(t *testing.T) {
 
 func TestInterpolateBracesInvalidDelimiter(t *testing.T) {
 	m := map[string]string{
-		"VAR:ABLE": "val1",
+		"VAR:ABLE": testValue,
 	}
 	str, err := Interpolate("${VAR:ABLE}", mapValueGetter(m), true)
-	if err != nil || str != "val1" {
+	if err != nil || str != testValue {
 		t.Fatal(str, err)
 	}
 }

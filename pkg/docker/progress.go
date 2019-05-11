@@ -29,49 +29,49 @@ var (
 	maxPullWeight             float64
 	maxPushWeight             float64
 	staticPullStatusInfoSlice = []*staticStatusInfo{
-		&staticStatusInfo{
+		{
 			labels: []string{"Waiting"},
 			weight: 1,
 		},
-		&staticStatusInfo{
+		{
 			labels: []string{"Pulling fs layer"},
 			weight: 1,
 		},
-		&staticStatusInfo{
+		{
 			labels: []string{"Downloading"},
 			weight: 20,
 		},
-		&staticStatusInfo{
+		{
 			labels: []string{"Verifying checksum"},
 			weight: 1,
 		},
-		&staticStatusInfo{
+		{
 			labels: []string{"Download complete"},
 			weight: 1,
 		},
-		&staticStatusInfo{
+		{
 			labels: []string{"Extracting"},
 			weight: 5,
 		},
-		&staticStatusInfo{
+		{
 			labels: []string{"Pull complete", "Already exists"},
 			weight: 1,
 		},
 	}
 	staticPushStatusInfoSlice = []*staticStatusInfo{
-		&staticStatusInfo{
+		{
 			labels: []string{"Waiting"},
 			weight: 1,
 		},
-		&staticStatusInfo{
+		{
 			labels: []string{"Preparing"},
 			weight: 1,
 		},
-		&staticStatusInfo{
+		{
 			labels: []string{"Pushing"},
 			weight: 20,
 		},
-		&staticStatusInfo{
+		{
 			labels: []string{"Layer already exists", "Pushed"},
 			weight: 1,
 		},
@@ -81,6 +81,7 @@ var (
 )
 
 // Special init function for this package
+// nolint
 func init() {
 	n := len(staticPullStatusInfoSlice)
 	staticPullStatusInfoFromLabel = make(map[string]*staticStatusInfo, n)
@@ -149,21 +150,21 @@ func (d *PullOrPush) Progress() float64 {
 	sum := 0.0
 	count := 0
 	for _, status := range d.statusFromLayer {
-		layerProgress := 0.0
-		if status.statusEnum != nil {
-			weight := status.statusEnum.weightBefore
-			if status.progress != nil && status.progress.Total > 0 {
-				statusProgress := float64(status.progress.Current) / float64(status.progress.Total)
-				weight = weight + (statusProgress * status.statusEnum.weight)
-			}
-			layerProgress = weight / d.maxWeight
+		weight := status.statusEnum.weightBefore
+		if status.progress != nil && status.progress.Total > 0 {
+			statusProgress := float64(status.progress.Current) / float64(status.progress.Total)
+			weight += (statusProgress * status.statusEnum.weight)
+		} else {
+			weight += status.statusEnum.weight
 		}
-		sum = sum + layerProgress
-		count = count + 1
+		sum += weight / d.maxWeight
+		count++
 	}
 	return sum / float64(count)
 }
 
+// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
+// nolint
 func (d *PullOrPush) Wait(onUpdate func(*PullOrPush)) (string, error) {
 	decoder := json.NewDecoder(d.reader)
 	digest := ""
@@ -189,13 +190,13 @@ func (d *PullOrPush) Wait(onUpdate func(*PullOrPush)) (string, error) {
 			onUpdate(d)
 			// TODO https://github.com/jbrekelmans/kube-compose/issues/5 support non-sha256 digests
 		} else if loc := digestRegExp.FindStringIndex(msg.Status); loc != nil {
-			len := sha256BitLength/4 + len(sha256Prefix)
-			digest = msg.Status[loc[0] : loc[0]+len]
+			y := sha256BitLength/4 + len(sha256Prefix)
+			digest = msg.Status[loc[0] : loc[0]+y]
 		} else if msg.Error != nil && len(msg.Error.Message) > 0 {
 			lastError = msg.Error.Message
 		}
 	}
-	if len(digest) == 0 {
+	if digest == "" {
 		verb := "pushing"
 		if d.isPull {
 			verb = "pulling"
