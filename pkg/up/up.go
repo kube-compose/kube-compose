@@ -40,6 +40,8 @@ const (
 	podStatusCompleted podStatus = 3
 )
 
+var colorSupported = []cmdColor.Color{409600, 147456, 344064, 81920, 212992, 278528, 475136}
+
 func (podStatus *podStatus) String() string {
 	switch *podStatus {
 	case podStatusReady:
@@ -67,6 +69,7 @@ type app struct {
 	name                                 string
 	nameEncoded                          string
 	containersForWhichWeAreStreamingLogs map[string]bool
+	color                                cmdColor.Color
 }
 
 type hostAliasesOrError struct {
@@ -112,6 +115,7 @@ func (u *upRunner) initKubernetesClientset() error {
 func (u *upRunner) initAppsToBeStarted() error {
 	appNames := make([]string, len(u.apps))
 	podsRequired := []string{}
+	var colorIndex int
 	n := 0
 	for _, app := range u.apps {
 		if contains(u.cfg.Services, app.name) {
@@ -133,6 +137,13 @@ func (u *upRunner) initAppsToBeStarted() error {
 	for app := range u.appsWithoutPods {
 		if !contains(podsRequired, app.name) {
 			delete(u.appsWithoutPods, app)
+		} else {
+			if colorIndex < len(colorSupported) {
+				app.color = colorSupported[colorIndex]
+				colorIndex++
+			} else {
+				colorIndex = 0
+			}
 		}
 	}
 	u.maxServiceNameLength = getMaxLenOfServiceName(podsRequired)
@@ -620,7 +631,6 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 				completedChannel := make(chan interface{})
 				u.completedChannels = append(u.completedChannels, completedChannel)
 				go func() {
-					color := getRandomColor()
 					getLogsRequest := u.k8sPodClient.GetLogs(pod.ObjectMeta.Name, getPodLogOptions)
 					var bodyReader io.ReadCloser
 					bodyReader, err = getLogsRequest.Stream()
@@ -636,7 +646,7 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 
 					scanner := bufio.NewScanner(bodyReader)
 					for scanner.Scan() {
-						fmt.Printf("%-*s| %s\n", u.maxServiceNameLength+3, cmdColor.Colorize(app.name, color), scanner.Text())
+						fmt.Printf("%-*s| %s\n", u.maxServiceNameLength+3, cmdColor.Colorize(app.name, app.color), scanner.Text())
 					}
 					close(completedChannel)
 				}()
