@@ -58,11 +58,12 @@ func upOrDownCommandCommon(cmd *cobra.Command, args []string) (*config.Config, e
 	if namespace, _ := cmd.Flags().GetString("namespace"); namespace != "" {
 		cfg.Namespace = namespace
 	}
-	cfg.Services = args
-	for _, serviceName := range cfg.Services {
-		if _, ok := cfg.CanonicalComposeFile.Services[serviceName]; !ok {
-			return nil, fmt.Errorf("service %#v does not exist in the docker-compose config", serviceName)
+	cfg.Services = map[string]bool{}
+	for _, arg := range args {
+		if _, ok := cfg.CanonicalComposeFile.Services[arg]; !ok {
+			return nil, fmt.Errorf("service %#v does not exist in the docker-compose config", arg)
 		}
+		cfg.Services[arg] = true
 	}
 	return cfg, nil
 }
