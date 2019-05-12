@@ -102,15 +102,23 @@ func (d *downRunner) run() error {
 	if err != nil {
 		return err
 	}
-	errorChannels := make([]chan error, 2)
-	for i := 0; i < len(errorChannels); i++ {
-		errorChannels[i] = make(chan error, 1)
+	errorChannels := []chan error{}
+
+	// Only delete services if all pods are to be deleted. This is so that existing pods will not have
+	// their host aliases invalidated.
+	if d.cfg.FilterMatchesAll() {
+		errorChannel := make(chan error)
+		errorChannels = append(errorChannels, errorChannel)
+		go d.deleteServices(errorChannel)
 	}
-	go d.deleteServices(errorChannels[0])
-	go d.deletePods(errorChannels[1])
+
+	errorChannel := make(chan error)
+	errorChannels = append(errorChannels, errorChannel)
+	go d.deletePods(errorChannel)
+
 	var firstError error
-	for i := 0; i < len(errorChannels); i++ {
-		err, more := <-errorChannels[i]
+	for _, errorChannel := range errorChannels {
+		err, more := <-errorChannel
 		if !more {
 			continue
 		}
