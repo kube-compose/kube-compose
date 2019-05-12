@@ -63,4 +63,3 @@ issues:
 # https://github.com/golangci/golangci/wiki/Configuration
 service:
   golangci-lint-version: 1.16.x # use the fixed version to not introduce new linters unexpectedly
-  prepare:
