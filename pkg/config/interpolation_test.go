@@ -174,7 +174,7 @@ func TestInterpolate_RecursiveMap(t *testing.T) {
 	}
 	outputRaw := c.interpolateRecursive(input, path{})
 	output, ok := outputRaw.(genericMap)
-	if !ok || &input != &output || len(c.errorList) > 0 {
+	if !ok || len(output) != 1 || output["key"] != "value" || len(c.errorList) > 0 {
 		t.Fail()
 	}
 }
