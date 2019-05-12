@@ -27,7 +27,7 @@ before_script:
 # .golangci.yml file at the top level of your repo.
 script:
 - golangci-lint run --deadline=30m
-- go test -v -covermode=count -coverpkg=./... -coverprofile=coverage.txt ./...
+- go test -covermode=count -coverpkg=./... -coverprofile=coverage.txt ./...
 - $GOPATH/bin/goveralls -coverprofile=coverage.txt -service=travis-ci
 
 before_deploy:

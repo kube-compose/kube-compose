@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	version "github.com/hashicorp/go-version"
+	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 	"github.com/pkg/errors"
 	"github.com/uber-go/mapdecode"
 	yaml "gopkg.in/yaml.v2"
@@ -36,14 +37,16 @@ type Service struct {
 	Healthcheck         *Healthcheck
 	HealthcheckDisabled bool
 	Image               string
+	Name                string
 	Ports               []PortBinding
-	ServiceName         string
 	User                *string
 	WorkingDir          string
 
 	// helpers for ensureNoDependsOnCycle
-	recStack bool
-	visited  bool
+	recStack         bool
+	visited          bool
+	nameEscaped      string
+	nameEscapedIsSet bool
 }
 
 type PushImagesConfig struct {
@@ -67,9 +70,8 @@ type Config struct {
 	// service.
 	RunAsUser bool
 
-	// A filter of the docker compose services to start. Transitive dependencies of filtered are always started, even if they themselves
-	// are not filtered. If the map is empty all services will be started.
-	Services map[string]bool
+	// A subset of docker compose services to start and stop.
+	filter map[string]bool
 }
 
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
@@ -164,6 +166,14 @@ func (service *Service) clearRecStack() {
 	service.recStack = false
 }
 
+func (service *Service) NameEscaped() string {
+	if !service.nameEscapedIsSet {
+		service.nameEscaped = util.EscapeName(service.Name)
+		service.nameEscapedIsSet = true
+	}
+	return service.nameEscaped
+}
+
 // https://www.geeksforgeeks.org/detect-cycle-in-a-graph/
 func ensureNoDependsOnCycle(service *Service) error {
 	service.visited = true
@@ -177,7 +187,7 @@ func ensureNoDependsOnCycle(service *Service) error {
 			}
 		} else if dep.recStack {
 			return fmt.Errorf("service %s depends on %s, but this means there is a cyclic dependency, aborting",
-				service.ServiceName, dep.ServiceName)
+				service.Name, dep.Name)
 		}
 	}
 	return nil
@@ -195,7 +205,7 @@ func parseCompose2_1(composeYAML *composeFile2_1, dockerComposeFile *CanonicalCo
 			if err != nil {
 				return err
 			}
-			service.ServiceName = name
+			service.Name = name
 			dockerComposeFile.Services[name] = service
 			if serviceYAML.DependsOn != nil {
 				for dependsOnService := range serviceYAML.DependsOn.Values {
@@ -307,4 +317,53 @@ func parseServiceYAML2_1(serviceYAML *service2_1) (*Service, error) {
 		service.Environment[pair.Name] = value
 	}
 	return service, nil
+}
+
+// MatchesFilter determines whether a service (by name) matches a previously set filter.
+func (cfg *Config) MatchesFilter(serviceName string) bool {
+	_, ok := cfg.filter[serviceName]
+	return ok
+}
+
+// FilterMatchesAll determines whether or not MatchesFilter returns true for any service in cfg.CanoicalComposeFile.Services.
+func (cfg *Config) FilterMatchesAll() bool {
+	return len(cfg.filter) == len(cfg.CanonicalComposeFile.Services)
+}
+
+// SetFilterToMatchAll resets the filter on cfg to match all docker compose services.
+func (cfg *Config) SetFilterToMatchAll() {
+	cfg.filter = map[string]bool{}
+	for serviceName := range cfg.CanonicalComposeFile.Services {
+		cfg.filter[serviceName] = true
+	}
+}
+
+// SetFilter resets the filter of docker compose services on cfg to match those with a name in args, and their (indirect) dependencies.
+func (cfg *Config) SetFilter(args []string) error {
+	cfg.filter = map[string]bool{}
+	queue := make([]string, len(args))
+	n := 0
+	for _, arg := range args {
+		if _, ok := cfg.CanonicalComposeFile.Services[arg]; !ok {
+			return fmt.Errorf("service %#v does not exist in the docker-compose config", arg)
+		}
+		queue[n] = arg
+		n++
+	}
+	for n > 0 {
+		n--
+		serviceName := queue[n]
+		if _, ok := cfg.filter[serviceName]; !ok {
+			cfg.filter[serviceName] = true
+			for serviceDependency := range cfg.CanonicalComposeFile.Services[serviceName].DependsOn {
+				if n < len(queue) {
+					queue[n] = serviceDependency.Name
+				} else {
+					queue = append(queue, serviceDependency.Name)
+				}
+				n++
+			}
+		}
+	}
+	return nil
 }

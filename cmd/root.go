@@ -32,7 +32,8 @@ func init() {
 	rootCmd.PersistentFlags().StringP("file", "f", "", "Specify an alternate compose file")
 	envID := new(string)
 	rootCmd.PersistentFlags().StringVarP(envID, "env-id", "e", "", "used to isolate environments deployed to a shared namespace, "+
-		"by (1) using this value as a suffix of pod and service names and (2) using this value to isolate selectors(required)")
+		"by (1) using this value as a suffix of pod and service names and (2) using this value to isolate selectors. Either this flag or "+
+		"the environment variable KUBECOMPOSE_ENVID must be set")
 	viper.AutomaticEnv()
 	if *namespace == "" && viper.GetString("namespace") != "" {
 		// check if environment variable is set
