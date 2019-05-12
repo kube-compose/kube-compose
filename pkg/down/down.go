@@ -3,6 +3,7 @@ package down
 import (
 	"fmt"
 
+	"github.com/jbrekelmans/kube-compose/internal/pkg/k8smeta"
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,6 +20,8 @@ type downRunner struct {
 	k8sClientset     *kubernetes.Clientset
 	k8sServiceClient clientV1.ServiceInterface
 	k8sPodClient     clientV1.PodInterface
+	// a filter of the names of docker compose services that were specified on the command line, including their (indirect) dependencies.
+	filter map[string]bool
 }
 
 func (d *downRunner) initKubernetesClientset() error {
@@ -44,15 +47,25 @@ func (d *downRunner) deleteCommon(errorChannel chan<- error, kind string, lister
 	}
 	deleteOptions := &metav1.DeleteOptions{}
 	for _, item := range list {
-		err := deleter(item.Name, deleteOptions)
+		composeService, err := k8smeta.FindFromObjectMeta(d.cfg, item)
 		if err != nil {
 			errorChannel <- err
 			return
 		}
-		fmt.Printf("deleted %s %s\n", kind, item.Name)
+		if d.cfg.MatchesFilter(composeService.ServiceName) {
+			err = deleter(item.Name, deleteOptions)
+			if err != nil {
+				errorChannel <- err
+				return
+			}
+			fmt.Printf("deleted %s %s\n", kind, item.Name)
+		}
 	}
 }
 
+// Linter reports code duplication amongst deleteServices and deletePods. Although this is true, deduplicating would require the use of
+// generics, so we choose to nolint.
+// nolint
 func (d *downRunner) deleteServices(errorChannel chan<- error) {
 	lister := func(listOptions metav1.ListOptions) ([]*v1.ObjectMeta, error) {
 		serviceList, err := d.k8sServiceClient.List(listOptions)
@@ -68,6 +81,9 @@ func (d *downRunner) deleteServices(errorChannel chan<- error) {
 	d.deleteCommon(errorChannel, "Service", lister, d.k8sServiceClient.Delete)
 }
 
+// Linter reports code duplication amongst deleteServices and deletePods. Although this is true, deduplicating would require the use of
+// generics, so we choose to nolint.
+// nolint
 func (d *downRunner) deletePods(errorChannel chan<- error) {
 	lister := func(listOptions metav1.ListOptions) ([]*v1.ObjectMeta, error) {
 		podList, err := d.k8sPodClient.List(listOptions)

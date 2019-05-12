@@ -67,9 +67,8 @@ type Config struct {
 	// service.
 	RunAsUser bool
 
-	// A filter of the docker compose services to start. Transitive dependencies of filtered are always started, even if they themselves
-	// are not filtered. If the map is empty all services will be started.
-	Services map[string]bool
+	// A subset of docker compose services to start and stop.
+	filter map[string]bool
 }
 
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
@@ -307,4 +306,48 @@ func parseServiceYAML2_1(serviceYAML *service2_1) (*Service, error) {
 		service.Environment[pair.Name] = value
 	}
 	return service, nil
+}
+
+// MatchesFilter determines whether a service (by name) matches a previously set filter.
+func (cfg *Config) MatchesFilter(serviceName string) bool {
+	_, ok := cfg.filter[serviceName]
+	return ok
+}
+
+// SetFilterToMatchAll resets the filter on cfg to match all docker compose services.
+func (cfg *Config) SetFilterToMatchAll() {
+	cfg.filter = map[string]bool{}
+	for serviceName := range cfg.CanonicalComposeFile.Services {
+		cfg.filter[serviceName] = true
+	}
+}
+
+// SetFilter resets the filter of docker compose services on cfg to match those with a name in args, and their (indirect) dependencies.
+func (cfg *Config) SetFilter(args []string) error {
+	cfg.filter = map[string]bool{}
+	queue := make([]string, len(args))
+	n := 0
+	for _, arg := range args {
+		if _, ok := cfg.CanonicalComposeFile.Services[arg]; !ok {
+			return fmt.Errorf("service %#v does not exist in the docker-compose config", arg)
+		}
+		queue[n] = arg
+		n++
+	}
+	for n > 0 {
+		n--
+		serviceName := queue[n]
+		if _, ok := cfg.filter[serviceName]; !ok {
+			cfg.filter[serviceName] = true
+			for serviceDependency := range cfg.CanonicalComposeFile.Services[serviceName].DependsOn {
+				if n < len(queue) {
+					queue[n] = serviceDependency.ServiceName
+				} else {
+					queue = append(queue, serviceDependency.ServiceName)
+				}
+				n++
+			}
+		}
+	}
+	return nil
 }

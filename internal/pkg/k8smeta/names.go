@@ -1,4 +1,4 @@
-package k8s
+package k8smeta
 
 import (
 	"io"
@@ -7,9 +7,9 @@ import (
 
 const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
 
-// EncodeName takes an arbitrary string and maps it bijectively to the grammar ^[a-z0-9]+$.
+// EscapeName takes an arbitrary string and maps it bijectively to the grammar ^[a-z0-9]+$.
 // This is useful when creating Kubernetes resources.
-func EncodeName(input string) string {
+func EscapeName(input string) string {
 	n := len(input)
 	var sb strings.Builder
 	for i := 0; i < n; i++ {

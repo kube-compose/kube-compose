@@ -12,9 +12,9 @@ import (
 	dockerRef "github.com/docker/distribution/reference"
 	dockerTypes "github.com/docker/docker/api/types"
 	dockerClient "github.com/docker/docker/client"
+	"github.com/jbrekelmans/kube-compose/internal/pkg/k8smeta"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 	"github.com/jbrekelmans/kube-compose/pkg/config"
-	k8sUtil "github.com/jbrekelmans/kube-compose/pkg/k8s"
 	cmdColor "github.com/logrusorgru/aurora"
 	goDigest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -27,14 +27,9 @@ import (
 	clientV1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
-func errorResourcesModifiedExternally() error {
-	return fmt.Errorf("one or more resources appear to have been modified by an external process, aborting")
-}
-
 type podStatus int
 
 const (
-	annotationName               = "kube-compose/service"
 	podStatusReady     podStatus = 2
 	podStatusStarted   podStatus = 1
 	podStatusOther     podStatus = 0
@@ -69,7 +64,6 @@ type app struct {
 	hasService                           bool
 	maxObservedPodStatus                 podStatus
 	name                                 string
-	nameEncoded                          string
 	containersForWhichWeAreStreamingLogs map[string]bool
 	color                                cmdColor.Color
 }
@@ -116,19 +110,12 @@ func (u *upRunner) initKubernetesClientset() error {
 
 func (u *upRunner) initAppsToBeStarted() {
 	u.appsToBeStarted = map[*app]bool{}
-	if len(u.cfg.Services) == 0 {
-		for _, app := range u.apps {
-			u.appsToBeStarted[app] = true
-		}
-	} else {
-		for _, app := range u.apps {
-			if _, ok := u.cfg.Services[app.name]; ok {
-				u.computeDependsOnClosure(app, u.appsToBeStarted)
-			}
-		}
-	}
 	colorIndex := 0
-	for app := range u.appsToBeStarted {
+	for _, app := range u.apps {
+		if !u.cfg.MatchesFilter(app.name) {
+			continue
+		}
+		u.appsToBeStarted[app] = true
 		if colorIndex < len(colorSupported) {
 			app.color = colorSupported[colorIndex]
 			colorIndex++
@@ -141,58 +128,18 @@ func (u *upRunner) initAppsToBeStarted() {
 	}
 }
 
-func (u *upRunner) computeDependsOnClosure(app1 *app, result map[*app]bool) {
-	appQueue := []*app{
-		app1,
-	}
-	n := 1
-	for {
-		app2 := appQueue[n-1]
-		n--
-		if _, ok := result[app2]; !ok {
-			result[app2] = true
-			for service := range u.cfg.CanonicalComposeFile.Services[app2.name].DependsOn {
-				dependencyApp := u.apps[service.ServiceName]
-				if n < len(appQueue) {
-					appQueue[n] = dependencyApp
-				} else {
-					appQueue = append(appQueue, dependencyApp)
-				}
-				n++
-			}
-		}
-		if n == 0 {
-			break
-		}
-	}
-}
-
 func (u *upRunner) initApps() {
 	u.apps = make(map[string]*app, len(u.cfg.CanonicalComposeFile.Services))
 	u.appsThatNeedToBeReady = map[*app]bool{}
 	for name, dcService := range u.cfg.CanonicalComposeFile.Services {
 		app := &app{
 			name:                                 name,
-			nameEncoded:                          k8sUtil.EncodeName(name),
 			containersForWhichWeAreStreamingLogs: make(map[string]bool),
 		}
 		app.imageInfo.once = &sync.Once{}
 		app.hasService = len(dcService.Ports) > 0
 		u.apps[name] = app
 	}
-}
-
-func (u *upRunner) initResourceObjectMeta(objectMeta *metav1.ObjectMeta, nameEncoded, name string) {
-	objectMeta.Name = nameEncoded + "-" + u.cfg.EnvironmentID
-	if objectMeta.Labels == nil {
-		objectMeta.Labels = map[string]string{}
-	}
-	objectMeta.Labels["app"] = nameEncoded
-	objectMeta.Labels[u.cfg.EnvironmentLabel] = u.cfg.EnvironmentID
-	if objectMeta.Annotations == nil {
-		objectMeta.Annotations = map[string]string{}
-	}
-	objectMeta.Annotations[annotationName] = name
 }
 
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
@@ -242,7 +189,7 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 		return err
 	}
 	if u.cfg.PushImages != nil {
-		destinationImage := fmt.Sprintf("%s/%s/%s", u.cfg.PushImages.DockerRegistry, u.cfg.Namespace, app.nameEncoded)
+		destinationImage := fmt.Sprintf("%s/%s/%s", u.cfg.PushImages.DockerRegistry, u.cfg.Namespace, k8smeta.EscapeName(app.name))
 		destinationImagePush := destinationImage + ":latest"
 		err = u.dockerClient.ImageTag(u.ctx, sourceImageID, destinationImagePush)
 		if err != nil {
@@ -303,30 +250,21 @@ func (u *upRunner) getAppImageInfoOnce(app *app) error {
 	return app.imageInfo.err
 }
 
-func (u *upRunner) findAppFromResourceObjectMeta(objectMeta *metav1.ObjectMeta) (*app, error) {
-	if objectMeta.Annotations != nil {
-		if name, ok := objectMeta.Annotations[annotationName]; ok {
-			if app, ok := u.apps[name]; ok {
-				return app, nil
-			}
-		}
+func (u *upRunner) findAppFromObjectMeta(objectMeta *metav1.ObjectMeta) (*app, error) {
+	composeService, err := k8smeta.FindFromObjectMeta(u.cfg, objectMeta)
+	if err != nil {
+		return nil, err
 	}
-	nameEncoded := objectMeta.Name
-	for _, app := range u.apps {
-		if app.nameEncoded == nameEncoded {
-			return nil, errorResourcesModifiedExternally()
-		}
-	}
-	return nil, nil
+	return u.apps[composeService.ServiceName], err
 }
 
 func (u *upRunner) waitForServiceClusterIPUpdate(service *v1.Service) (*app, error) {
-	app, err := u.findAppFromResourceObjectMeta(&service.ObjectMeta)
+	app, err := u.findAppFromObjectMeta(&service.ObjectMeta)
 	if err != nil || app == nil {
 		return app, err
 	}
 	if service.Spec.Type != "ClusterIP" {
-		return app, errorResourcesModifiedExternally()
+		return app, k8smeta.ErrorResourcesModifiedExternally()
 	}
 	app.serviceClusterIP = service.Spec.ClusterIP
 	return app, nil
@@ -353,7 +291,7 @@ func (u *upRunner) waitForServiceClusterIP(expected int) error {
 		return err
 	}
 	if len(serviceList.Items) < expected {
-		return errorResourcesModifiedExternally()
+		return k8smeta.ErrorResourcesModifiedExternally()
 	}
 	for i := 0; i < len(serviceList.Items); i++ {
 		_, err = u.waitForServiceClusterIPUpdate(&serviceList.Items[i])
@@ -388,12 +326,12 @@ func (u *upRunner) waitForServiceClusterIP(expected int) error {
 			}
 		case k8swatch.Deleted:
 			service := event.Object.(*v1.Service)
-			app, err := u.findAppFromResourceObjectMeta(&service.ObjectMeta)
+			app, err := u.findAppFromObjectMeta(&service.ObjectMeta)
 			if err != nil {
 				return err
 			}
 			if app != nil {
-				return errorResourcesModifiedExternally()
+				return k8smeta.ErrorResourcesModifiedExternally()
 			}
 		default:
 			return fmt.Errorf("got unexpected error event from channel: %+v", event.Object)
@@ -431,15 +369,12 @@ func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) 
 		}
 		service := &v1.Service{
 			Spec: v1.ServiceSpec{
-				Ports: servicePorts,
-				Selector: map[string]string{
-					"app":                  app.nameEncoded,
-					u.cfg.EnvironmentLabel: u.cfg.EnvironmentID,
-				},
-				Type: v1.ServiceType("ClusterIP"),
+				Ports:    servicePorts,
+				Selector: k8smeta.InitCommonLabels(u.cfg, dcService, nil),
+				Type:     v1.ServiceType("ClusterIP"),
 			},
 		}
-		u.initResourceObjectMeta(&service.ObjectMeta, app.nameEncoded, app.name)
+		k8smeta.InitObjectMeta(u.cfg, &service.ObjectMeta, dcService)
 		_, err := u.k8sServiceClient.Create(service)
 		switch {
 		case k8sError.IsAlreadyExists(err):
@@ -581,7 +516,7 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 					Env:             envVars,
 					Image:           app.imageInfo.podImage,
 					ImagePullPolicy: v1.PullAlways,
-					Name:            app.nameEncoded,
+					Name:            k8smeta.EscapeName(app.name),
 					Ports:           containerPorts,
 					ReadinessProbe:  readinessProbe,
 					WorkingDir:      dcService.WorkingDir,
@@ -592,10 +527,10 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 			SecurityContext: securityContext,
 		},
 	}
-	u.initResourceObjectMeta(&pod.ObjectMeta, app.nameEncoded, app.name)
+	k8smeta.InitObjectMeta(u.cfg, &pod.ObjectMeta, dcService)
 	podServer, err := u.k8sPodClient.Create(pod)
 	if k8sError.IsAlreadyExists(err) {
-		fmt.Printf("app %s: pod %s already exists\n", app.name, app.nameEncoded)
+		fmt.Printf("app %s: pod %s already exists\n", app.name, pod.ObjectMeta.Name)
 	} else if err != nil {
 		return nil, err
 	}
@@ -648,7 +583,7 @@ func parsePodStatus(pod *v1.Pod) (podStatus, error) {
 // nolint
 func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 
-	app, err := u.findAppFromResourceObjectMeta(&pod.ObjectMeta)
+	app, err := u.findAppFromObjectMeta(&pod.ObjectMeta)
 	if err != nil {
 		return err
 	}
@@ -835,12 +770,12 @@ func (u *upRunner) run() error {
 		case k8swatch.Deleted:
 			pod := event.Object.(*v1.Pod)
 			var app *app
-			app, err = u.findAppFromResourceObjectMeta(&pod.ObjectMeta)
+			app, err = u.findAppFromObjectMeta(&pod.ObjectMeta)
 			if err != nil {
 				return err
 			}
 			if app != nil {
-				return errorResourcesModifiedExternally()
+				return k8smeta.ErrorResourcesModifiedExternally()
 			}
 		default:
 			return fmt.Errorf("got unexpected error event from channel: %+v", event.Object)
@@ -849,7 +784,6 @@ func (u *upRunner) run() error {
 		if err != nil {
 			return err
 		}
-
 		if u.checkIfPodsReady() {
 			break
 		}
