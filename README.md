@@ -71,9 +71,17 @@ You can compile the kube-compose binary using either Go or Docker-compose.
 
 Using Go:
 
-```go
+```
 go build -o kube-compose .
 ```
+
+Using Makefile (**Recommended**):
+
+```make
+make releases
+```
+
+*Note: Will build for Linux, MacOS (darwin), and Windows.*
 
 Using Docker-compose:
 
@@ -87,8 +95,8 @@ The following is a list of all available commands:
  
 ```bash
 Available Commands:
-  up          A brief description of your command
-  down        A brief description of your command
+  up          Create and start containers running on K8s
+  down        Stop and remove containers, networks, images, and volumes running on K8s
   help        Help about any command
 ```
 
@@ -105,15 +113,19 @@ export KUBECOMPOSE_ENVID=""
 
 ## Examples
 
-kube-compose loads pod and services definitions implicitly defined in a docker compose file, and creates them in a target namespace via the following command:
+To create pods and services in K8s from a docker-compose file run the following command:
 
 ```bash
-kube-compose -e mybuildid up
+kube-compose -e [build-id] up
 ```
 
-The target namespace and service account token are loaded from the context set in `~/.kube/config`. This means that k8s Client Tools kubectl commands can be used to configure kube-compose's target namespace and service account.
+The created resources names will be suffixed with build-id and their selectors will include env: build-id.
+
+The target namespace and service account token are loaded from the context set in `~/.kube/config`. This means that k8s Client tool kubectl commands can be used to configure kube-compose's target namespace and service account.
 
 If no `~/.kube/config` exists and kube-compose is run inside a pod in Kubernetes, the pod's namespace becomes the target namespace, and the service account used to create pods and services is the pod's service account.
+
+To read more about how the ~/.kube/config file works read the documentation [here](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/).
 
 The namespace can be overridden via the `--namespace` option, for example: `kube-compose --namespace ci up`.
 
