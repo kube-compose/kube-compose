@@ -19,7 +19,7 @@ func ErrorResourcesModifiedExternally() error {
 }
 
 func validateComposeService(cfg *config.Config, composeService *config.Service) {
-	if composeService != cfg.CanonicalComposeFile.Services[composeService.Name()] {
+	if composeService != cfg.CanonicalComposeFile.Services[composeService.Name] {
 		panic(fmt.Errorf("invalid service"))
 	}
 }
@@ -43,17 +43,15 @@ func InitObjectMeta(cfg *config.Config, objectMeta *metav1.ObjectMeta, composeSe
 	if objectMeta.Annotations == nil {
 		objectMeta.Annotations = map[string]string{}
 	}
-	objectMeta.Annotations[AnnotationName] = composeService.Name()
+	objectMeta.Annotations[AnnotationName] = composeService.Name
 }
 
 // FindFromObjectMeta finds a docker compose service from resource metadata.
 func FindFromObjectMeta(cfg *config.Config, objectMeta *metav1.ObjectMeta) (*config.Service, error) {
-	if objectMeta.Annotations != nil {
-		if composeServiceName, ok := objectMeta.Annotations[AnnotationName]; ok {
-			composeService := cfg.CanonicalComposeFile.Services[composeServiceName]
-			if composeService != nil {
-				return composeService, nil
-			}
+	if composeServiceName, ok := objectMeta.Annotations[AnnotationName]; ok {
+		composeService := cfg.CanonicalComposeFile.Services[composeServiceName]
+		if composeService != nil {
+			return composeService, nil
 		}
 	}
 	i := strings.IndexByte(objectMeta.Name, '-')

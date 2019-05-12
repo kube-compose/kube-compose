@@ -37,6 +37,7 @@ type Service struct {
 	Healthcheck         *Healthcheck
 	HealthcheckDisabled bool
 	Image               string
+	Name                string
 	Ports               []PortBinding
 	User                *string
 	WorkingDir          string
@@ -44,7 +45,6 @@ type Service struct {
 	// helpers for ensureNoDependsOnCycle
 	recStack         bool
 	visited          bool
-	name             string
 	nameEscaped      string
 	nameEscapedIsSet bool
 }
@@ -166,13 +166,9 @@ func (service *Service) clearRecStack() {
 	service.recStack = false
 }
 
-func (service *Service) Name() string {
-	return service.name
-}
-
 func (service *Service) NameEscaped() string {
 	if !service.nameEscapedIsSet {
-		service.nameEscaped = util.EscapeName(service.Name())
+		service.nameEscaped = util.EscapeName(service.Name)
 		service.nameEscapedIsSet = true
 	}
 	return service.nameEscaped
@@ -191,7 +187,7 @@ func ensureNoDependsOnCycle(service *Service) error {
 			}
 		} else if dep.recStack {
 			return fmt.Errorf("service %s depends on %s, but this means there is a cyclic dependency, aborting",
-				service.Name(), dep.Name())
+				service.Name, dep.Name)
 		}
 	}
 	return nil
@@ -209,7 +205,7 @@ func parseCompose2_1(composeYAML *composeFile2_1, dockerComposeFile *CanonicalCo
 			if err != nil {
 				return err
 			}
-			service.name = name
+			service.Name = name
 			dockerComposeFile.Services[name] = service
 			if serviceYAML.DependsOn != nil {
 				for dependsOnService := range serviceYAML.DependsOn.Values {
@@ -361,9 +357,9 @@ func (cfg *Config) SetFilter(args []string) error {
 			cfg.filter[serviceName] = true
 			for serviceDependency := range cfg.CanonicalComposeFile.Services[serviceName].DependsOn {
 				if n < len(queue) {
-					queue[n] = serviceDependency.Name()
+					queue[n] = serviceDependency.Name
 				} else {
-					queue = append(queue, serviceDependency.Name())
+					queue = append(queue, serviceDependency.Name)
 				}
 				n++
 			}

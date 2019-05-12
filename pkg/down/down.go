@@ -50,7 +50,7 @@ func (d *downRunner) deleteCommon(errorChannel chan<- error, kind string, lister
 			errorChannel <- err
 			return
 		}
-		if d.cfg.MatchesFilter(composeService.Name()) {
+		if d.cfg.MatchesFilter(composeService.Name) {
 			err = deleter(item.Name, deleteOptions)
 			if err != nil {
 				errorChannel <- err

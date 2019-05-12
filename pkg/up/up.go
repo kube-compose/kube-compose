@@ -258,7 +258,7 @@ func (u *upRunner) findAppFromObjectMeta(objectMeta *metav1.ObjectMeta) (*app, e
 	if err != nil {
 		return nil, err
 	}
-	return u.apps[composeService.Name()], err
+	return u.apps[composeService.Name], err
 }
 
 func (u *upRunner) waitForServiceClusterIPUpdate(service *v1.Service) (*app, error) {
@@ -644,7 +644,7 @@ func (u *upRunner) createPodsIfNeeded() error {
 	for app1 := range u.appsToBeStarted {
 		createPod := true
 		for composeService, healthiness := range app1.composeService.DependsOn {
-			app2 := u.apps[composeService.Name()]
+			app2 := u.apps[composeService.Name]
 			if healthiness == config.ServiceHealthy {
 				if app2.maxObservedPodStatus != podStatusReady {
 					createPod = false
@@ -663,7 +663,7 @@ func (u *upRunner) createPodsIfNeeded() error {
 				if comma {
 					reason.WriteString(", ")
 				}
-				reason.WriteString(composeService.Name())
+				reason.WriteString(composeService.Name)
 				if healthiness == config.ServiceHealthy {
 					reason.WriteString(": ready")
 				} else {
