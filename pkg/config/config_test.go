@@ -42,8 +42,10 @@ func TestSetFilter(t *testing.T) {
 	cfg := newTestConfig()
 
 	// Since a depends on b, and b depends on c and d, we expect the result to contain all 4 apps.
-	cfg.SetFilter([]string{"a"})
-
+	err := cfg.SetFilter([]string{"a"})
+	if err != nil {
+		t.Fail()
+	}
 	_, resultContainsAppA := cfg.filter["a"]
 	_, resultContainsAppB := cfg.filter["b"]
 	_, resultContainsAppC := cfg.filter["c"]
