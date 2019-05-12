@@ -6,16 +6,16 @@ import (
 
 func newTestConfig() *Config {
 	serviceA := &Service{
-		ServiceName: "a",
+		name: "a",
 	}
 	serviceB := &Service{
-		ServiceName: "b",
+		name: "b",
 	}
 	serviceC := &Service{
-		ServiceName: "c",
+		name: "c",
 	}
 	serviceD := &Service{
-		ServiceName: "d",
+		name: "d",
 	}
 	serviceA.DependsOn = map[*Service]ServiceHealthiness{
 		serviceB: ServiceHealthy,
@@ -27,10 +27,10 @@ func newTestConfig() *Config {
 	cfg := &Config{
 		CanonicalComposeFile: CanonicalComposeFile{
 			Services: map[string]*Service{
-				serviceA.ServiceName: serviceA,
-				serviceB.ServiceName: serviceB,
-				serviceC.ServiceName: serviceC,
-				serviceD.ServiceName: serviceD,
+				serviceA.Name(): serviceA,
+				serviceB.Name(): serviceB,
+				serviceC.Name(): serviceC,
+				serviceD.Name(): serviceD,
 			},
 			Version: v2_1,
 		},
