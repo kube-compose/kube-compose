@@ -25,6 +25,7 @@ func validateComposeService(cfg *config.Config, composeService *config.Service) 
 
 // InitCommonLabels adds the labels for the specified docker compose service to the string map.
 func InitCommonLabels(cfg *config.Config, composeService *config.Service, labels map[string]string) map[string]string {
+	validateComposeService(cfg, composeService)
 	if labels == nil {
 		labels = map[string]string{}
 	}
@@ -35,6 +36,7 @@ func InitCommonLabels(cfg *config.Config, composeService *config.Service, labels
 
 // InitObjectMeta sets the name, labels and annotations of a resource for the specified docker compose service.
 func InitObjectMeta(cfg *config.Config, objectMeta *metav1.ObjectMeta, composeService *config.Service) {
+	validateComposeService(cfg, composeService)
 	objectMeta.Name = EscapeName(composeService.ServiceName) + "-" + cfg.EnvironmentID
 	objectMeta.Labels = InitCommonLabels(cfg, composeService, objectMeta.Labels)
 	if objectMeta.Annotations == nil {

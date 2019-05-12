@@ -20,8 +20,6 @@ type downRunner struct {
 	k8sClientset     *kubernetes.Clientset
 	k8sServiceClient clientV1.ServiceInterface
 	k8sPodClient     clientV1.PodInterface
-	// a filter of the names of docker compose services that were specified on the command line, including their (indirect) dependencies.
-	filter map[string]bool
 }
 
 func (d *downRunner) initKubernetesClientset() error {
