@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	version "github.com/hashicorp/go-version"
+	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 	"github.com/pkg/errors"
 	"github.com/uber-go/mapdecode"
 	yaml "gopkg.in/yaml.v2"
@@ -37,13 +38,15 @@ type Service struct {
 	HealthcheckDisabled bool
 	Image               string
 	Ports               []PortBinding
-	ServiceName         string
 	User                *string
 	WorkingDir          string
 
 	// helpers for ensureNoDependsOnCycle
-	recStack bool
-	visited  bool
+	recStack         bool
+	visited          bool
+	name             string
+	nameEscaped      string
+	nameEscapedIsSet bool
 }
 
 type PushImagesConfig struct {
@@ -163,6 +166,18 @@ func (service *Service) clearRecStack() {
 	service.recStack = false
 }
 
+func (service *Service) Name() string {
+	return service.name
+}
+
+func (service *Service) NameEscaped() string {
+	if !service.nameEscapedIsSet {
+		service.nameEscaped = util.EscapeName(service.Name())
+		service.nameEscapedIsSet = true
+	}
+	return service.nameEscaped
+}
+
 // https://www.geeksforgeeks.org/detect-cycle-in-a-graph/
 func ensureNoDependsOnCycle(service *Service) error {
 	service.visited = true
@@ -176,7 +191,7 @@ func ensureNoDependsOnCycle(service *Service) error {
 			}
 		} else if dep.recStack {
 			return fmt.Errorf("service %s depends on %s, but this means there is a cyclic dependency, aborting",
-				service.ServiceName, dep.ServiceName)
+				service.Name(), dep.Name())
 		}
 	}
 	return nil
@@ -194,7 +209,7 @@ func parseCompose2_1(composeYAML *composeFile2_1, dockerComposeFile *CanonicalCo
 			if err != nil {
 				return err
 			}
-			service.ServiceName = name
+			service.name = name
 			dockerComposeFile.Services[name] = service
 			if serviceYAML.DependsOn != nil {
 				for dependsOnService := range serviceYAML.DependsOn.Values {
@@ -341,9 +356,9 @@ func (cfg *Config) SetFilter(args []string) error {
 			cfg.filter[serviceName] = true
 			for serviceDependency := range cfg.CanonicalComposeFile.Services[serviceName].DependsOn {
 				if n < len(queue) {
-					queue[n] = serviceDependency.ServiceName
+					queue[n] = serviceDependency.Name()
 				} else {
-					queue = append(queue, serviceDependency.ServiceName)
+					queue = append(queue, serviceDependency.Name())
 				}
 				n++
 			}

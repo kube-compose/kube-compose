@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -18,7 +19,7 @@ func ErrorResourcesModifiedExternally() error {
 }
 
 func validateComposeService(cfg *config.Config, composeService *config.Service) {
-	if composeService != cfg.CanonicalComposeFile.Services[composeService.ServiceName] {
+	if composeService != cfg.CanonicalComposeFile.Services[composeService.Name()] {
 		panic(fmt.Errorf("invalid service"))
 	}
 }
@@ -29,7 +30,7 @@ func InitCommonLabels(cfg *config.Config, composeService *config.Service, labels
 	if labels == nil {
 		labels = map[string]string{}
 	}
-	labels["app"] = EscapeName(composeService.ServiceName)
+	labels["app"] = composeService.NameEscaped()
 	labels[cfg.EnvironmentLabel] = cfg.EnvironmentID
 	return labels
 }
@@ -37,12 +38,12 @@ func InitCommonLabels(cfg *config.Config, composeService *config.Service, labels
 // InitObjectMeta sets the name, labels and annotations of a resource for the specified docker compose service.
 func InitObjectMeta(cfg *config.Config, objectMeta *metav1.ObjectMeta, composeService *config.Service) {
 	validateComposeService(cfg, composeService)
-	objectMeta.Name = EscapeName(composeService.ServiceName) + "-" + cfg.EnvironmentID
+	objectMeta.Name = composeService.NameEscaped() + "-" + cfg.EnvironmentID
 	objectMeta.Labels = InitCommonLabels(cfg, composeService, objectMeta.Labels)
 	if objectMeta.Annotations == nil {
 		objectMeta.Annotations = map[string]string{}
 	}
-	objectMeta.Annotations[AnnotationName] = composeService.ServiceName
+	objectMeta.Annotations[AnnotationName] = composeService.Name()
 }
 
 // FindFromObjectMeta finds a docker compose service from resource metadata.
@@ -57,9 +58,10 @@ func FindFromObjectMeta(cfg *config.Config, objectMeta *metav1.ObjectMeta) (*con
 	}
 	i := strings.IndexByte(objectMeta.Name, '-')
 	if i >= 0 && objectMeta.Name[i+1:] == cfg.EnvironmentID {
-		prefix := objectMeta.Name[:i]
-		for composeServiceName := range cfg.CanonicalComposeFile.Services {
-			if EscapeName(composeServiceName) == prefix {
+		composeServiceName, err := util.UnescapeName(objectMeta.Name[:i])
+		if err != nil {
+			composeService := cfg.CanonicalComposeFile.Services[composeServiceName]
+			if composeService != nil {
 				return nil, ErrorResourcesModifiedExternally()
 			}
 		}
