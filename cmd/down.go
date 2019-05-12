@@ -9,7 +9,7 @@ import (
 
 var downCmd = &cobra.Command{
 	Use:   "down",
-	Short: "A brief description of your command",
+	Short: "Stop and remove containers, networks, images, and volumes running on K8s",
 	Long:  "destroy all pods and services",
 	Run:   downCommand,
 }
