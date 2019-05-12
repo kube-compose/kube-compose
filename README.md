@@ -10,9 +10,8 @@ kube-compose is a CI tool that can create and destroy environments in Kubernetes
 
 * [Installation](#Installation)
 * [Getting Started](#Getting-Started)
-  * [Prerequisites](#Prerequisites)
-  * [Running Tests](#Running-Tests)
   * [Build And Package](#Build-And-Package)
+  * [Running Tests](#Running-Tests)
 * [Commands](#Commands)
 * [Examples](#Examples)
 * [Advanced Usage](#Advanced-Usage)
@@ -43,28 +42,6 @@ Otherwise download the binary from https://github.com/jbrekelmans/kube-compose/r
 
 ## Getting Started
 
-### Prerequisites
-
-NA
-
-### Testing
-
-Use `kubectl` to set the target Kubernetes namespace and the service account of kube-compose.
-
-Run `kube-compose` with the test [docker-compose.yml](test/docker-compose.yml):
-
-```bash
-(cd test && ../kube-compose --env-id test123 up)
-```
-
-This writes the created Kubernetes resources to the directory test/output.
-
-To clean up after the test:
-
-```bash
-kubectl delete $(kubectl get all -lenv=test123 -oname)
-```
-
 ### Build And Package
 
 You can compile the kube-compose binary using either Go or Docker-compose.
@@ -87,6 +64,24 @@ Using Docker-compose:
 
 ```bash
 docker-compose build
+```
+
+### Testing
+
+Use `kubectl` to set the target Kubernetes namespace and the service account of kube-compose.
+
+Run `kube-compose` with the test [docker-compose.yml](test/docker-compose.yml):
+
+```bash
+(cd test && ../kube-compose --env-id test123 up)
+```
+
+This writes the created Kubernetes resources to the directory test/output.
+
+To clean up after the test:
+
+```bash
+kubectl delete $(kubectl get all -lenv=test123 -oname)
 ```
 
 ## Commands
