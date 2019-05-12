@@ -57,7 +57,7 @@ func FindFromObjectMeta(cfg *config.Config, objectMeta *metav1.ObjectMeta) (*con
 	i := strings.IndexByte(objectMeta.Name, '-')
 	if i >= 0 && objectMeta.Name[i+1:] == cfg.EnvironmentID {
 		composeServiceName, err := util.UnescapeName(objectMeta.Name[:i])
-		if err != nil {
+		if err == nil {
 			composeService := cfg.CanonicalComposeFile.Services[composeServiceName]
 			if composeService != nil {
 				return nil, ErrorResourcesModifiedExternally()
