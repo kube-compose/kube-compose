@@ -92,7 +92,7 @@ docker-compose build
 ## Commands
 
 The following is a list of all available commands:
- 
+
 ```bash
 Available Commands:
   up          Create and start containers running on K8s
@@ -100,16 +100,23 @@ Available Commands:
   help        Help about any command
 ```
 
-Intuitively, the `kube-compose up` mirrors functionality of `docker-compose up`, but runs containers on a Kubernetes cluster instead of on the host docker. Likewise `kube-compose down` behaves in a similar fashion.
+The following is a list of global flags:
 
-## Environment Variables
+```bash
+ -e, --env-id string      used to isolate environments deployed to a shared namespace, by (1) using this value as a suffix of pod and service names and (2) using this value to isolate selectors. Either this flag or the environment variable KUBECOMPOSE_ENVID must be set
+  -f, --file string        Specify an alternate compose file
+  -n, --namespace string   namespace for environment
+  -h, --help               help for kube-compose
+```
 
-kube-compose currently supports 2 environment variables. If these environment variables are set, you don't need to pass the `--namespace` and `--env-id` flags.
+kube-compose currently supports environment variables for certain flags. If these environment variables are set, you don't need to pass the `--namespace` and `--env-id` flags.
 
 ```bash
 export KUBECOMPOSE_NAMESPACE=""
 export KUBECOMPOSE_ENVID=""
 ```
+
+Intuitively, the `kube-compose up` mirrors functionality of `docker-compose up`, but runs containers on a Kubernetes cluster instead of on the host docker. Likewise `kube-compose down` behaves in a similar fashion.
 
 ## Examples
 
