@@ -8,16 +8,27 @@ import (
 )
 
 var mockFileSystem = fsPackage.MockFileSystem(map[string][]byte{
-	"/passwd": []byte(""),
+	"/passwd": []byte("root:x:0:"),
 })
 
-func TestFindUserInPasswd(t *testing.T) {
+func TestFindUserInPasswd_Success(t *testing.T) {
 	fsOld := fs
 	defer func() {
 		fs = fsOld
 	}()
 	fs = mockFileSystem
 	_, _ = FindUserInPasswd("/passwd", "")
+}
+func TestFindUserInPasswd_ENOENT(t *testing.T) {
+	fsOld := fs
+	defer func() {
+		fs = fsOld
+	}()
+	fs = mockFileSystem
+	_, err := FindUserInPasswd("", "")
+	if err == nil {
+		t.Fail()
+	}
 }
 
 func TestFindUserInPasswdReader_Success(t *testing.T) {
