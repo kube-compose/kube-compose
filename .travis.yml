@@ -13,14 +13,13 @@ go:
 # in vendor/
 install: true
 
-# # Anything in before_script that returns a nonzero exit code will flunk the	
-# # build and immediately stop. It's sorta like having set -e enabled in bash.	
-# # Make sure golangci-lint is vendored.
+# Anything in before_script that returns a nonzero exit code will flunk the	
+# build and immediately stop. It's sorta like having set -e enabled in bash.	
+# Make sure golangci-lint is vendored.
 before_script:
 - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh |
-  sh -s -- -b "$(go env GOPATH)"/bin v1.15.0
+  sh -s -- -b "$(go env GOPATH)"/bin v1.16.0
 - go get github.com/mattn/goveralls
-# - make modules
 
 # Script always runs to completion (set +e). If we have linter issues AND a	
 # failing test, we want to see both. Configure golangci-lint with a	
