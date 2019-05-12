@@ -329,6 +329,11 @@ func (cfg *Config) MatchesFilter(serviceName string) bool {
 	return ok
 }
 
+// FilterMatchesAll determines whether or not MatchesFilter returns true for any service in cfg.CanoicalComposeFile.Services.
+func (cfg *Config) FilterMatchesAll() bool {
+	return len(cfg.filter) == len(cfg.CanonicalComposeFile.Services)
+}
+
 // SetFilterToMatchAll resets the filter on cfg to match all docker compose services.
 func (cfg *Config) SetFilterToMatchAll() {
 	cfg.filter = map[string]bool{}
