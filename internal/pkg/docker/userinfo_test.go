@@ -2,14 +2,14 @@ package docker
 
 import "testing"
 
-func TestParseUserinfoEmptyUserGroup(t *testing.T) {
+func TestParseUserinfo_EmptyUserGroup(t *testing.T) {
 	_, err := ParseUserinfo(":")
 	if err != nil {
 		t.Fail()
 	}
 }
 
-func TestParseUserinfoUID(t *testing.T) {
+func TestParseUserinfo_UID(t *testing.T) {
 	user, err := ParseUserinfo("0")
 	if err != nil {
 		t.Fail()
@@ -18,7 +18,7 @@ func TestParseUserinfoUID(t *testing.T) {
 		t.Fail()
 	}
 }
-func TestParseUserinfoGID(t *testing.T) {
+func TestParseUserinfo_GID(t *testing.T) {
 	user, err := ParseUserinfo(":1234")
 	if err != nil {
 		t.Fail()
@@ -28,14 +28,14 @@ func TestParseUserinfoGID(t *testing.T) {
 	}
 }
 
-func TestParseUserinfoUIDOutOfRange(t *testing.T) {
+func TestParseUserinfo_UIDOutOfRange(t *testing.T) {
 	_, err := ParseUserinfo("-1")
 	if err == nil {
 		t.Fail()
 	}
 }
 
-func TestParseUserinfoGIDOutOfRange(t *testing.T) {
+func TestParseUserinfo_GIDOutOfRange(t *testing.T) {
 	_, err := ParseUserinfo(":-1")
 	if err == nil {
 		t.Fail()

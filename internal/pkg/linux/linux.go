@@ -4,16 +4,18 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
+	fsPackage "github.com/jbrekelmans/kube-compose/internal/pkg/fs"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 )
+
+var fs = fsPackage.OSFileSystem()
 
 // FindUserInPasswd finds the UID of a user by name in an /etc/passwd file. It can also find the GID of a group by name in an /etc/group
 // file.
 func FindUserInPasswd(file, user string) (*int64, error) {
-	fd, err := os.Open(file)
+	fd, err := fs.Open(file)
 	if err != nil {
 		return nil, err
 	}

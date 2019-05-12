@@ -1,64 +1,86 @@
 package util
 
 import (
+	"fmt"
 	"testing"
 )
 
+type testCloser struct {
+	closed bool
+	err    error
+}
+
+func (c *testCloser) Close() error {
+	c.closed = true
+	return c.err
+}
+
+func TestCloseAndLogError(t *testing.T) {
+	c := testCloser{
+		err: fmt.Errorf(""),
+	}
+	CloseAndLogError(&c)
+	if !c.closed {
+		t.Fail()
+	}
+}
+
 func TestEscapeName(t *testing.T) {
-	r := EscapeName("\x00\x390a\x7B")
+	r := EscapeName("\x00\x390a\x7B!")
 	// Each character that is not [a-z0-8] is replaced by a three-letter sequence 9[a-z0-9]{2}, i.e.:
 	// "\x00" => "9aa"
 	// "\x39" => "9bv"
 	// "0" 	  => "0"
 	// "a"    => "a"
 	// "\x7B" => "9dp"
-	if r != "9aa9bv0a9dp" {
+	// "!" 	  => "9a7"
+	if r != "9aa9bv0a9dp9a7" {
 		t.Fail()
 	}
 }
 
-func TestTryParseInt64Error(t *testing.T) {
+func TestTryParseInt64_Error(t *testing.T) {
 	uid := TryParseInt64("asdf")
 	if uid != nil {
 		t.Fail()
 	}
 }
-func TestTryParseInt64Success(t *testing.T) {
+func TestTryParseInt64_Success(t *testing.T) {
 	uid := TryParseInt64("234")
 	if uid == nil || *uid != 234 {
 		t.Fail()
 	}
 }
 
-func TestUnescapeNameSuccess(t *testing.T) {
-	r, err := UnescapeName("9aa9bv0a9dp")
-	if r != "\x00\x390a\x7B" || err != nil {
+func TestUnescapeName_Success(t *testing.T) {
+	r, err := UnescapeName("9aa9bv0a9dp9a7")
+	if r != "\x00\x390a\x7B!" || err != nil {
 		t.Fail()
 	}
 }
 
-func TestUnescapeNameError(t *testing.T) {
+func TestUnescapeName_Error(t *testing.T) {
 	_, err := UnescapeName("9zz")
 	if err == nil {
 		t.Fail()
 	}
 }
 
-func TestUnescapeByteError1(t *testing.T) {
+func TestUnescapeByte_Error1(t *testing.T) {
 	_, err := unescapeByte("9\x00a", 0)
 	if err == nil {
 		t.Fail()
 	}
 }
 
-func TestUnescapeByteError2(t *testing.T) {
+func TestUnescapeByte_Error2(t *testing.T) {
 	_, err := unescapeByte("9a\x00", 0)
 	if err == nil {
 		t.Fail()
 	}
 }
 
-func TestUnescapeByteError3(t *testing.T) {
+func TestUnescapeByte_Error3(t *testing.T) {
 	_, err := unescapeByte("", 0)
 	if err == nil {
 		t.Fail()
