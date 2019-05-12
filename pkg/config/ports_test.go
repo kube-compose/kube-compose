@@ -50,9 +50,16 @@ func TestParsePortBindings_RangeLengthMismatch(t *testing.T) {
 	}
 }
 
-func TestParsePortBindings_SuccessWithExternal(t *testing.T) {
+func TestParsePortBindings_SuccessWithExternal1(t *testing.T) {
 	portBindings := []PortBinding{}
 	_, err := parsePortBindings("127.0.0.1:8000-8001:8000-8001/udp", portBindings)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+func TestParsePortBindings_SuccessWithExternal2(t *testing.T) {
+	portBindings := []PortBinding{}
+	_, err := parsePortBindings("127.0.0.1:8000:8000/udp", portBindings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,6 +70,13 @@ func TestParsePortBindings_SuccessWithoutExternal(t *testing.T) {
 	_, err := parsePortBindings("8000-8001", portBindings)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+func TestParsePortBindings_Error(t *testing.T) {
+	portBindings := []PortBinding{}
+	_, err := parsePortBindings("!", portBindings)
+	if err == nil {
+		t.Fail()
 	}
 }
 
@@ -85,4 +99,20 @@ func TestParsePortUint_TooLarge(t *testing.T) {
 	if err == nil {
 		t.Fail()
 	}
+}
+
+func TestParsePorts_Error(t *testing.T) {
+	p := port{
+		Value: "!",
+	}
+	_, err := parsePorts([]port{
+		p,
+	})
+	if err == nil {
+		t.Fail()
+	}
+}
+
+func TestParsePorts_Success(t *testing.T) {
+	_, _ = parsePorts([]port{})
 }
