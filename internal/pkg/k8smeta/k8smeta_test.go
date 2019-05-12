@@ -60,3 +60,36 @@ func TestFindFromObjectMeta_NotFound(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestInitObjectMeta_Success(t *testing.T) {
+	serviceA := &config.Service{
+		Name: "a",
+	}
+	cfg := config.Config{
+		CanonicalComposeFile: config.CanonicalComposeFile{
+			Services: map[string]*config.Service{
+				serviceA.Name: serviceA,
+			},
+		},
+	}
+	objectMeta := metav1.ObjectMeta{}
+	InitObjectMeta(&cfg, &objectMeta, serviceA)
+}
+
+func TestInitObjectMeta_InvalidService(t *testing.T) {
+	serviceA := &config.Service{
+		Name: "a",
+	}
+	cfg := config.Config{
+		CanonicalComposeFile: config.CanonicalComposeFile{
+			Services: map[string]*config.Service{},
+		},
+	}
+	objectMeta := metav1.ObjectMeta{}
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("expected panic due to invalid service")
+		}
+	}()
+	InitObjectMeta(&cfg, &objectMeta, serviceA)
+}
