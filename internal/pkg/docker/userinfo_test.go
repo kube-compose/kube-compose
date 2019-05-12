@@ -1,29 +1,16 @@
-package up
+package docker
 
 import "testing"
 
-func TestTryParseUIDError(t *testing.T) {
-	uid := tryParseUID("asdf")
-	if uid != nil {
-		t.Fail()
-	}
-}
-func TestTryParseUIDSuccess(t *testing.T) {
-	uid := tryParseUID("234")
-	if uid == nil || *uid != 234 {
-		t.Fail()
-	}
-}
-
 func TestParseUserinfoEmptyUserGroup(t *testing.T) {
-	_, err := parseUserinfo(":")
+	_, err := ParseUserinfo(":")
 	if err != nil {
 		t.Fail()
 	}
 }
 
 func TestParseUserinfoUID(t *testing.T) {
-	user, err := parseUserinfo("0")
+	user, err := ParseUserinfo("0")
 	if err != nil {
 		t.Fail()
 	}
@@ -32,7 +19,7 @@ func TestParseUserinfoUID(t *testing.T) {
 	}
 }
 func TestParseUserinfoGID(t *testing.T) {
-	user, err := parseUserinfo(":1234")
+	user, err := ParseUserinfo(":1234")
 	if err != nil {
 		t.Fail()
 	}
@@ -42,14 +29,14 @@ func TestParseUserinfoGID(t *testing.T) {
 }
 
 func TestParseUserinfoUIDOutOfRange(t *testing.T) {
-	_, err := parseUserinfo("-1")
+	_, err := ParseUserinfo("-1")
 	if err == nil {
 		t.Fail()
 	}
 }
 
 func TestParseUserinfoGIDOutOfRange(t *testing.T) {
-	_, err := parseUserinfo(":-1")
+	_, err := ParseUserinfo(":-1")
 	if err == nil {
 		t.Fail()
 	}

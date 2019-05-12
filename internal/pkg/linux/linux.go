@@ -1,4 +1,4 @@
-package up
+package linux
 
 import (
 	"bufio"
@@ -10,16 +10,20 @@ import (
 	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 )
 
-func findUserInPasswd(file, user string) (*int64, error) {
+// FindUserInPasswd finds the UID of a user by name in an /etc/passwd file. It can also find the GID of a group by name in an /etc/group
+// file.
+func FindUserInPasswd(file, user string) (*int64, error) {
 	fd, err := os.Open(file)
 	if err != nil {
 		return nil, err
 	}
 	defer util.CloseAndLogError(fd)
-	return findUserInPasswdReader(fd, user)
+	return FindUserInPasswdReader(fd, user)
 }
 
-func findUserInPasswdReader(reader io.Reader, user string) (*int64, error) {
+// FindUserInPasswdReader finds the UID of a user by name in a stream encoded like the contents of /etc/passwd. It can also find the GID of
+// a group by name in a stream encoded like the contents of /etc/group.
+func FindUserInPasswdReader(reader io.Reader, user string) (*int64, error) {
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -29,7 +33,7 @@ func findUserInPasswdReader(reader io.Reader, user string) (*int64, error) {
 				return nil, fmt.Errorf("unexpected file format")
 			}
 			user := parts[2]
-			uid := tryParseUID(user)
+			uid := util.TryParseInt64(user)
 			if uid == nil || *uid < 0 {
 				return nil, fmt.Errorf("unexpected file format")
 			}

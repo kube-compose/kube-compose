@@ -17,9 +17,10 @@ import (
 	dockerFilters "github.com/docker/docker/api/types/filters"
 	dockerClient "github.com/docker/docker/client"
 	dockerArchive "github.com/docker/docker/pkg/archive"
+	"github.com/jbrekelmans/kube-compose/internal/pkg/docker"
+	"github.com/jbrekelmans/kube-compose/internal/pkg/linux"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 	"github.com/jbrekelmans/kube-compose/pkg/config"
-	"github.com/jbrekelmans/kube-compose/pkg/docker"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 )
@@ -140,9 +141,7 @@ func copyFileFromContainer(ctx context.Context, dc *dockerClient.Client, contain
 	return nil
 }
 
-// Cyclomatic complexity of this function is too high
-// nolint
-func getUserinfoFromImage(ctx context.Context, dc *dockerClient.Client, image string, user *userinfo) error {
+func getUserinfoFromImage(ctx context.Context, dc *dockerClient.Client, image string, user *docker.Userinfo) error {
 	containerConfig := &dockerContainers.Config{
 		Entrypoint: []string{"sh"},
 		Image:      image,
@@ -175,7 +174,7 @@ func getUserinfoFromImage(ctx context.Context, dc *dockerClient.Client, image st
 			return err
 		}
 		var uid *int64
-		uid, err = findUserInPasswd(path.Join(tmpDir, "passwd"), user.User)
+		uid, err = linux.FindUserInPasswd(path.Join(tmpDir, "passwd"), user.User)
 		if err != nil {
 			return err
 		}
@@ -190,7 +189,7 @@ func getUserinfoFromImage(ctx context.Context, dc *dockerClient.Client, image st
 			return err
 		}
 		var gid *int64
-		gid, err = findUserInPasswd(path.Join(tmpDir, "group"), user.Group)
+		gid, err = linux.FindUserInPasswd(path.Join(tmpDir, "group"), user.Group)
 		if err != nil {
 			return err
 		}

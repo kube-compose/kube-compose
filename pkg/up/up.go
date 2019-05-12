@@ -12,6 +12,7 @@ import (
 	dockerRef "github.com/docker/distribution/reference"
 	dockerTypes "github.com/docker/docker/api/types"
 	dockerClient "github.com/docker/docker/client"
+	"github.com/jbrekelmans/kube-compose/internal/pkg/docker"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/k8smeta"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 	"github.com/jbrekelmans/kube-compose/pkg/config"
@@ -55,7 +56,7 @@ type appImageInfo struct {
 	imageHealthcheck *config.Healthcheck
 	once             *sync.Once
 	podImage         string
-	user             *userinfo
+	user             *docker.Userinfo
 }
 
 type app struct {
@@ -219,15 +220,15 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 	app.imageInfo.imageHealthcheck = imageHealthcheck
 
 	if u.cfg.RunAsUser {
-		var user *userinfo
+		var user *docker.Userinfo
 		userRaw := app.composeService.User
 		if userRaw == nil {
-			user, err = parseUserinfo(inspect.Config.User)
+			user, err = docker.ParseUserinfo(inspect.Config.User)
 			if err != nil {
 				return errors.Wrap(err, fmt.Sprintf("image %#v has an invalid user %#v", sourceImage, inspect.Config.User))
 			}
 		} else {
-			user, err = parseUserinfo(*userRaw)
+			user, err = docker.ParseUserinfo(*userRaw)
 			if err != nil {
 				return errors.Wrap(err, fmt.Sprintf("docker-compose service %s has an invalid user %#v", app.name, *userRaw))
 			}
