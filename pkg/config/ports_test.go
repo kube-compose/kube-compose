@@ -102,10 +102,11 @@ func TestParsePortUint_TooLarge(t *testing.T) {
 }
 
 func TestParsePorts_Error(t *testing.T) {
+	p := port{
+		Value: "!",
+	}
 	_, err := parsePorts([]port{
-		port{
-			Value: "!",
-		},
+		p,
 	})
 	if err == nil {
 		t.Fail()

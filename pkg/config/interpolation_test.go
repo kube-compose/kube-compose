@@ -163,3 +163,33 @@ func TestInterpolate_RecursiveSlice(t *testing.T) {
 	}
 	t.Fail()
 }
+func TestInterpolate_RecursiveMap(t *testing.T) {
+	m := map[string]string{}
+	c := &configInterpolator{
+		valueGetter: mapValueGetter(m),
+		version:     v2_1,
+	}
+	input := genericMap{
+		"key": "value",
+	}
+	outputRaw := c.interpolateRecursive(input, path{})
+	output, ok := outputRaw.(genericMap)
+	if !ok || &input != &output || len(c.errorList) > 0 {
+		t.Fail()
+	}
+}
+
+func TestInterpolate_NestedErrors(t *testing.T) {
+	m := map[string]string{}
+	c := &configInterpolator{
+		valueGetter: mapValueGetter(m),
+		version:     v2_1,
+	}
+	input := genericMap{
+		"key": "$",
+	}
+	c.interpolateRecursive(input, path{})
+	if len(c.errorList) == 0 {
+		t.Fail()
+	}
+}
