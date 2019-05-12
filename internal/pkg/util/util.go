@@ -3,6 +3,7 @@ package util
 import (
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 )
 
@@ -14,6 +15,17 @@ func CloseAndLogError(closer io.Closer) {
 	if err != nil {
 		fmt.Println(err)
 	}
+}
+
+func decodeBase36(b int) int {
+	if b <= 0x39 {
+		if 0x30 <= b {
+			return 26 - 0x30 + b
+		}
+	} else if 0x61 <= b && b <= 0x7A {
+		return b - 0x61
+	}
+	return -1
 }
 
 // EscapeName takes an arbitrary string and maps it bijectively to the grammar ^[a-z0-9]+$.
@@ -37,6 +49,16 @@ func EscapeName(input string) string {
 		sb.WriteByte(chars[b%36])
 	}
 	return sb.String()
+}
+
+// TryParseInt64 is a convenience method to parse a string into an *int64, allowing only one or more ASCII digits and an optional sign
+// prefix.
+func TryParseInt64(s string) *int64 {
+	i, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return nil
+	}
+	return &i
 }
 
 // UnescapeName performs the reverse transformation of EscapeName.
@@ -74,15 +96,4 @@ func unescapeByte(input string, i int) (byte, error) {
 
 	}
 	return 0, fmt.Errorf("invalid input")
-}
-
-func decodeBase36(b int) int {
-	if b <= 0x39 {
-		if 0x30 <= b {
-			return 26 - 0x30 + b
-		}
-	} else if 0x61 <= b && b <= 0x7A {
-		return b - 0x61
-	}
-	return -1
 }

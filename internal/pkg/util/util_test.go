@@ -17,6 +17,19 @@ func TestEscapeName(t *testing.T) {
 	}
 }
 
+func TestTryParseInt64Error(t *testing.T) {
+	uid := TryParseInt64("asdf")
+	if uid != nil {
+		t.Fail()
+	}
+}
+func TestTryParseInt64Success(t *testing.T) {
+	uid := TryParseInt64("234")
+	if uid == nil || *uid != 234 {
+		t.Fail()
+	}
+}
+
 func TestUnescapeNameSuccess(t *testing.T) {
 	r, err := UnescapeName("9aa9bv0a9dp")
 	if r != "\x00\x390a\x7B" || err != nil {
