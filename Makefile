@@ -8,7 +8,7 @@ GOMOD=$(GOCMD) mod
 BINARY_NAME=kube-compose
 SYSTEMS=darwin linux windows
 
-all: build test
+all: build tests
 
 build: 
 	$(GOBUILD) -o $(BINARY_NAME) -v
