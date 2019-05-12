@@ -3,6 +3,7 @@ package down
 import (
 	"fmt"
 
+	"github.com/jbrekelmans/kube-compose/internal/pkg/k8smeta"
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,17 +45,24 @@ func (d *downRunner) deleteCommon(errorChannel chan<- error, kind string, lister
 	}
 	deleteOptions := &metav1.DeleteOptions{}
 	for _, item := range list {
-		err := deleter(item.Name, deleteOptions)
+		composeService, err := k8smeta.FindFromObjectMeta(d.cfg, item)
 		if err != nil {
 			errorChannel <- err
 			return
 		}
-		fmt.Printf("deleted %s %s\n", kind, item.Name)
+		if d.cfg.MatchesFilter(composeService.Name) {
+			err = deleter(item.Name, deleteOptions)
+			if err != nil {
+				errorChannel <- err
+				return
+			}
+			fmt.Printf("deleted %s %s\n", kind, item.Name)
+		}
 	}
 }
 
-// Duplication with deletePods error is ignored as these functions serve a seperate purpose. Will address in future.
-// TODO: https://github.com/jbrekelmans/kube-compose/issues/65
+// Linter reports code duplication amongst deleteServices and deletePods. Although this is true, deduplicating would require the use of
+// generics, so we choose to nolint.
 // nolint
 func (d *downRunner) deleteServices(errorChannel chan<- error) {
 	lister := func(listOptions metav1.ListOptions) ([]*v1.ObjectMeta, error) {
@@ -71,8 +79,8 @@ func (d *downRunner) deleteServices(errorChannel chan<- error) {
 	d.deleteCommon(errorChannel, "Service", lister, d.k8sServiceClient.Delete)
 }
 
-// Duplication with deleteServices error is ignored as these functions serve a seperate purpose. Will address in future.
-// TODO: https://github.com/jbrekelmans/kube-compose/issues/65
+// Linter reports code duplication amongst deleteServices and deletePods. Although this is true, deduplicating would require the use of
+// generics, so we choose to nolint.
 // nolint
 func (d *downRunner) deletePods(errorChannel chan<- error) {
 	lister := func(listOptions metav1.ListOptions) ([]*v1.ObjectMeta, error) {
@@ -94,15 +102,23 @@ func (d *downRunner) run() error {
 	if err != nil {
 		return err
 	}
-	errorChannels := make([]chan error, 2)
-	for i := 0; i < len(errorChannels); i++ {
-		errorChannels[i] = make(chan error, 1)
+	errorChannels := []chan error{}
+
+	// Only delete services if all pods are to be deleted. This is so that existing pods will not have
+	// their host aliases invalidated.
+	if d.cfg.FilterMatchesAll() {
+		errorChannel := make(chan error)
+		errorChannels = append(errorChannels, errorChannel)
+		go d.deleteServices(errorChannel)
 	}
-	go d.deleteServices(errorChannels[0])
-	go d.deletePods(errorChannels[1])
+
+	errorChannel := make(chan error)
+	errorChannels = append(errorChannels, errorChannel)
+	go d.deletePods(errorChannel)
+
 	var firstError error
-	for i := 0; i < len(errorChannels); i++ {
-		err, more := <-errorChannels[i]
+	for _, errorChannel := range errorChannels {
+		err, more := <-errorChannel
 		if !more {
 			continue
 		}

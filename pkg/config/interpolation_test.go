@@ -13,7 +13,7 @@ func mapValueGetter(m map[string]string) ValueGetter {
 	}
 }
 
-func TestInterpolateSimple1(t *testing.T) {
+func TestInterpolate_Simple1(t *testing.T) {
 	m := map[string]string{
 		"VAR1": testValue,
 	}
@@ -23,7 +23,7 @@ func TestInterpolateSimple1(t *testing.T) {
 	}
 }
 
-func TestInterpolateSimple2(t *testing.T) {
+func TestInterpolate_Simple2(t *testing.T) {
 	m := map[string]string{
 		"VAR1": testValue,
 	}
@@ -33,7 +33,7 @@ func TestInterpolateSimple2(t *testing.T) {
 	}
 }
 
-func TestInterpolateEOF(t *testing.T) {
+func TestInterpolate_EOF(t *testing.T) {
 	m := map[string]string{}
 	_, err := Interpolate("$", mapValueGetter(m), true)
 	if err == nil {
@@ -41,7 +41,7 @@ func TestInterpolateEOF(t *testing.T) {
 	}
 }
 
-func TestInterpolateDefaultValue(t *testing.T) {
+func TestInterpolate_DefaultValue(t *testing.T) {
 	m := map[string]string{}
 	str, err := Interpolate("$VAR1", mapValueGetter(m), true)
 	if err != nil || str != "" {
@@ -49,14 +49,14 @@ func TestInterpolateDefaultValue(t *testing.T) {
 	}
 }
 
-func TestInterpolateDollarSign1(t *testing.T) {
+func TestInterpolate_DollarSign1(t *testing.T) {
 	m := map[string]string{}
 	str, err := Interpolate("$$", mapValueGetter(m), true)
 	if err != nil || str != "$" {
 		t.Fatal(str, err)
 	}
 }
-func TestInterpolateDollarSign2(t *testing.T) {
+func TestInterpolate_DollarSign2(t *testing.T) {
 	m := map[string]string{}
 	str, err := Interpolate("$$ ", mapValueGetter(m), true)
 	if err != nil || str != "$ " {
@@ -64,7 +64,7 @@ func TestInterpolateDollarSign2(t *testing.T) {
 	}
 }
 
-func TestInterpolateUnexpectedRune(t *testing.T) {
+func TestInterpolate_UnexpectedRune(t *testing.T) {
 	m := map[string]string{}
 	_, err := Interpolate("$[", mapValueGetter(m), true)
 	if err == nil {
@@ -72,7 +72,7 @@ func TestInterpolateUnexpectedRune(t *testing.T) {
 	}
 }
 
-func TestInterpolateBracesSimple(t *testing.T) {
+func TestInterpolate_BracesSimple(t *testing.T) {
 	m := map[string]string{
 		"VAR1": testValue,
 	}
@@ -82,7 +82,7 @@ func TestInterpolateBracesSimple(t *testing.T) {
 	}
 }
 
-func TestInterpolateBracesEOF(t *testing.T) {
+func TestInterpolate_BracesEOF(t *testing.T) {
 	m := map[string]string{
 		"VAR1": testValue,
 	}
@@ -92,7 +92,7 @@ func TestInterpolateBracesEOF(t *testing.T) {
 	}
 }
 
-func TestInterpolateBracesDefaultValue1(t *testing.T) {
+func TestInterpolate_BracesDefaultValue1(t *testing.T) {
 	m := map[string]string{}
 	str, err := Interpolate("${VAR1}", mapValueGetter(m), true)
 	if err != nil || str != "" {
@@ -100,7 +100,7 @@ func TestInterpolateBracesDefaultValue1(t *testing.T) {
 	}
 }
 
-func TestInterpolateBracesDefaultValue2(t *testing.T) {
+func TestInterpolate_BracesDefaultValue2(t *testing.T) {
 	m := map[string]string{}
 	str, err := Interpolate("${VAR1-val1}", mapValueGetter(m), true)
 	if err != nil || str != testValue {
@@ -108,7 +108,7 @@ func TestInterpolateBracesDefaultValue2(t *testing.T) {
 	}
 }
 
-func TestInterpolateBracesDefaultValue3(t *testing.T) {
+func TestInterpolate_BracesDefaultValue3(t *testing.T) {
 	m := map[string]string{
 		"VAR1": "",
 	}
@@ -117,7 +117,7 @@ func TestInterpolateBracesDefaultValue3(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-func TestInterpolateBracesError1(t *testing.T) {
+func TestInterpolate_BracesError1(t *testing.T) {
 	m := map[string]string{}
 	_, err := Interpolate("${VAR1?errorMsg1}", mapValueGetter(m), true)
 	if err == nil {
@@ -125,7 +125,7 @@ func TestInterpolateBracesError1(t *testing.T) {
 	}
 }
 
-func TestInterpolateBracesError2(t *testing.T) {
+func TestInterpolate_BracesError2(t *testing.T) {
 	m := map[string]string{
 		"VAR1": "",
 	}
@@ -135,7 +135,7 @@ func TestInterpolateBracesError2(t *testing.T) {
 	}
 }
 
-func TestInterpolateBracesInvalidDelimiter(t *testing.T) {
+func TestInterpolate_BracesInvalidDelimiter(t *testing.T) {
 	m := map[string]string{
 		"VAR:ABLE": testValue,
 	}
@@ -145,7 +145,7 @@ func TestInterpolateBracesInvalidDelimiter(t *testing.T) {
 	}
 }
 
-func TestInterpolateRecursiveSlice(t *testing.T) {
+func TestInterpolate_RecursiveSlice(t *testing.T) {
 	m := map[string]string{}
 	c := &configInterpolator{
 		valueGetter: mapValueGetter(m),
@@ -162,4 +162,34 @@ func TestInterpolateRecursiveSlice(t *testing.T) {
 		return
 	}
 	t.Fail()
+}
+func TestInterpolate_RecursiveMap(t *testing.T) {
+	m := map[string]string{}
+	c := &configInterpolator{
+		valueGetter: mapValueGetter(m),
+		version:     v2_1,
+	}
+	input := genericMap{
+		"key": "value",
+	}
+	outputRaw := c.interpolateRecursive(input, path{})
+	output, ok := outputRaw.(genericMap)
+	if !ok || len(output) != 1 || output["key"] != "value" || len(c.errorList) > 0 {
+		t.Fail()
+	}
+}
+
+func TestInterpolate_NestedErrors(t *testing.T) {
+	m := map[string]string{}
+	c := &configInterpolator{
+		valueGetter: mapValueGetter(m),
+		version:     v2_1,
+	}
+	input := genericMap{
+		"key": "$",
+	}
+	c.interpolateRecursive(input, path{})
+	if len(c.errorList) == 0 {
+		t.Fail()
+	}
 }
