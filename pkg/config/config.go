@@ -41,6 +41,7 @@ type Service struct {
 	Ports               []PortBinding
 	User                *string
 	WorkingDir          string
+	Restart             string
 
 	// helpers for ensureNoDependsOnCycle
 	recStack         bool
@@ -276,6 +277,7 @@ func parseServiceYAML2_1(serviceYAML *service2_1) (*Service, error) {
 		Image:      serviceYAML.Image,
 		User:       serviceYAML.User,
 		WorkingDir: serviceYAML.WorkingDir,
+		Restart:    serviceYAML.Restart,
 	}
 
 	ports, err := parsePorts(serviceYAML.Ports)

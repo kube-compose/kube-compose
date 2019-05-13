@@ -251,6 +251,7 @@ type service2_1 struct {
 	User        *string             `mapdecode:"user"`
 	Volumes     []string            `mapdecode:"volumes"`
 	WorkingDir  string              `mapdecode:"working_dir"`
+	Restart     string              `mapdecode:"restart"`
 }
 
 type composeFile2_1 struct {
