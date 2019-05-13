@@ -6,6 +6,12 @@ import (
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 )
 
+const (
+	TestRestartPolicyAlways    = "Always"
+	TestRestartPolicyOnFailure = "OnFailure"
+	TestRestartPolicyNever     = "Never"
+)
+
 func newTestConfig() *config.Config {
 	serviceA := &config.Service{
 		Name:    "a",
@@ -45,29 +51,30 @@ func newTestApp(serviceName string) *app {
 }
 func TestRestartPolicyforService_never(t *testing.T) {
 	app := newTestApp("a")
-	str := getRestartPolicyforService(app)
-	if str != "Never" {
+	restartPolicy := getRestartPolicyforService(app)
+	if restartPolicy != TestRestartPolicyNever {
 		t.Fail()
 	}
 }
+
 func TestRestartPolicyforService_always(t *testing.T) {
 	app := newTestApp("b")
-	str := getRestartPolicyforService(app)
-	if str != "Always" {
+	restartPolicy := getRestartPolicyforService(app)
+	if restartPolicy != TestRestartPolicyAlways {
 		t.Fail()
 	}
 }
 func TestRestartPolicyforService_onfailure(t *testing.T) {
 	app := newTestApp("c")
-	str := getRestartPolicyforService(app)
-	if str != "OnFailure" {
+	restartPolicy := getRestartPolicyforService(app)
+	if restartPolicy != TestRestartPolicyOnFailure {
 		t.Fail()
 	}
 }
 func TestRestartPolicyforService_default(t *testing.T) {
 	app := newTestApp("d")
-	str := getRestartPolicyforService(app)
-	if str != "Never" {
+	restartPolicy := getRestartPolicyforService(app)
+	if restartPolicy != TestRestartPolicyNever {
 		t.Fail()
 	}
 }
