@@ -186,6 +186,7 @@ Although [kompose](https://github.com/kubernetes/kompose) can already convert do
 
 ## Advanced Usage
 
+### Dependency healthchecks
 If you require that an application is not started until one of its dependencies is healthy, you can add `condition: service_healthy` to the `depends_on`, and give the dependency a [Docker healthcheck](https://docs.docker.com/engine/reference/builder#healthcheck).
 
 Docker healthchecks are converted into [Readiness Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/).
