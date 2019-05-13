@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/jbrekelmans/kube-compose/pkg/config"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	// Plugin does not export any functions therefore it is ignored IE. "_"
@@ -15,7 +16,7 @@ func setFromKubeConfig(cfg *config.Config) error {
 	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loader, &overrides)
 	kubeConfig, err := clientConfig.ClientConfig()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error loading kubernetes config file")
 	}
 	namespace, _, err := clientConfig.Namespace()
 	if err != nil {
