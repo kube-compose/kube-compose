@@ -1,9 +1,5 @@
 package config
 
-import (
-	"fmt"
-)
-
 // extendedService is merged into service
 func merge(service, extendedService *Service) {
 	// rules based on https://docs.docker.com/compose/extends/#adding-and-overriding-configuration
@@ -21,8 +17,5 @@ func mergeStringMap(intoStringMap, fromStringMap map[string]string) {
 }
 
 func mergePortBindings(intoPorts []PortBinding, fromPorts []PortBinding) {
-	fmt.Println(intoPorts)
-	fmt.Println(fromPorts)
 	intoPorts = append(intoPorts, fromPorts...)
-	fmt.Println(intoPorts)
 }
