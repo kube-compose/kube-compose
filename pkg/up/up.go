@@ -448,6 +448,22 @@ func (u *upRunner) createServicesAndGetPodHostAliasesOnce() ([]v1.HostAlias, err
 	return u.hostAliases.v, u.hostAliases.err
 }
 
+func getRestartPolicyforService(app *app) v1.RestartPolicy {
+	// check if the docker-compose has restart key
+	var restartPolicy v1.RestartPolicy
+	switch app.composeService.Restart {
+	case "no":
+		restartPolicy = v1.RestartPolicyNever
+	case "always":
+		restartPolicy = v1.RestartPolicyAlways
+	case "on-failure":
+		restartPolicy = v1.RestartPolicyOnFailure
+	default:
+		restartPolicy = v1.RestartPolicyNever
+	}
+	return restartPolicy
+}
+
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
 func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
@@ -523,7 +539,7 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 				},
 			},
 			HostAliases:     hostAliases,
-			RestartPolicy:   v1.RestartPolicyNever,
+			RestartPolicy:   getRestartPolicyforService(app),
 			SecurityContext: securityContext,
 		},
 	}

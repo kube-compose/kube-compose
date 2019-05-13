@@ -41,6 +41,7 @@ type Service struct {
 	Ports               []PortBinding
 	User                *string
 	WorkingDir          string
+	Restart             string
 
 	// helpers for ensureNoDependsOnCycle
 	recStack         bool
@@ -226,7 +227,6 @@ func parseCompose2_1(composeYAML *composeFile2_1, dockerComposeFile *CanonicalCo
 			}
 		}
 		for _, service := range dockerComposeFile.Services {
-
 			// Reset the visited marker on each service. This is a precondition of ensureNoDependsOnCycle.
 			for _, service := range dockerComposeFile.Services {
 				service.visited = false
@@ -276,6 +276,7 @@ func parseServiceYAML2_1(serviceYAML *service2_1) (*Service, error) {
 		Image:      serviceYAML.Image,
 		User:       serviceYAML.User,
 		WorkingDir: serviceYAML.WorkingDir,
+		Restart:    serviceYAML.Restart,
 	}
 
 	ports, err := parsePorts(serviceYAML.Ports)
