@@ -48,8 +48,8 @@ You can compile the kube-compose binary using either Go or Docker-compose.
 
 Using Go:
 
-```
-go build -o kube-compose .
+```go
+go build .
 ```
 
 Using Makefile (**Recommended**):
@@ -60,12 +60,6 @@ make releases
 
 *Note: Will build for Linux, MacOS (darwin), and Windows.*
 
-Using Docker-compose:
-
-```bash
-docker-compose build
-```
-
 ### Testing
 
 Use `kubectl` to set the target Kubernetes namespace and the service account of kube-compose.
@@ -73,7 +67,7 @@ Use `kubectl` to set the target Kubernetes namespace and the service account of 
 Run `kube-compose` with the test [docker-compose.yml](test/docker-compose.yml):
 
 ```bash
-(cd test && ../kube-compose --env-id test123 up)
+kube-compose -f test/docker-compose.yml --env-id test123 up
 ```
 
 This writes the created Kubernetes resources to the directory test/output.
@@ -81,7 +75,7 @@ This writes the created Kubernetes resources to the directory test/output.
 To clean up after the test:
 
 ```bash
-kubectl delete $(kubectl get all -lenv=test123 -oname)
+kube-compose down
 ```
 
 ## Commands
@@ -162,7 +156,7 @@ kube-compose up service-1
 kube-compose up service-1 service-2
 ```
 
-### Detach mode
+### Detached mode
 
 ```bash
 kube-compose --namespace default --env-id test123 up --detach
