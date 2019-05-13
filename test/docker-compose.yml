@@ -19,7 +19,7 @@ services:
     environment:
       ENVVAR_EXTENDS: test
     ports:
-      - "1234"
+      - 8235:8234
   permission-service:
     entrypoint: ["/bin/bash", "-c", "STOP=0; trap 'STOP=1' INT; while [[ $$STOP -eq 0 ]]; do sleep 1; done"]
     image: ubuntu:latest
@@ -37,6 +37,7 @@ services:
     - "8080"
     - 8081
     - 8082:8082
+    - 8236:8234
     working_dir: /app/test
   db:
     image: postgres:$BLA
