@@ -18,6 +18,8 @@ services:
     image: ubuntu:latest
     environment:
       ENVVAR_EXTENDS: test
+    ports:
+      - "1234"
   permission-service:
     entrypoint: ["/bin/bash", "-c", "STOP=0; trap 'STOP=1' INT; while [[ $$STOP -eq 0 ]]; do sleep 1; done"]
     image: ubuntu:latest
