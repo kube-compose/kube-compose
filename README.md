@@ -190,3 +190,6 @@ Although [kompose](https://github.com/kubernetes/kompose) can already convert do
 If you require that an application is not started until one of its dependencies is healthy, you can add `condition: service_healthy` to the `depends_on`, and give the dependency a [Docker healthcheck](https://docs.docker.com/engine/reference/builder#healthcheck).
 
 Docker healthchecks are converted into [Readiness Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/).
+
+### Running as specific users
+If any of the images you are running with kube-compose need to be run as a specific user, you can set the `--run-as-user` flag for `kube-compose up`. This will set each pod's `runAsUser`/`runAsGroup` based on either the `user` property of its docker-compose service or the `USER` configuration of its Docker image (prioritising the former if both are present).
