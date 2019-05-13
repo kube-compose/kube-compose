@@ -10,7 +10,7 @@ import (
 
 var upCmd = &cobra.Command{
 	Use:   "up",
-	Short: "A brief description of your command",
+	Short: "Create and start containers running on K8s",
 	Long:  "creates pods and services in an order that respects depends_on in the docker compose file",
 	Run:   upCommand,
 }
