@@ -1,56 +1,43 @@
-[![Build Status](https://travis-ci.com/jbrekelmans/kube-compose.svg?branch=master)](https://travis-ci.com/jbrekelmans/kube-compose)
-[![License](https://img.shields.io/badge/license-Apache_v2.0-blue.svg)](https://github.com/jbrekelmans/kube-compose/blob/master/LICENSE.md)
-[![Coverage Status](https://coveralls.io/repos/github/jbrekelmans/kube-compose/badge.svg?branch=master)](https://coveralls.io/github/jbrekelmans/kube-compose?branch=master)
+# Go parameters
+GOCMD=go
+GOBUILD=$(GOCMD) build
+GOCLEAN=$(GOCMD) clean
+GOTEST=$(GOCMD) test
+GOGET=$(GOCMD) get
+GOMOD=$(GOCMD) mod
+BINARY_NAME=kube-compose
+SYSTEMS=darwin linux windows
 
-# Introduction
-kube-compose is a CI tool that can create and destroy environments in Kubernetes based on docker compose files.
+all: build tests
 
-# Why another tool?
-Although [kompose](https://github.com/kubernetes/kompose) can already convert docker compose files into Kubernetes resources. The main differences between kube-compose and Kompose are:
-1. kube-compose generates Kubernetes resource names and selectors that are unique for each build to support shared namespaces and scaling to many concurrent CI environments.
-1. kube-compose creates pods with `restartPolicy: Never` instead of deployments, so that failed pods can be inspected, no logs are lost due to pod restarts, and Kubernetes cluster resources are used more efficiently.
-1. kube-compose allows startup dependencies to be specified by respecting [docker compose](https://docs.docker.com/compose/compose-file/compose-file-v2#depends_on)'s `depends_on` field.
-1. kube-compose currently depends on the docker daemon to pull Docker images and extract their healthcheck.
+build: 
+	$(GOBUILD) -o $(BINARY_NAME) -v
 
-# Installation
-Download the binary from https://github.com/jbrekelmans/kube-compose/releases, and place it on your `PATH`.
+tests: 
+	$(GOTEST) -v ./...
 
-# Usage
-kube-compose loads pod and services definitions implicitly defined in a docker compose file, and creates them in a target namespace via the following command:
-```
-kube-compose -e mybuildid up
-```
+clean: 
+	$(GOCLEAN)
+	rm -rf release
 
-The target namespace and service account token are loaded from the context set in `~/.kube/config`. This means that Openshift Origin Client Tools' `oc login` and `oc project` commands can be used to configure kube-compose's target namespace and service account.
+run:
+	$(GOBUILD) -o $(BINARY_NAME) -v ./...
+	./$(BINARY_NAME)
 
-If no `~/.kube/config` exists and kube-compose is run inside a pod in Kubernetes, the pod's namespace becomes the target namespace, and the service account used to create pods and services is the pod's service account.
+deps:
+	$(GOGET) github.com/stretchr/testify
+	$(GOGET) github.com/urfave/cli
 
-The namespace can be overriden via the `--namespace` option, for example: `kube-compose --namespace ci up`.¯
+modules:
+	$(GOMOD) tidy
+	${GOMOD} download
 
-# Advanced usage
-If you require that an application is not started until one of its dependencies is healthy, you can add `condition: service_healthy` to the `depends_on`, and give the dependency a [Docker healthchecks](https://docs.docker.com/engine/reference/builder#healthcheck).
 
-Docker healthchecks are converted into [Readiness Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/).
-
-# Building
-```
-go build -o kube-compose .
-```
-# Building (docker)
-```
-docker-compose build
-```
-
-# Testing
-Use `kubectl` or `oc` to set the target Kubernetes namespace and the service account of kube-compose.
-
-Run `kube-compose` with the test [docker-compose.yml](test/docker-compose.yml):
-```
-(cd test && ../kube-compose --env-id test123 up)
-```
-This writes to the directory `test/output` the created Kubernetes resources.
-
-To clean up after the test:
-```
-kubectl delete $(kubectl get all -lenv=test123 -oname)
-```
+releases:
+	$(foreach SYSTEM, $(SYSTEMS), \
+	mkdir -p release/$(SYSTEM); \
+	CGO_ENABLED=0 GOOS=$(SYSTEM) GOARCH=amd64 $(GOBUILD) -o release/$(SYSTEM)/$(BINARY_NAME).$(SYSTEM); \
+	cd release/$(SYSTEM)/; \
+	tar -zcvf $(BINARY_NAME).$(SYSTEM).tar.gz $(BINARY_NAME).$(SYSTEM); \
+	cd ../../; \
+	)
