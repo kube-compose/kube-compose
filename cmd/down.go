@@ -8,10 +8,11 @@ import (
 )
 
 var downCmd = &cobra.Command{
-	Use:   "down",
-	Short: "A brief description of your command",
-	Long:  "destroy all pods and services",
-	Run:   downCommand,
+	Use: "down",
+	Short: "Deletes the pods of the specified docker compose services. " +
+		"If all docker compose services would be deleted then the Kubernetes services are also deleted.",
+	Long: "destroy all pods and services",
+	Run:  downCommand,
 }
 
 func downCommand(cmd *cobra.Command, args []string) {
