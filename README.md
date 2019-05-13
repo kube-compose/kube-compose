@@ -195,3 +195,5 @@ Docker healthchecks are converted into [Readiness Probes](https://kubernetes.io/
 ### Running as specific users
 
 If any of the images you are running with kube-compose need to be run as a specific user, you can set the `--run-as-user` flag for `kube-compose up`. This will set each pod's `runAsUser`/`runAsGroup` based on either the [`user` property](https://docs.docker.com/compose/compose-file/#domainname-hostname-ipc-mac_address-privileged-read_only-shm_size-stdin_open-tty-user-working_dir) of its docker-compose service or the [`USER` configuration](https://docs.docker.com/engine/reference/builder/#user) of its Docker image (prioritising the former if both are present).
+
+Bear in mind that if a Dockerfile does not explicitly include the `USER` instruction, it will recursively follow its base image (as defined in the `FROM` instruction) until it finds an image that did configure its `USER`. This could result in vulnerabilities, such as accidentally running as root.
