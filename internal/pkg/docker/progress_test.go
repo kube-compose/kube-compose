@@ -90,15 +90,19 @@ func TestPushProgress_Done(t *testing.T) {
 }
 
 func TestPushProgress_Partial(t *testing.T) {
-	reader := bytes.NewReader([]byte(`{"id":"layer1","status":"Pushing","progress":{"current":1,"total":2}}`))
+	reader := bytes.NewReader([]byte(`{"id":"layer1","status":"Pushing","progressDetail":{"current":1,"total":2}}`))
 	push := NewPush(reader)
 	// If there is 1 layer that is only observed to be already pushed then there should be 1 progress update of 100%.
 	var progress float64
 	count := 0
-	_, _ = push.Wait(func(_ *PullOrPush) {
+	_, err := push.Wait(func(_ *PullOrPush) {
 		progress = push.Progress()
 		count++
 	})
+	if err != nil {
+		// Don't fail the test here because we expect an error due to no digest being reported from the server.
+		t.Log(err)
+	}
 	if count != 1 || progress >= 1 || progress <= 0 {
 		t.Fail()
 	}
