@@ -78,3 +78,28 @@ func TestMergeStringMaps_Empty(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestMerge_Basic(t *testing.T) {
+	serviceA := &Service{
+		Name:        "a",
+		Environment: map[string]string{"a": "b"},
+		Ports:       []PortBinding{{80, 80, 80, "tcp", ""}},
+	}
+
+	serviceB := &Service{
+		Name:        "b",
+		Environment: map[string]string{"b": "c"},
+		Ports:       []PortBinding{{8000, 8000, 8000, "tcp", ""}},
+	}
+
+	expected := &Service{
+		Name:        "a",
+		Environment: map[string]string{"a": "b", "b": "c"},
+		Ports:       []PortBinding{{80, 80, 80, "tcp", ""}, {8000, 8000, 8000, "tcp", ""}},
+	}
+
+	merge(serviceA, serviceB)
+	if !reflect.DeepEqual(serviceA, expected) {
+		t.Fail()
+	}
+}
