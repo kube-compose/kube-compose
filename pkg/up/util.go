@@ -287,9 +287,9 @@ func getTag(ref dockerRef.Reference) string {
 	return refWithTag.Tag()
 }
 
-func pullImageWithLogging(ctx context.Context, dc *dockerClient.Client, appName, image string) (string, error) {
+func pullImageWithLogging(ctx context.Context, puller docker.ImagePuller, appName, image string) (string, error) {
 	lastLogTime := time.Now().Add(-2 * time.Second)
-	digest, err := docker.PullImage(ctx, dc, image, "123", func(pull *docker.PullOrPush) {
+	digest, err := docker.PullImage(ctx, puller, image, "123", func(pull *docker.PullOrPush) {
 		t := time.Now()
 		elapsed := t.Sub(lastLogTime)
 		if elapsed >= 2*time.Second {
@@ -305,13 +305,10 @@ func pullImageWithLogging(ctx context.Context, dc *dockerClient.Client, appName,
 	return digest, nil
 }
 
-func pushImageWithLogging(ctx context.Context, dc *dockerClient.Client, appName, image, bearerToken string) (string, error) {
+func pushImageWithLogging(ctx context.Context, pusher docker.ImagePusher, appName, image, bearerToken string) (string, error) {
 	lastLogTime := time.Now().Add(-2 * time.Second)
-	registryAuth, err := docker.EncodeRegistryAuth("unused", bearerToken)
-	if err != nil {
-		return "", err
-	}
-	digest, err := docker.PushImage(ctx, dc, image, registryAuth, func(push *docker.PullOrPush) {
+	registryAuth := docker.EncodeRegistryAuth("unused", bearerToken)
+	digest, err := docker.PushImage(ctx, pusher, image, registryAuth, func(push *docker.PullOrPush) {
 		t := time.Now()
 		elapsed := t.Sub(lastLogTime)
 		if elapsed >= 2*time.Second {

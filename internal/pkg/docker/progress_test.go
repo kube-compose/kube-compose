@@ -2,9 +2,13 @@ package docker
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"strings"
 	"testing"
 )
+
+const testDigest = "sha256:f0b6db8bb4b757d0c3c9e120f4ac091286be5815ad576fbd48d8b953e8d2b06d"
 
 func TestPullProgress_Done(t *testing.T) {
 	// If there is 1 layer that is only observed to be pulled then there should be 1 progress update of 100%.
@@ -30,26 +34,49 @@ func TestPullProgress_Empty(t *testing.T) {
 	}
 }
 
-func TestPullWaitKnownError(t *testing.T) {
+func TestPullWait_KnownError(t *testing.T) {
 	// If the server returns an error then it should be forwarded by Wait (pull).
-	reader := bytes.NewReader([]byte(`{"error":{"message":"asdf"}}`))
+	reader := bytes.NewReader([]byte(`{"errorDetail":{"message":"asdf"}}`))
 	pull := NewPull(reader)
 	_, err := pull.Wait(func(_ *PullOrPush) {})
 	if err == nil {
 		t.Fail()
+	} else if !strings.Contains(err.Error(), "asdf") {
+		t.Error(err)
 	}
 }
 
-func TestPushWaitKnownError(t *testing.T) {
+type errorReader struct {
+	err error
+}
+
+func (e *errorReader) Read(p []byte) (n int, err error) {
+	return 0, e.err
+}
+
+func TestPushWait_ReaderError(t *testing.T) {
+	errExpected := errors.New("readerroroops")
+	push := NewPush(&errorReader{
+		err: errExpected,
+	})
+	_, err := push.Wait(func(_ *PullOrPush) {})
+	if err != errExpected {
+		t.Error(err)
+	}
+}
+
+func TestPushWait_KnownError(t *testing.T) {
 	// If the server returns an error then it should be forwarded by Wait (push).
-	reader := bytes.NewReader([]byte(`{"error":{"message":"asdf"}}`))
+	reader := bytes.NewReader([]byte(`{"errorDetail":{"message":"asdf"}}`))
 	push := NewPush(reader)
 	_, err := push.Wait(func(_ *PullOrPush) {})
 	if err == nil {
 		t.Fail()
+	} else if !strings.Contains(err.Error(), "asdf") {
+		t.Error(err)
 	}
 }
-func TestPullWaitUnknownError(t *testing.T) {
+func TestPullWait_UnknownError(t *testing.T) {
 	// If there is no digest then we expect an error.
 	reader := bytes.NewReader([]byte(`{"id":"layer1","status":"Pull complete"}`))
 	pull := NewPull(reader)
@@ -59,17 +86,15 @@ func TestPullWaitUnknownError(t *testing.T) {
 	}
 }
 
-func TestPullWaitDigest(t *testing.T) {
+func TestPullWait_Digest(t *testing.T) {
 	// Wait should return the image digest.
-	digestExpected := "sha256:f0b6db8bb4b757d0c3c9e120f4ac091286be5815ad576fbd48d8b953e8d2b06d"
-	reader := bytes.NewReader([]byte(fmt.Sprintf(`{"status":"%s "}`, digestExpected)))
+	reader := bytes.NewReader([]byte(fmt.Sprintf(`{"status":"%s "}`, testDigest)))
 	pull := NewPull(reader)
-	digestActual, err := pull.Wait(func(_ *PullOrPush) {})
+	digest, err := pull.Wait(func(_ *PullOrPush) {})
 	if err != nil {
-		t.Log(err)
-		t.Fail()
+		t.Error(err)
 	}
-	if digestActual != digestExpected {
+	if digest != testDigest {
 		t.Fail()
 	}
 }
