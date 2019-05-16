@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strconv"
 
+	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 	"github.com/pkg/errors"
 )
 
@@ -53,7 +54,7 @@ func parsePortBindings(spec string, portBindings []PortBinding) ([]PortBinding, 
 	if matches == nil {
 		return nil, fmt.Errorf("invalid port %q, should be [[remote_ip:]remote_port[-remote_port]:]port[/protocol]", spec)
 	}
-	matchMap := buildRegexpMatchMap(portBindingSpecRegexp, matches)
+	matchMap := util.BuildRegexpMatchMap(portBindingSpecRegexp, matches)
 
 	host := matchMap["host"]
 	protocol := matchMap["protocol"]
