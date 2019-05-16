@@ -18,12 +18,12 @@ func CloseAndLogError(closer io.Closer) {
 }
 
 func decodeBase36(b int) int {
-	if b <= 0x39 {
-		if 0x30 <= b {
-			return 26 - 0x30 + b
+	if b <= '9' {
+		if '0' <= b {
+			return 26 - '0' + b
 		}
-	} else if 0x61 <= b && b <= 0x7A {
-		return b - 0x61
+	} else if 'a' <= b && b <= 'z' {
+		return b - 'a'
 	}
 	return -1
 }
@@ -42,7 +42,7 @@ func EscapeName(input string) string {
 			sb.WriteByte(b)
 			continue
 		}
-		sb.WriteByte(0x39)
+		sb.WriteByte('9')
 		sb.WriteByte(chars[b/36])
 		sb.WriteByte(chars[b%36])
 	}
@@ -64,7 +64,7 @@ func UnescapeName(input string) (string, error) {
 	var sb strings.Builder
 	i := 0
 	for i < len(input) {
-		if input[i] == 0x39 {
+		if input[i] == '9' {
 			b, err := unescapeByte(input, i)
 			if err != nil {
 				return "", err
