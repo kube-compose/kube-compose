@@ -8,11 +8,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var upCmd = &cobra.Command{
-	Use:   "up",
-	Short: "Create and start containers running on K8s",
-	Long:  "creates pods and services in an order that respects depends_on in the docker compose file",
-	Run:   upCommand,
+func SetupUpCli() *cobra.Command {
+	var upCmd = &cobra.Command{
+		Use:   "up",
+		Short: "Create and start containers running on K8s",
+		Long:  "creates pods and services in an order that respects depends_on in the docker compose file",
+		Run:   upCommand,
+	}
+	upCmd.PersistentFlags().BoolP("detach", "d", false, "Detached mode: Run containers in the background")
+	upCmd.PersistentFlags().BoolP("run-as-user", "", false, "When set, the runAsUser/runAsGroup will be set for each pod based on the "+
+		"user of the pod's image and the \"user\" key of the pod's docker-compose service")
+	return upCmd
 }
 
 func upCommand(cmd *cobra.Command, args []string) {
@@ -26,15 +32,4 @@ func upCommand(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-}
-
-// This method is generated when cobra is initialized.
-// Flags and configuration settings are meant to be
-// configured here.
-// nolint
-func init() {
-	rootCmd.AddCommand(upCmd)
-	upCmd.PersistentFlags().BoolP("detach", "d", false, "Detached mode: Run containers in the background")
-	upCmd.PersistentFlags().BoolP("run-as-user", "", false, "When set, the runAsUser/runAsGroup will be set for each pod based on the "+
-		"user of the pod's image and the \"user\" key of the pod's docker-compose service")
 }
