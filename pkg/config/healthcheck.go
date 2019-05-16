@@ -53,14 +53,14 @@ func ParseHealthcheck(healthcheckYAML *ServiceHealthcheck) (*Healthcheck, bool, 
 		return nil, true, nil
 	}
 	if len(test) == 1 {
-		return nil, false, fmt.Errorf("field \"test\" of Healthcheck must have size at least 2 of its first element is not \"NONE\"")
+		return nil, false, fmt.Errorf("field \"test\" of Healthcheck must have size at least 2 if its first element is not \"NONE\"")
 	}
 	healthcheck.Test = test[1:]
 
 	// We do not set StartPeriod because it is unsupported in docker-compose 2.1 and
-	// should therefore  be treated as 0.
+	// should therefore be treated as 0.
 
-	// time.ParseDuration supports a superset of duration compared to docker-compose:
+	// time.ParseDuration supports a superset of durations compared to docker-compose:
 	// https://golang.org/pkg/time/#Duration
 	// https://docs.docker.com/compose/compose-file/compose-file-v2/#specifying-durations
 	if healthcheckYAML.Interval != nil {
