@@ -4,29 +4,30 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"io"
 
 	dockerTypes "github.com/docker/docker/api/types"
-	dockerClient "github.com/docker/docker/client"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 )
 
-func EncodeRegistryAuth(username, password string) (string, error) {
+func EncodeRegistryAuth(username, password string) string {
 	authConfig := dockerTypes.AuthConfig{
 		Username: username,
 		Password: password,
 	}
-	authConfigBytes, err := json.Marshal(&authConfig)
-	if err != nil {
-		return "", err
-	}
-	return base64.StdEncoding.EncodeToString(authConfigBytes), nil
+	authConfigBytes, _ := json.Marshal(&authConfig)
+	return base64.StdEncoding.EncodeToString(authConfigBytes)
 }
 
-func PullImage(ctx context.Context, dc *dockerClient.Client, image, registryAuth string, onUpdate func(*PullOrPush)) (string, error) {
+type ImagePuller interface {
+	ImagePull(ctx context.Context, image string, pushOptions dockerTypes.ImagePullOptions) (io.ReadCloser, error)
+}
+
+func PullImage(ctx context.Context, puller ImagePuller, image, registryAuth string, onUpdate func(*PullOrPush)) (string, error) {
 	pullOptions := dockerTypes.ImagePullOptions{
 		RegistryAuth: registryAuth,
 	}
-	readCloser, err := dc.ImagePull(ctx, image, pullOptions)
+	readCloser, err := puller.ImagePull(ctx, image, pullOptions)
 	if err != nil {
 		return "", err
 	}
@@ -35,11 +36,15 @@ func PullImage(ctx context.Context, dc *dockerClient.Client, image, registryAuth
 	return pull.Wait(onUpdate)
 }
 
-func PushImage(ctx context.Context, dc *dockerClient.Client, image, registryAuth string, onUpdate func(*PullOrPush)) (string, error) {
+type ImagePusher interface {
+	ImagePush(ctx context.Context, image string, pushOptions dockerTypes.ImagePushOptions) (io.ReadCloser, error)
+}
+
+func PushImage(ctx context.Context, pusher ImagePusher, image, registryAuth string, onUpdate func(*PullOrPush)) (string, error) {
 	pushOptions := dockerTypes.ImagePushOptions{
 		RegistryAuth: registryAuth,
 	}
-	readCloser, err := dc.ImagePush(ctx, image, pushOptions)
+	readCloser, err := pusher.ImagePush(ctx, image, pushOptions)
 	if err != nil {
 		return "", err
 	}

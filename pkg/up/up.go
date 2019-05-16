@@ -650,6 +650,7 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 		app.maxObservedPodStatus = podStatus
 		fmt.Printf("app %s: pod status %s\n", app.name, &app.maxObservedPodStatus)
 	}
+
 	return nil
 }
 
@@ -807,7 +808,6 @@ func (u *upRunner) run() error {
 	for _, completedChannel := range u.completedChannels {
 		<-completedChannel
 	}
-
 	return nil
 }
 

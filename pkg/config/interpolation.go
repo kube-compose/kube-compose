@@ -19,16 +19,14 @@ type configInterpolator struct {
 }
 
 type stringOrInt struct {
-	str string
-	i   int
+	str   string
+	i     int
+	isInt bool
 }
 
 type path []stringOrInt
 
 func (p path) appendStr(str string) path {
-	if str == "" {
-		panic(fmt.Errorf("s must not be empty"))
-	}
 	return append(p, stringOrInt{
 		str: str,
 	})
@@ -36,7 +34,8 @@ func (p path) appendStr(str string) path {
 
 func (p path) appendInt(i int) path {
 	return append(p, stringOrInt{
-		i: i,
+		i:     i,
+		isInt: true,
 	})
 }
 
