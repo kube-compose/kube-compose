@@ -42,7 +42,6 @@ func TestEscapeName_Success(t *testing.T) {
 func TestEscapeName_Success2(t *testing.T) {
 	r := EscapeName("--a-z089--")
 	if r != "9bj-a-z089bv-9bj" {
-		t.Log(r)
 		t.Fail()
 	}
 }
