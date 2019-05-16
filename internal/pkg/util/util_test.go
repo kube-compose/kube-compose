@@ -25,7 +25,7 @@ func TestCloseAndLogError(t *testing.T) {
 	}
 }
 
-func TestEscapeName(t *testing.T) {
+func TestEscapeName_Success(t *testing.T) {
 	r := EscapeName("\x00\x390a\x7B!")
 	// Each character that is not [a-z0-8] is replaced by a three-letter sequence 9[a-z0-9]{2}, i.e.:
 	// "\x00" => "9aa"
@@ -35,6 +35,13 @@ func TestEscapeName(t *testing.T) {
 	// "\x7B" => "9dp"
 	// "!" 	  => "9a7"
 	if r != "9aa9bv0a9dp9a7" {
+		t.Fail()
+	}
+}
+
+func TestEscapeName_Success2(t *testing.T) {
+	r := EscapeName("--a-z089--")
+	if r != "9bj-a-z089bv-9bj" {
 		t.Fail()
 	}
 }
@@ -55,6 +62,13 @@ func TestTryParseInt64_Success(t *testing.T) {
 func TestUnescapeName_Success(t *testing.T) {
 	r, err := UnescapeName("9aa9bv0a9dp9a7")
 	if r != "\x00\x390a\x7B!" || err != nil {
+		t.Fail()
+	}
+}
+
+func TestUnescapeName_Success2(t *testing.T) {
+	r, err := UnescapeName("9bj-a-z089bv-9bj")
+	if r != "--a-z089--" || err != nil {
 		t.Fail()
 	}
 }
