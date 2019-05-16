@@ -247,7 +247,6 @@ func (c *configInterpolator) interpolateRecursive(obj interface{}, p path) inter
 			iv.Set(reflect.ValueOf(val2))
 			childPath.pop()
 		}
-		return slicev.Interface()
 	}
 	return obj
 }
