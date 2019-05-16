@@ -16,38 +16,22 @@ import (
 	"github.com/jbrekelmans/kube-compose/internal/pkg/k8smeta"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 	"github.com/jbrekelmans/kube-compose/pkg/config"
-<<<<<<< HEAD
 	cmdColor "github.com/logrusorgru/aurora"
-=======
-	k8sUtil "github.com/jbrekelmans/kube-compose/pkg/k8s"
->>>>>>> 63e2104... Fixing lint issues
 	goDigest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
-	k8sError "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-<<<<<<< HEAD
 	k8swatch "k8s.io/apimachinery/pkg/watch"
-=======
-
-	k8swatch "k8s.io/apimachinery/pkg/watch"
-
->>>>>>> 63e2104... Fixing lint issues
 	"k8s.io/client-go/kubernetes"
 	clientV1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	k8sError "k8s.io/apimachinery/pkg/api/errors"
-
 )
 
 type podStatus int
 
 const (
-<<<<<<< HEAD
-=======
-	annotationName               = "kube-compose/service"
->>>>>>> 63e2104... Fixing lint issues
 	podStatusReady     podStatus = 2
 	podStatusStarted   podStatus = 1
 	podStatusOther     podStatus = 0
@@ -103,7 +87,6 @@ type localImagesCache struct {
 type upRunner struct {
 	apps                  map[string]*app
 	appsThatNeedToBeReady map[*app]bool
-<<<<<<< HEAD
 	appsToBeStarted       map[*app]bool
 	cfg                   *config.Config
 	ctx                   context.Context
@@ -115,19 +98,6 @@ type upRunner struct {
 	hostAliases           hostAliases
 	completedChannels     []chan interface{}
 	maxServiceNameLength  int
-=======
-	appsWithoutPods       map[*app]bool
-	cfg                   *config.Config
-	ctx                   context.Context
-	dockerClient          *dockerClient.Client
-	localImagesCache      localImagesCacheOrError
-	localImagesCacheOnce  *sync.Once
-	k8sClientset          *kubernetes.Clientset
-	k8sServiceClient      clientV1.ServiceInterface
-	k8sPodClient          clientV1.PodInterface
-	hostAliasesOnce       *sync.Once
-	hostAliases           hostAliasesOrError
->>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
 }
 
 func (u *upRunner) initKubernetesClientset() error {
@@ -141,7 +111,6 @@ func (u *upRunner) initKubernetesClientset() error {
 	return nil
 }
 
-<<<<<<< HEAD
 func (u *upRunner) initAppsToBeStarted() {
 	u.appsToBeStarted = map[*app]bool{}
 	colorIndex := 0
@@ -166,42 +135,6 @@ func (u *upRunner) initApps() {
 	u.apps = make(map[string]*app, len(u.cfg.CanonicalComposeFile.Services))
 	u.appsThatNeedToBeReady = map[*app]bool{}
 	for name, composeService := range u.cfg.CanonicalComposeFile.Services {
-=======
-func (u *upRunner) initAppsToBeStarted() error {
-	appNames := make([]string, len(u.apps))
-	podsRequired := []string{}
-	n := 0
-	for _, app := range u.apps {
-		if contains(u.cfg.Services, app.name) {
-			appNames[n] = app.name
-			n++
-			for n > 0 {
-				appName := appNames[n-1]
-				n--
-				for dependencyApp := range u.cfg.CanonicalComposeFile.Services[appName].DependsOn {
-					appNames[n] = u.apps[dependencyApp.ServiceName].name
-					n++
-				}
-				podsRequired = append(podsRequired, appName)
-			}
-		} else if len(u.cfg.Services) == 0 {
-			podsRequired = append(podsRequired, app.name)
-		}
-	}
-	for app := range u.appsWithoutPods {
-		if !contains(podsRequired, app.name) {
-			delete(u.appsWithoutPods, app)
-		}
-	}
-	return nil
-}
-
-func (u *upRunner) initApps() error {
-	u.apps = make(map[string]*app, len(u.cfg.CanonicalComposeFile.Services))
-	u.appsThatNeedToBeReady = map[*app]bool{}
-	u.appsWithoutPods = make(map[*app]bool, len(u.cfg.CanonicalComposeFile.Services))
-	for name, dcService := range u.cfg.CanonicalComposeFile.Services {
->>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
 		app := &app{
 			name:                                 name,
 			composeService:                       composeService,
@@ -211,41 +144,14 @@ func (u *upRunner) initApps() error {
 		app.hasService = len(composeService.Ports) > 0
 		u.apps[name] = app
 	}
-<<<<<<< HEAD
-=======
-	if err := u.initAppsToBeStarted(); err != nil {
-		return err
-	}
-	return nil
-}
-func (u *upRunner) initResourceObjectMeta(objectMeta *metav1.ObjectMeta, nameEncoded, name string) {
-	objectMeta.Name = nameEncoded + "-" + u.cfg.EnvironmentID
-	if objectMeta.Labels == nil {
-		objectMeta.Labels = map[string]string{}
-	}
-	objectMeta.Labels["app"] = nameEncoded
-	objectMeta.Labels[u.cfg.EnvironmentLabel] = u.cfg.EnvironmentID
-	if objectMeta.Annotations == nil {
-		objectMeta.Annotations = map[string]string{}
-	}
-	objectMeta.Annotations[annotationName] = name
->>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
 }
 
-<<<<<<< HEAD
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
 func (u *upRunner) getAppImageInfo(app *app) error {
 	sourceImage := app.composeService.Image
 	if sourceImage == "" {
 		return fmt.Errorf("docker compose service %s has no image or its image is the empty string, and building images is not supported",
-=======
-// nolint
-func (u *upRunner) getAppImage(app *app) (*config.Healthcheck, string, error) {
-	sourceImage := u.cfg.CanonicalComposeFile.Services[app.name].Image
-	if sourceImage == "" {
-		return nil, "", fmt.Errorf("docker compose service %s has no image or is a empty string, and building images is not supported",
->>>>>>> 63e2104... Fixing lint issues
 			app.name)
 	}
 	localImageIDSet, err := u.getLocalImageIDSet()
@@ -277,13 +183,8 @@ func (u *upRunner) getAppImage(app *app) (*config.Healthcheck, string, error) {
 			return err
 		}
 		if sourceImageID == "" {
-<<<<<<< HEAD
 			return fmt.Errorf("could get ID of image %#v, this is either a bug or images were removed by an external process (please try again)",
 				sourceImage)
-=======
-			return nil, "", fmt.Errorf("could get ID of image %s, "+
-				"this is either a bug or images were removed by an external process (please try again)", sourceImage)
->>>>>>> 63e2104... Fixing lint issues
 		}
 		// len(podImage) > 0 by definition of resolveLocalImageAfterPull
 	}
@@ -299,13 +200,7 @@ func (u *upRunner) getAppImage(app *app) (*config.Healthcheck, string, error) {
 			return err
 		}
 		var digest string
-<<<<<<< HEAD
 		digest, err = pushImageWithLogging(u.ctx, u.dockerClient, app.name, destinationImagePush, u.cfg.KubeConfig.BearerToken)
-=======
-		digest, err = pushImageWithLogging(u.ctx, u.dockerClient, app.name,
-			destinationImagePush,
-			u.cfg.KubeConfig.BearerToken)
->>>>>>> 63e2104... Fixing lint issues
 		if err != nil {
 			return err
 		}
@@ -313,13 +208,8 @@ func (u *upRunner) getAppImage(app *app) (*config.Healthcheck, string, error) {
 	} else if podImage == "" {
 		if !sourceImageIsNamed {
 			// TODO https://github.com/jbrekelmans/kube-compose/issues/6
-<<<<<<< HEAD
 			return fmt.Errorf("image reference %#v is likely unstable, "+
 				"please enable pushing of images or use named image references to improve consistency across hosts", sourceImage)
-=======
-			return nil, "", fmt.Errorf("image reference %s is likely unstable, "+
-				"please enable pushing of images or use named image references to improve reliability", sourceImage)
->>>>>>> 63e2104... Fixing lint issues
 		}
 		podImage = sourceImage
 	}
@@ -394,10 +284,7 @@ func (u *upRunner) waitForServiceClusterIPCountRemaining() int {
 	return remaining
 }
 
-<<<<<<< HEAD
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-=======
->>>>>>> 63e2104... Fixing lint issues
 // nolint
 func (u *upRunner) waitForServiceClusterIP(expected int) error {
 	listOptions := metav1.ListOptions{
@@ -465,10 +352,7 @@ func (u *upRunner) waitForServiceClusterIP(expected int) error {
 	return nil
 }
 
-<<<<<<< HEAD
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-=======
->>>>>>> 63e2104... Fixing lint issues
 // nolint
 func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) {
 	expectedServiceCount := 0
@@ -477,22 +361,14 @@ func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) 
 			continue
 		}
 		expectedServiceCount++
-<<<<<<< HEAD
 		servicePorts := make([]v1.ServicePort, len(app.composeService.Ports))
 		for i, port := range app.composeService.Ports {
-=======
-		dcService := u.cfg.CanonicalComposeFile.Services[app.name]
-		servicePorts := make([]v1.ServicePort, len(dcService.Ports))
-		for i, port := range dcService.Ports {
->>>>>>> 63e2104... Fixing lint issues
 			servicePorts[i] = v1.ServicePort{
 				Name:       fmt.Sprintf("%s%d", port.Protocol, port.Internal),
 				Port:       port.Internal,
 				Protocol:   v1.Protocol(strings.ToUpper(port.Protocol)),
 				TargetPort: intstr.FromInt(int(port.Internal)),
 			}
-<<<<<<< HEAD
-<<<<<<< HEAD
 		}
 		service := &v1.Service{
 			Spec: v1.ServiceSpec{
@@ -510,52 +386,6 @@ func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) 
 			return nil, err
 		default:
 			fmt.Printf("app %s: service %s created\n", app.name, service.ObjectMeta.Name)
-=======
-			service := &v1.Service{
-				Spec: v1.ServiceSpec{
-					Ports: servicePorts,
-					Selector: map[string]string{
-						"app":                  app.nameEncoded,
-						u.cfg.EnvironmentLabel: u.cfg.EnvironmentID,
-					},
-					// This is the default value.
-					// Type: v1.ServiceType("ClusterIP"),
-				},
-			}
-			u.initResourceObjectMeta(&service.ObjectMeta, app.nameEncoded, app.name)
-			_, err := u.k8sServiceClient.Create(service)
-
-			if k8sError.IsAlreadyExists(err) {
-				fmt.Printf("app %s: service %s already exists\n", app.name, service.ObjectMeta.Name)
-			} else if err != nil {
-				return nil, err
-			} else {
-				fmt.Printf("app %s: created service %s\n", app.name, service.ObjectMeta.Name)
-			}
->>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
-=======
-		}
-		service := &v1.Service{
-			Spec: v1.ServiceSpec{
-				Ports: servicePorts,
-				Selector: map[string]string{
-					"app":                  app.nameEncoded,
-					u.cfg.EnvironmentLabel: u.cfg.EnvironmentID,
-				},
-				// This is the default value.
-				// Type: v1.ServiceType("ClusterIP"),
-			},
-		}
-		u.initResourceObjectMeta(&service.ObjectMeta, app.nameEncoded, app.name)
-		_, err := u.k8sServiceClient.Create(service)
-		switch {
-		case k8sError.IsAlreadyExists(err):
-			fmt.Printf("app %s: service %s already exists\n", app.name, service.ObjectMeta.Name)
-		case err != nil:
-			return nil, err
-		default:
-			fmt.Printf("app %s: created service %s\n", app.name, service.ObjectMeta.Name)
->>>>>>> 63e2104... Fixing lint issues
 		}
 	}
 	if expectedServiceCount == 0 {
@@ -619,10 +449,22 @@ func (u *upRunner) createServicesAndGetPodHostAliasesOnce() ([]v1.HostAlias, err
 	return u.hostAliases.v, u.hostAliases.err
 }
 
-<<<<<<< HEAD
+func getRestartPolicyforService(app *app) v1.RestartPolicy {
+	var restartPolicy v1.RestartPolicy
+	switch app.composeService.Restart {
+	case "no":
+		restartPolicy = v1.RestartPolicyNever
+	case "always":
+		restartPolicy = v1.RestartPolicyAlways
+	case "on-failure":
+		restartPolicy = v1.RestartPolicyOnFailure
+	default:
+		restartPolicy = v1.RestartPolicyNever
+	}
+	return restartPolicy
+}
+
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-=======
->>>>>>> 63e2104... Fixing lint issues
 // nolint
 func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	err := u.getAppImageInfoOnce(app)
@@ -670,8 +512,6 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	if err != nil {
 		return nil, err
 	}
-
-<<<<<<< HEAD
 	var securityContext *v1.PodSecurityContext
 	if u.cfg.RunAsUser {
 		securityContext = &v1.PodSecurityContext{
@@ -681,19 +521,13 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 			securityContext.RunAsGroup = app.imageInfo.user.GID
 		}
 	}
-=======
->>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
 	pod := &v1.Pod{
 		Spec: v1.PodSpec{
 			// new(bool) allocates a bool, sets it to false, and returns a pointer to it.
 			AutomountServiceAccountToken: new(bool),
 			Containers: []v1.Container{
 				{
-<<<<<<< HEAD
 					Command:         app.composeService.Entrypoint,
-=======
-					Command:         dcService.Entrypoint,
->>>>>>> 63e2104... Fixing lint issues
 					Env:             envVars,
 					Image:           app.imageInfo.podImage,
 					ImagePullPolicy: v1.PullAlways,
@@ -704,7 +538,7 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 				},
 			},
 			HostAliases:     hostAliases,
-			RestartPolicy:   v1.RestartPolicyNever,
+			RestartPolicy:   getRestartPolicyforService(app),
 			SecurityContext: securityContext,
 		},
 	}
@@ -719,10 +553,7 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	return podServer, nil
 }
 
-<<<<<<< HEAD
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-=======
->>>>>>> 63e2104... Fixing lint issues
 // nolint
 func parsePodStatus(pod *v1.Pod) (podStatus, error) {
 	for _, condition := range pod.Status.Conditions {
@@ -763,18 +594,10 @@ func parsePodStatus(pod *v1.Pod) (podStatus, error) {
 	return podStatusOther, nil
 }
 
-<<<<<<< HEAD
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-=======
->>>>>>> 63e2104... Fixing lint issues
 // nolint
 func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
-
-<<<<<<< HEAD
 	app, err := u.findAppFromObjectMeta(&pod.ObjectMeta)
-=======
-	app, err := u.findAppFromResourceObjectMeta(&pod.ObjectMeta)
->>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
 	if err != nil {
 		return err
 	}
@@ -804,16 +627,7 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 					if err != nil {
 						panic(err)
 					}
-<<<<<<< HEAD
 					defer util.CloseAndLogError(bodyReader)
-=======
-					defer func() {
-						err = bodyReader.Close()
-						if err != nil {
-							fmt.Println(err)
-						}
-					}()
->>>>>>> 63e2104... Fixing lint issues
 					scanner := bufio.NewScanner(bodyReader)
 					for scanner.Scan() {
 						fmt.Printf("%-*s| %s\n", u.maxServiceNameLength+3, cmdColor.Colorize(app.name, app.color), scanner.Text())
@@ -838,10 +652,7 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 	return nil
 }
 
-<<<<<<< HEAD
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-=======
->>>>>>> 63e2104... Fixing lint issues
 // nolint
 func (u *upRunner) createPodsIfNeeded() error {
 	for app1 := range u.appsToBeStarted {
@@ -886,10 +697,7 @@ func (u *upRunner) createPodsIfNeeded() error {
 	return nil
 }
 
-<<<<<<< HEAD
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-=======
->>>>>>> 63e2104... Fixing lint issues
 // nolint
 func (u *upRunner) run() error {
 	u.initApps()
@@ -906,11 +714,7 @@ func (u *upRunner) run() error {
 	}
 	u.dockerClient = dc
 
-<<<<<<< HEAD
 	for app := range u.appsToBeStarted {
-=======
-	for app := range u.appsWithoutPods {
->>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
 		// Begin pulling and pushing images immediately...
 		//nolint
 		go u.getAppImageInfoOnce(app)
@@ -919,7 +723,6 @@ func (u *upRunner) run() error {
 	// set the hostAliases of each pod)
 	// nolint
 	go u.createServicesAndGetPodHostAliasesOnce()
-<<<<<<< HEAD
 	for app := range u.appsToBeStarted {
 		if len(app.composeService.DependsOn) != 0 {
 			continue
@@ -928,33 +731,9 @@ func (u *upRunner) run() error {
 		pod, err = u.createPod(app)
 		if err != nil {
 			return err
-=======
-	for app := range u.appsWithoutPods {
-<<<<<<< HEAD
-		if len(u.cfg.CanonicalComposeFile.Services[app.name].DependsOn) == 0 {
-			pod, err := u.createPod(app)
-			if err != nil {
-				return err
-			}
-			fmt.Printf("app %s: created pod %s because all its dependency conditions are met\n", app.name, pod.ObjectMeta.Name)
-			delete(u.appsWithoutPods, app)
->>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
 		}
 		fmt.Printf("app %s: created pod %s because all its dependency conditions are met\n", app.name, pod.ObjectMeta.Name)
 		delete(u.appsToBeStarted, app)
-=======
-		if len(u.cfg.CanonicalComposeFile.Services[app.name].DependsOn) != 0 {
-			continue
-		}
-		var pod *v1.Pod
-		pod, err = u.createPod(app)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("app %s: created pod %s because all its dependency conditions are met\n", app.name, pod.ObjectMeta.Name)
-		delete(u.appsWithoutPods, app)
-
->>>>>>> 63e2104... Fixing lint issues
 	}
 
 	listOptions := metav1.ListOptions{
@@ -1004,11 +783,7 @@ func (u *upRunner) run() error {
 		case k8swatch.Deleted:
 			pod := event.Object.(*v1.Pod)
 			var app *app
-<<<<<<< HEAD
 			app, err = u.findAppFromObjectMeta(&pod.ObjectMeta)
-=======
-			app, err = u.findAppFromResourceObjectMeta(&pod.ObjectMeta)
->>>>>>> 63e2104... Fixing lint issues
 			if err != nil {
 				return err
 			}
@@ -1022,29 +797,15 @@ func (u *upRunner) run() error {
 		if err != nil {
 			return err
 		}
-<<<<<<< HEAD
 		if u.checkIfPodsReady() {
-=======
-		allPodsReady := true
-		for app := range u.appsThatNeedToBeReady {
-			if app.maxObservedPodStatus != podStatusReady {
-				allPodsReady = false
-			}
-		}
-		if allPodsReady {
->>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
 			break
 		}
 	}
 	fmt.Printf("pods ready (%d/%d)\n", len(u.appsThatNeedToBeReady), len(u.appsThatNeedToBeReady))
-<<<<<<< HEAD
 	// Wait for completed channels
 	for _, completedChannel := range u.completedChannels {
 		<-completedChannel
 	}
-
-=======
->>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
 	return nil
 }
 

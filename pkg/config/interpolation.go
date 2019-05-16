@@ -27,12 +27,6 @@ type stringOrInt struct {
 type path []stringOrInt
 
 func (p path) appendStr(str string) path {
-<<<<<<< HEAD
-=======
-	if str == "" {
-		panic(fmt.Errorf("s must not be empty"))
-	}
->>>>>>> 63e2104... Fixing lint issues
 	return append(p, stringOrInt{
 		str: str,
 	})
@@ -112,10 +106,7 @@ func InterpolateConfig(fileName string, config genericMap, valueGetter ValueGett
 // The implementation is not strict on the syntax between two paired curly braces, but
 // is otherwise identical to the Python implementation:
 // https://github.com/docker/compose/blob/master/compose/config/interpolation.py
-<<<<<<< HEAD
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-=======
->>>>>>> 63e2104... Fixing lint issues
 // nolint
 func Interpolate(str string, valueGetter ValueGetter, v bool) (string, error) {
 	var sb strings.Builder
@@ -246,9 +237,6 @@ func (c *configInterpolator) interpolateRecursive(obj interface{}, p path) inter
 		}
 		return m
 	}
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 	if obj != nil && reflect.TypeOf(obj).Kind() == reflect.Slice {
 		slicev := reflect.ValueOf(obj)
 		for i := 0; i < slicev.Len(); i++ {
@@ -259,29 +247,7 @@ func (c *configInterpolator) interpolateRecursive(obj interface{}, p path) inter
 			iv.Set(reflect.ValueOf(val2))
 			childPath.pop()
 		}
-=======
-	if slice, ok := obj.([]interface{}); ok {
-		for i, val := range slice {
-=======
-	if reflect.TypeOf(obj).Kind() == reflect.Slice {
-=======
-	if obj != nil && reflect.TypeOf(obj).Kind() == reflect.Slice {
->>>>>>> e55e9bd... issue #39: improve handling of environment to be more consistent with docker-compose
-		slicev := reflect.ValueOf(obj)
-		for i := 0; i < slicev.Len(); i++ {
-			iv := slicev.Index(i)
->>>>>>> 32bf048... issue #7: fix bug where slices were not properly supported
-			childPath := p.appendInt(i)
-			val := iv.Interface()
-			val2 := c.interpolateRecursive(val, childPath)
-			iv.Set(reflect.ValueOf(val2))
-			childPath.pop()
-		}
-<<<<<<< HEAD
-		return slice
->>>>>>> d2d10a0... finalize implementation of variable substitutions
-=======
->>>>>>> 32bf048... issue #7: fix bug where slices were not properly supported
+		return slicev.Interface()
 	}
 	return obj
 }

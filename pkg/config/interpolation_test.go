@@ -155,14 +155,10 @@ func TestInterpolate_RecursiveSlice(t *testing.T) {
 	input := []string{
 		"$$",
 	}
-	outputRaw := c.interpolateRecursive(input, path{})
-	if output, ok := outputRaw.([]string); ok {
-		if len(output) != 1 || output[0] != "$" {
-			t.Fail()
-		}
-		return
+	output := c.interpolateRecursive(input, path{})
+	if !reflect.DeepEqual(output, []string{"$"}) {
+		t.Fail()
 	}
-	t.Fail()
 }
 func TestInterpolate_RecursiveMap(t *testing.T) {
 	m := map[string]string{}
@@ -193,7 +189,6 @@ func TestInterpolate_NestedErrors(t *testing.T) {
 	if len(c.errorList) == 0 {
 		t.Fail()
 	}
-	t.Fail()
 }
 
 func TestInterpolateConfig_V1(t *testing.T) {

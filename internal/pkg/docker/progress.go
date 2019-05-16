@@ -150,7 +150,6 @@ func (d *PullOrPush) Progress() float64 {
 	sum := 0.0
 	count := 0
 	for _, status := range d.statusFromLayer {
-<<<<<<< HEAD:internal/pkg/docker/progress.go
 		weight := status.statusEnum.weightBefore
 		if status.progress != nil && status.progress.Total > 0 {
 			statusProgress := float64(status.progress.Current) / float64(status.progress.Total)
@@ -159,27 +158,12 @@ func (d *PullOrPush) Progress() float64 {
 			weight += status.statusEnum.weight
 		}
 		sum += weight / d.maxWeight
-=======
-		layerProgress := 0.0
-		if status.statusEnum != nil {
-			weight := status.statusEnum.weightBefore
-			if status.progress != nil && status.progress.Total > 0 {
-				statusProgress := float64(status.progress.Current) / float64(status.progress.Total)
-				weight += (statusProgress * status.statusEnum.weight)
-			}
-			layerProgress = weight / d.maxWeight
-		}
-		sum += layerProgress
->>>>>>> 63e2104... Fixing lint issues:pkg/docker/progress.go
 		count++
 	}
 	return sum / float64(count)
 }
 
-<<<<<<< HEAD:internal/pkg/docker/progress.go
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-=======
->>>>>>> 63e2104... Fixing lint issues:pkg/docker/progress.go
 // nolint
 func (d *PullOrPush) Wait(onUpdate func(*PullOrPush)) (string, error) {
 	decoder := json.NewDecoder(d.reader)

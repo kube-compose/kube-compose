@@ -61,14 +61,10 @@ func (d *downRunner) deleteCommon(errorChannel chan<- error, kind string, lister
 	}
 }
 
-<<<<<<< HEAD
 // Linter reports code duplication amongst deleteServices and deletePods. Although this is true, deduplicating would require the use of
 // generics, so we choose to nolint.
 // nolint
 func (d *downRunner) deleteServices(errorChannel chan<- error) {
-=======
-func (d *downRunner) deleteK8sResource(resource string, errorChannel chan<- error) {
->>>>>>> 63e2104... Fixing lint issues
 	lister := func(listOptions metav1.ListOptions) ([]*v1.ObjectMeta, error) {
 		serviceList, err := d.k8sServiceClient.List(listOptions)
 		if err != nil {
@@ -80,7 +76,6 @@ func (d *downRunner) deleteK8sResource(resource string, errorChannel chan<- erro
 		}
 		return list, nil
 	}
-<<<<<<< HEAD
 	d.deleteCommon(errorChannel, "Service", lister, d.k8sServiceClient.Delete)
 }
 
@@ -100,9 +95,6 @@ func (d *downRunner) deletePods(errorChannel chan<- error) {
 		return list, nil
 	}
 	d.deleteCommon(errorChannel, "Pod", lister, d.k8sPodClient.Delete)
-=======
-	d.deleteCommon(errorChannel, resource, lister, d.k8sServiceClient.Delete)
->>>>>>> 63e2104... Fixing lint issues
 }
 
 func (d *downRunner) run() error {
@@ -119,16 +111,9 @@ func (d *downRunner) run() error {
 		errorChannels = append(errorChannels, errorChannel)
 		go d.deleteServices(errorChannel)
 	}
-<<<<<<< HEAD
-
 	errorChannel := make(chan error)
 	errorChannels = append(errorChannels, errorChannel)
 	go d.deletePods(errorChannel)
-
-=======
-	go d.deleteK8sResource("Service", errorChannels[0])
-	go d.deleteK8sResource("Pod", errorChannels[1])
->>>>>>> 63e2104... Fixing lint issues
 	var firstError error
 	for _, errorChannel := range errorChannels {
 		err, more := <-errorChannel

@@ -56,13 +56,9 @@ type PushImagesConfig struct {
 
 type Config struct {
 	CanonicalComposeFile CanonicalComposeFile
-<<<<<<< HEAD
-<<<<<<< HEAD
 
 	Detach bool
 
-=======
->>>>>>> 63e2104... Fixing lint issues
 	// All Kubernetes resources are named with "-"+EnvironmentID as a suffix,
 	// and have an additional label "env="+EnvironmentID so that namespaces can be shared.
 	EnvironmentID    string
@@ -70,7 +66,6 @@ type Config struct {
 	KubeConfig       *rest.Config
 	Namespace        string
 	PushImages       *PushImagesConfig
-<<<<<<< HEAD
 
 	// True to set runAsUser/runAsGroup for each pod based on the user of the pod's image and the "user" key of the pod's docker-compose
 	// service.
@@ -78,14 +73,6 @@ type Config struct {
 
 	// A subset of docker compose services to start and stop.
 	filter map[string]bool
-=======
-	EnvironmentID        string // All Kubernetes resources are named with "-"+EnvironmentID as a suffix, and have an additional label "env="+EnvironmentID so that namespaces can be shared.
-	EnvironmentLabel     string
-	KubeConfig           *rest.Config
-	Namespace            string
-	PushImages           *PushImagesConfig
-	Services             []string
->>>>>>> adf01d6... Start independent services in kube-compose defined in docker-compose.yml (#49)
 }
 
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
@@ -99,17 +86,6 @@ func New(file *string) (*Config, error) {
 		file = new(string)
 		*file = "docker-compose.yml"
 		data, err = ioutil.ReadFile(*file)
-=======
-	Services         []string
-	Detach           bool
-}
-
-// nolint
-func New() (*Config, error) {
-	fileName := "docker-compose.yml"
-	data, err := ioutil.ReadFile(fileName)
-	if err != nil {
->>>>>>> 63e2104... Fixing lint issues
 		if os.IsNotExist(err) {
 			*file = "docker-compose.yaml"
 			data, err = ioutil.ReadFile(*file)
@@ -212,21 +188,14 @@ func ensureNoDependsOnCycle(service *Service) error {
 			}
 		} else if dep.recStack {
 			return fmt.Errorf("service %s depends on %s, but this means there is a cyclic dependency, aborting",
-<<<<<<< HEAD
 				service.Name, dep.Name)
-=======
-				service.ServiceName, dep.ServiceName)
->>>>>>> 63e2104... Fixing lint issues
 		}
 	}
 	return nil
 }
 
 // https://github.com/docker/compose/blob/master/compose/config/config_schema_v2.1.json
-<<<<<<< HEAD
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-=======
->>>>>>> 63e2104... Fixing lint issues
 // nolint
 func parseCompose2_1(composeYAML *composeFile2_1, dockerComposeFile *CanonicalComposeFile) error {
 	n := len(composeYAML.Services)
@@ -300,10 +269,7 @@ func parseCompose2_1(composeYAML *composeFile2_1, dockerComposeFile *CanonicalCo
 	return nil
 }
 
-<<<<<<< HEAD
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-=======
->>>>>>> 63e2104... Fixing lint issues
 // nolint
 func parseServiceYAML2_1(serviceYAML *service2_1) (*Service, error) {
 	service := &Service{
@@ -341,13 +307,8 @@ func parseServiceYAML2_1(serviceYAML *service2_1) (*Service, error) {
 			}
 		case pair.Value.StringValue != nil:
 			value = *pair.Value.StringValue
-<<<<<<< HEAD
 		case pair.Value.Int64Value != nil:
 			value = strconv.FormatInt(*pair.Value.Int64Value, 10)
-=======
-		case pair.Value.IntValue != nil:
-			value = strconv.Itoa(*pair.Value.IntValue)
->>>>>>> 63e2104... Fixing lint issues
 		case pair.Value.FloatValue != nil:
 			value = strconv.FormatFloat(*pair.Value.FloatValue, 'g', -1, 64)
 		default:
