@@ -20,13 +20,12 @@ import (
 	goDigest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
+	k8sError "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	k8swatch "k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	clientV1 "k8s.io/client-go/kubernetes/typed/core/v1"
-
-	k8sError "k8s.io/apimachinery/pkg/api/errors"
 )
 
 type podStatus int
@@ -512,6 +511,7 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	var securityContext *v1.PodSecurityContext
 	if u.cfg.RunAsUser {
 		securityContext = &v1.PodSecurityContext{
@@ -597,6 +597,7 @@ func parsePodStatus(pod *v1.Pod) (podStatus, error) {
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
 func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
+
 	app, err := u.findAppFromObjectMeta(&pod.ObjectMeta)
 	if err != nil {
 		return err
@@ -649,6 +650,7 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 		app.maxObservedPodStatus = podStatus
 		fmt.Printf("app %s: pod status %s\n", app.name, &app.maxObservedPodStatus)
 	}
+
 	return nil
 }
 

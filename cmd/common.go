@@ -2,9 +2,8 @@ package cmd
 
 import (
 	"github.com/jbrekelmans/kube-compose/pkg/config"
-	"github.com/spf13/cobra"
-
 	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 
 	// Plugin does not export any functions therefore it is ignored IE. "_"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"

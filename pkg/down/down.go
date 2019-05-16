@@ -111,9 +111,11 @@ func (d *downRunner) run() error {
 		errorChannels = append(errorChannels, errorChannel)
 		go d.deleteServices(errorChannel)
 	}
+
 	errorChannel := make(chan error)
 	errorChannels = append(errorChannels, errorChannel)
 	go d.deletePods(errorChannel)
+
 	var firstError error
 	for _, errorChannel := range errorChannels {
 		err, more := <-errorChannel
