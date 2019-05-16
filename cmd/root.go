@@ -16,7 +16,7 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() {
-	rootCmd.AddCommand(SetupDownCli(), SetupUpCli(), SetupDescribeCli())
+	rootCmd.AddCommand(SetupDownCli(), SetupUpCli(), SetupGetCli())
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
