@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"os"
 
 	"text/template"
 
+	"github.com/jbrekelmans/kube-compose/internal/get"
 	"github.com/spf13/cobra"
 )
 
@@ -32,12 +35,21 @@ func getCommand(cmd *cobra.Command, args []string) {
 	if len(args) == 0 {
 		log.Fatal("No Args Provided")
 	}
+	cfg, err := upOrDownCommandCommon(cmd, args)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if cmd.Flags().Changed("format") {
 		filter, err = cmd.Flags().GetString("format")
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
+	result, err := get.Service(context.Background(), cfg, args[0])
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(result)
 	service := KubeComposeService{args[0], "TestServiceName", "0.0.0.0"}
 	tmpl, err := template.New(args[0]).Parse(filter)
 	if err != nil {
