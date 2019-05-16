@@ -28,19 +28,17 @@ func decodeBase36(b int) int {
 	return -1
 }
 
-// EscapeName takes an arbitrary string and maps it bijectively to the grammar ^[a-z0-9]+$.
+// EscapeName takes an arbitrary string and maps it bijectively to the grammar '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'.
 // This is useful when creating Kubernetes resources.
 func EscapeName(input string) string {
 	n := len(input)
 	var sb strings.Builder
 	for i := 0; i < n; i++ {
 		b := input[i]
-		if b <= 0x38 {
-			if 0x30 <= b {
-				sb.WriteByte(b)
-				continue
-			}
-		} else if 0x61 <= b && b <= 0x7A {
+		if (b >= '0' && b <= '8') || (b >= 'a' && b <= 'z') {
+			sb.WriteByte(b)
+			continue
+		} else if b == '-' && i > 0 && i < n-1 {
 			sb.WriteByte(b)
 			continue
 		}
