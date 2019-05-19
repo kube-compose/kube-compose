@@ -256,5 +256,5 @@ type composeFileService struct {
 
 type composeFile struct {
 	Services map[string]*composeFileService `mapdecode:"services"`
-	Volumes  map[string]interface{} 		`mapdecode:"volumes"`
+	Volumes  map[string]interface{}         `mapdecode:"volumes"`
 }

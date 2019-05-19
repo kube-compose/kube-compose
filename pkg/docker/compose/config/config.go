@@ -212,12 +212,14 @@ func (c *configLoader) loadStandardFile() (*composeFileParsed, error) {
 	return nil, loadFileError(file, err)
 }
 
-// processExtends process the extends field of a docker compose service. That is: given a docker compose service X named name in the docker compose file
-// cfParsed.resolvedFile, if X extends another service Y then processExtends copies inherited configuration Y into the representation of X (cfServiceParsed).
+// processExtends process the extends field of a docker compose service. That is: given a docker compose service X named name in the docker
+// compose file cfParsed.resolvedFile, if X extends another service Y then processExtends copies inherited configuration Y into the
+// representation of X (cfServiceParsed).
 func (c *configLoader) processExtends(name string, cfServiceParsed *composeFileParsedService, cfParsed *composeFileParsed) error {
 	if cfServiceParsed.visited {
 		if cfServiceParsed.recStack {
-			return fmt.Errorf("cannot extend service %s of file %#v because this would cause an infinite loop. Please ensure your docker compose services do not have a cyclical extends relationship", name, cfParsed.resolvedFile)
+			return fmt.Errorf("cannot extend service %s of file %#v because this would cause an infinite loop. Please ensure your docker "+
+				"compose services do not have a cyclical extends relationship", name, cfParsed.resolvedFile)
 		}
 		return nil
 	}
@@ -241,7 +243,10 @@ func (c *configLoader) processExtends(name string, cfServiceParsed *composeFileP
 // in the docker compose file cfParsed.resolvedFile, if X extends another service Y then resolveExtends ensures that:
 // 1. the representation of Y has been loaded; -and
 // 2. processExtends has been called on Y.
-func (c *configLoader) resolveExtends(name string, cfServiceParsed *composeFileParsedService, cfParsed *composeFileParsed) (*composeFileParsedService, error) {
+func (c *configLoader) resolveExtends(
+	name string,
+	cfServiceParsed *composeFileParsedService,
+	cfParsed *composeFileParsed) (*composeFileParsedService, error) {
 	var cfExtendedServiceParsed *composeFileParsedService
 	var cfParsedExtends *composeFileParsed
 	if cfServiceParsed.extends.File != nil {
@@ -321,7 +326,10 @@ func New(files []string) (*CanonicalDockerComposeConfig, error) {
 			return nil, err
 		}
 	}
-	c.resolveDependsOn(cfParsed)
+	err := c.resolveDependsOn(cfParsed)
+	if err != nil {
+		return nil, err
+	}
 
 	configCanonical := &CanonicalDockerComposeConfig{}
 	configCanonical.Services = map[string]*Service{}

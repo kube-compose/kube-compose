@@ -148,7 +148,7 @@ func (cfg *Config) ClearFilter() {
 
 // AddToFilter adds service and its (in)direct dependencies (based on depends_on) to the set of services matched by
 // the current filter.
-func (cfg *Config) AddToFilter(service *Service) error {
+func (cfg *Config) AddToFilter(service *Service) {
 	queue := []*Service{
 		service,
 	}
@@ -169,5 +169,4 @@ func (cfg *Config) AddToFilter(service *Service) error {
 			}
 		}
 	}
-	return nil
 }
