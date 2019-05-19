@@ -20,14 +20,14 @@ import (
 	"github.com/jbrekelmans/kube-compose/internal/pkg/docker"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/linux"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
-	"github.com/jbrekelmans/kube-compose/pkg/config"
+	dockerComposeConfig "github.com/jbrekelmans/kube-compose/pkg/docker/compose/config"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 )
 
 // https://docs.docker.com/engine/reference/builder/#healthcheck
 // https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
-func createReadinessProbeFromDockerHealthcheck(healthcheck *config.Healthcheck) *v1.Probe {
+func createReadinessProbeFromDockerHealthcheck(healthcheck *dockerComposeConfig.Healthcheck) *v1.Probe {
 	if healthcheck == nil {
 		return nil
 	}
@@ -78,7 +78,7 @@ type hasTag interface {
 	Tag() string
 }
 
-func inspectImageRawParseHealthcheck(inspectRaw []byte) (*config.Healthcheck, error) {
+func inspectImageRawParseHealthcheck(inspectRaw []byte) (*dockerComposeConfig.Healthcheck, error) {
 	// inspectInfo's type is similar to dockerClient.ImageInspect, but it allows us to detect absent fields so we can apply default values.
 	var inspectInfo struct {
 		Config struct {
@@ -94,15 +94,15 @@ func inspectImageRawParseHealthcheck(inspectRaw []byte) (*config.Healthcheck, er
 	if err != nil {
 		return nil, err
 	}
-	if len(inspectInfo.Config.Healthcheck.Test) == 0 || inspectInfo.Config.Healthcheck.Test[0] == config.HealthcheckCommandNone {
+	if len(inspectInfo.Config.Healthcheck.Test) == 0 || inspectInfo.Config.Healthcheck.Test[0] == dockerComposeConfig.HealthcheckCommandNone {
 		return nil, nil
 	}
-	healthcheck := &config.Healthcheck{
-		Interval: config.HealthcheckDefaultInterval,
-		Timeout:  config.HealthcheckDefaultTimeout,
-		Retries:  config.HealthcheckDefaultRetries,
+	healthcheck := &dockerComposeConfig.Healthcheck{
+		Interval: dockerComposeConfig.HealthcheckDefaultInterval,
+		Timeout:  dockerComposeConfig.HealthcheckDefaultTimeout,
+		Retries:  dockerComposeConfig.HealthcheckDefaultRetries,
 	}
-	if inspectInfo.Config.Healthcheck.Test[0] == config.HealthcheckCommandShell {
+	if inspectInfo.Config.Healthcheck.Test[0] == dockerComposeConfig.HealthcheckCommandShell {
 		healthcheck.IsShell = true
 	}
 	healthcheck.Test = inspectInfo.Config.Healthcheck.Test[1:]

@@ -16,6 +16,7 @@ import (
 	"github.com/jbrekelmans/kube-compose/internal/pkg/k8smeta"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 	"github.com/jbrekelmans/kube-compose/pkg/config"
+	dockerComposeConfig "github.com/jbrekelmans/kube-compose/pkg/docker/compose/config"
 	cmdColor "github.com/logrusorgru/aurora"
 	goDigest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -53,7 +54,7 @@ func (podStatus *podStatus) String() string {
 
 type appImageInfo struct {
 	err              error
-	imageHealthcheck *config.Healthcheck
+	imageHealthcheck *dockerComposeConfig.Healthcheck
 	once             *sync.Once
 	podImage         string
 	user             *docker.Userinfo
@@ -63,11 +64,17 @@ type app struct {
 	composeService                       *config.Service
 	serviceClusterIP                     string
 	imageInfo                            appImageInfo
-	hasService                           bool
 	maxObservedPodStatus                 podStatus
-	name                                 string
 	containersForWhichWeAreStreamingLogs map[string]bool
 	color                                cmdColor.Color
+}
+
+func (a *app) name() string {
+	return a.composeService.Name
+}
+
+func (a *app) hasService() bool {
+	return len(a.composeService.DockerComposeService.Ports) > 0
 }
 
 type hostAliases struct {
@@ -114,7 +121,7 @@ func (u *upRunner) initAppsToBeStarted() {
 	u.appsToBeStarted = map[*app]bool{}
 	colorIndex := 0
 	for _, app := range u.apps {
-		if !u.cfg.MatchesFilter(app.name) {
+		if !u.cfg.MatchesFilter(app.composeService) {
 			continue
 		}
 		u.appsToBeStarted[app] = true
@@ -124,34 +131,32 @@ func (u *upRunner) initAppsToBeStarted() {
 		} else {
 			colorIndex = 0
 		}
-		if len(app.name) > u.maxServiceNameLength {
-			u.maxServiceNameLength = len(app.name)
+		if len(app.name()) > u.maxServiceNameLength {
+			u.maxServiceNameLength = len(app.name())
 		}
 	}
 }
 
 func (u *upRunner) initApps() {
-	u.apps = make(map[string]*app, len(u.cfg.CanonicalComposeFile.Services))
+	u.apps = make(map[string]*app, len(u.cfg.Services))
 	u.appsThatNeedToBeReady = map[*app]bool{}
-	for name, composeService := range u.cfg.CanonicalComposeFile.Services {
+	for _, composeService := range u.cfg.Services {
 		app := &app{
-			name:                                 name,
 			composeService:                       composeService,
 			containersForWhichWeAreStreamingLogs: make(map[string]bool),
 		}
 		app.imageInfo.once = &sync.Once{}
-		app.hasService = len(composeService.Ports) > 0
-		u.apps[name] = app
+		u.apps[app.name()] = app
 	}
 }
 
 // TODO: https://github.com/jbrekelmans/kube-compose/issues/64
 // nolint
 func (u *upRunner) getAppImageInfo(app *app) error {
-	sourceImage := app.composeService.Image
+	sourceImage := app.composeService.DockerComposeService.Image
 	if sourceImage == "" {
 		return fmt.Errorf("docker compose service %s has no image or its image is the empty string, and building images is not supported",
-			app.name)
+			app.name())
 	}
 	localImageIDSet, err := u.getLocalImageIDSet()
 	if err != nil {
@@ -173,7 +178,7 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 			return fmt.Errorf("could not find image %#v locally, and building images is not supported", sourceImage)
 		}
 		var digest string
-		digest, err = pullImageWithLogging(u.ctx, u.dockerClient, app.name, sourceImageRef.String())
+		digest, err = pullImageWithLogging(u.ctx, u.dockerClient, app.name(), sourceImageRef.String())
 		if err != nil {
 			return err
 		}
@@ -192,14 +197,14 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 		return err
 	}
 	if u.cfg.PushImages != nil {
-		destinationImage := fmt.Sprintf("%s/%s/%s", u.cfg.PushImages.DockerRegistry, u.cfg.Namespace, app.composeService.NameEscaped())
+		destinationImage := fmt.Sprintf("%s/%s/%s", u.cfg.PushImages.DockerRegistry, u.cfg.Namespace, app.composeService.NameEscaped)
 		destinationImagePush := destinationImage + ":latest"
 		err = u.dockerClient.ImageTag(u.ctx, sourceImageID, destinationImagePush)
 		if err != nil {
 			return err
 		}
 		var digest string
-		digest, err = pushImageWithLogging(u.ctx, u.dockerClient, app.name, destinationImagePush, u.cfg.KubeConfig.BearerToken)
+		digest, err = pushImageWithLogging(u.ctx, u.dockerClient, app.name(), destinationImagePush, u.cfg.KubeConfig.BearerToken)
 		if err != nil {
 			return err
 		}
@@ -221,7 +226,7 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 
 	if u.cfg.RunAsUser {
 		var user *docker.Userinfo
-		userRaw := app.composeService.User
+		userRaw := app.composeService.DockerComposeService.User
 		if userRaw == nil {
 			user, err = docker.ParseUserinfo(inspect.Config.User)
 			if err != nil {
@@ -230,7 +235,7 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 		} else {
 			user, err = docker.ParseUserinfo(*userRaw)
 			if err != nil {
-				return errors.Wrap(err, fmt.Sprintf("docker-compose service %s has an invalid user %#v", app.name, *userRaw))
+				return errors.Wrap(err, fmt.Sprintf("docker-compose service %s has an invalid user %#v", app.name(), *userRaw))
 			}
 		}
 		if user.UID == nil || (user.Group != "" && user.GID == nil) {
@@ -276,7 +281,7 @@ func (u *upRunner) waitForServiceClusterIPUpdate(service *v1.Service) (*app, err
 func (u *upRunner) waitForServiceClusterIPCountRemaining() int {
 	remaining := 0
 	for _, app := range u.apps {
-		if app.hasService && app.serviceClusterIP == "" {
+		if app.hasService() && app.serviceClusterIP == "" {
 			remaining++
 		}
 	}
@@ -356,12 +361,12 @@ func (u *upRunner) waitForServiceClusterIP(expected int) error {
 func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) {
 	expectedServiceCount := 0
 	for _, app := range u.apps {
-		if !app.hasService {
+		if !app.hasService() {
 			continue
 		}
 		expectedServiceCount++
-		servicePorts := make([]v1.ServicePort, len(app.composeService.Ports))
-		for i, port := range app.composeService.Ports {
+		servicePorts := make([]v1.ServicePort, len(app.composeService.DockerComposeService.Ports))
+		for i, port := range app.composeService.DockerComposeService.Ports {
 			servicePorts[i] = v1.ServicePort{
 				Name:       fmt.Sprintf("%s%d", port.Protocol, port.Internal),
 				Port:       port.Internal,
@@ -380,11 +385,11 @@ func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) 
 		_, err := u.k8sServiceClient.Create(service)
 		switch {
 		case k8sError.IsAlreadyExists(err):
-			fmt.Printf("app %s: service %s already exists\n", app.name, service.ObjectMeta.Name)
+			fmt.Printf("app %s: service %s already exists\n", app.name(), service.ObjectMeta.Name)
 		case err != nil:
 			return nil, err
 		default:
-			fmt.Printf("app %s: service %s created\n", app.name, service.ObjectMeta.Name)
+			fmt.Printf("app %s: service %s created\n", app.name(), service.ObjectMeta.Name)
 		}
 	}
 	if expectedServiceCount == 0 {
@@ -397,11 +402,11 @@ func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) 
 	hostAliases := make([]v1.HostAlias, expectedServiceCount)
 	i := 0
 	for _, app := range u.apps {
-		if app.hasService {
+		if app.hasService() {
 			hostAliases[i] = v1.HostAlias{
 				IP: app.serviceClusterIP,
 				Hostnames: []string{
-					app.name,
+					app.name(),
 				},
 			}
 			i++
@@ -450,7 +455,7 @@ func (u *upRunner) createServicesAndGetPodHostAliasesOnce() ([]v1.HostAlias, err
 
 func getRestartPolicyforService(app *app) v1.RestartPolicy {
 	var restartPolicy v1.RestartPolicy
-	switch app.composeService.Restart {
+	switch app.composeService.DockerComposeService.Restart {
 	case "no":
 		restartPolicy = v1.RestartPolicyNever
 	case "always":
@@ -477,9 +482,9 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	// ... so we're not doubling up on healthchecks.
 	// We accept that this may lead to calls failing due to removal backend pods from load balancers.
 	var readinessProbe *v1.Probe
-	if !app.composeService.HealthcheckDisabled {
-		if app.composeService.Healthcheck != nil {
-			readinessProbe = createReadinessProbeFromDockerHealthcheck(app.composeService.Healthcheck)
+	if !app.composeService.DockerComposeService.HealthcheckDisabled {
+		if app.composeService.DockerComposeService.Healthcheck != nil {
+			readinessProbe = createReadinessProbeFromDockerHealthcheck(app.composeService.DockerComposeService.Healthcheck)
 		} else if app.imageInfo.imageHealthcheck != nil {
 			readinessProbe = createReadinessProbeFromDockerHealthcheck(app.imageInfo.imageHealthcheck)
 		}
@@ -489,17 +494,17 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 		containerPorts = make([]v1.ContainerPort, len(app.composeService.Ports))
 		for i, port := range app.composeService.Ports {
 			containerPorts[i] = v1.ContainerPort{
-				ContainerPort: port.Internal,
+				ContainerPort: port.Port,
 				Protocol:      v1.Protocol(strings.ToUpper(port.Protocol)),
 			}
 		}
 	}
 	var envVars []v1.EnvVar
-	envVarCount := len(app.composeService.Environment)
+	envVarCount := len(app.composeService.DockerComposeService.Environment)
 	if envVarCount > 0 {
 		envVars = make([]v1.EnvVar, envVarCount)
 		i := 0
-		for key, value := range app.composeService.Environment {
+		for key, value := range app.composeService.DockerComposeService.Environment {
 			envVars[i] = v1.EnvVar{
 				Name:  key,
 				Value: value,
@@ -527,14 +532,14 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 			AutomountServiceAccountToken: new(bool),
 			Containers: []v1.Container{
 				{
-					Command:         app.composeService.Entrypoint,
+					Command:         app.composeService.DockerComposeService.Entrypoint,
 					Env:             envVars,
 					Image:           app.imageInfo.podImage,
 					ImagePullPolicy: v1.PullAlways,
-					Name:            app.composeService.NameEscaped(),
+					Name:            app.composeService.NameEscaped,
 					Ports:           containerPorts,
 					ReadinessProbe:  readinessProbe,
-					WorkingDir:      app.composeService.WorkingDir,
+					WorkingDir:      app.composeService.DockerComposeService.WorkingDir,
 				},
 			},
 			HostAliases:     hostAliases,
@@ -545,7 +550,7 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	k8smeta.InitObjectMeta(u.cfg, &pod.ObjectMeta, app.composeService)
 	podServer, err := u.k8sPodClient.Create(pod)
 	if k8sError.IsAlreadyExists(err) {
-		fmt.Printf("app %s: pod %s already exists\n", app.name, pod.ObjectMeta.Name)
+		fmt.Printf("app %s: pod %s already exists\n", app.name(), pod.ObjectMeta.Name)
 	} else if err != nil {
 		return nil, err
 	}
@@ -648,7 +653,7 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 
 	if podStatus > app.maxObservedPodStatus {
 		app.maxObservedPodStatus = podStatus
-		fmt.Printf("app %s: pod status %s\n", app.name, &app.maxObservedPodStatus)
+		fmt.Printf("app %s: pod status %s\n", app.name(), &app.maxObservedPodStatus)
 	}
 
 	return nil
@@ -659,9 +664,10 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 func (u *upRunner) createPodsIfNeeded() error {
 	for app1 := range u.appsToBeStarted {
 		createPod := true
-		for composeService, healthiness := range app1.composeService.DependsOn {
+		for dcService, healthiness := range app1.composeService.DockerComposeService.DependsOn {
+			composeService := u.cfg.FindService(dcService)
 			app2 := u.apps[composeService.Name]
-			if healthiness == config.ServiceHealthy {
+			if healthiness == dockerComposeConfig.ServiceHealthy {
 				if app2.maxObservedPodStatus != podStatusReady {
 					createPod = false
 				}
@@ -675,12 +681,13 @@ func (u *upRunner) createPodsIfNeeded() error {
 			reason := strings.Builder{}
 			reason.WriteString("its dependency conditions are met (")
 			comma := false
-			for composeService, healthiness := range app1.composeService.DependsOn {
+			for dcService, healthiness := range app1.composeService.DockerComposeService.DependsOn {
+				composeService := u.cfg.FindService(dcService)
 				if comma {
 					reason.WriteString(", ")
 				}
 				reason.WriteString(composeService.Name)
-				if healthiness == config.ServiceHealthy {
+				if healthiness == dockerComposeConfig.ServiceHealthy {
 					reason.WriteString(": ready")
 				} else {
 					reason.WriteString(": running")
@@ -692,7 +699,7 @@ func (u *upRunner) createPodsIfNeeded() error {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("app %s: created pod %s because %s\n", app1.name, pod.ObjectMeta.Name, reason.String())
+			fmt.Printf("app %s: created pod %s because %s\n", app1.name(), pod.ObjectMeta.Name, reason.String())
 			delete(u.appsToBeStarted, app1)
 		}
 	}
@@ -726,7 +733,7 @@ func (u *upRunner) run() error {
 	// nolint
 	go u.createServicesAndGetPodHostAliasesOnce()
 	for app := range u.appsToBeStarted {
-		if len(app.composeService.DependsOn) != 0 {
+		if len(app.composeService.DockerComposeService.DependsOn) != 0 {
 			continue
 		}
 		var pod *v1.Pod
@@ -734,7 +741,7 @@ func (u *upRunner) run() error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("app %s: created pod %s because all its dependency conditions are met\n", app.name, pod.ObjectMeta.Name)
+		fmt.Printf("app %s: created pod %s because all its dependency conditions are met\n", app.name(), pod.ObjectMeta.Name)
 		delete(u.appsToBeStarted, app)
 	}
 

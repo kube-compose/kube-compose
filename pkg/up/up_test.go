@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/jbrekelmans/kube-compose/pkg/config"
+	dockerComposeConfig "github.com/jbrekelmans/kube-compose/pkg/docker/compose/config"
 )
 
 const (
@@ -13,43 +14,28 @@ const (
 )
 
 func newTestConfig() *config.Config {
-	serviceA := &config.Service{
-		Name:    "a",
+	cfg := &config.Config{}
+	cfg.AddService("a", &dockerComposeConfig.Service{
 		Restart: "no",
-	}
-	serviceB := &config.Service{
-		Name:    "b",
+	})
+	cfg.AddService("b", &dockerComposeConfig.Service{
 		Restart: "always",
-	}
-	serviceC := &config.Service{
-		Name:    "c",
+	})
+	cfg.AddService("c", &dockerComposeConfig.Service{
 		Restart: "on-failure",
-	}
-	serviceD := &config.Service{
-		Name: "d",
-	}
-
-	cfg := &config.Config{
-		CanonicalComposeFile: config.CanonicalComposeFile{
-			Services: map[string]*config.Service{
-				serviceA.Name: serviceA,
-				serviceB.Name: serviceB,
-				serviceC.Name: serviceC,
-				serviceD.Name: serviceD,
-			},
-		},
-	}
+	})
+	cfg.AddService("d", &dockerComposeConfig.Service{})
 	return cfg
 }
 
 func newTestApp(serviceName string) *app {
 	cfg := newTestConfig()
 	app := &app{
-		composeService: cfg.CanonicalComposeFile.Services[serviceName],
+		composeService: cfg.FindServiceByName(serviceName),
 	}
 	return app
 }
-func TestRestartPolicyforService_never(t *testing.T) {
+func TestRestartPolicyforService_Never(t *testing.T) {
 	app := newTestApp("a")
 	restartPolicy := getRestartPolicyforService(app)
 	if restartPolicy != TestRestartPolicyNever {
@@ -57,21 +43,21 @@ func TestRestartPolicyforService_never(t *testing.T) {
 	}
 }
 
-func TestRestartPolicyforService_always(t *testing.T) {
+func TestRestartPolicyforService_Always(t *testing.T) {
 	app := newTestApp("b")
 	restartPolicy := getRestartPolicyforService(app)
 	if restartPolicy != TestRestartPolicyAlways {
 		t.Fail()
 	}
 }
-func TestRestartPolicyforService_onfailure(t *testing.T) {
+func TestRestartPolicyforService_Onfailure(t *testing.T) {
 	app := newTestApp("c")
 	restartPolicy := getRestartPolicyforService(app)
 	if restartPolicy != TestRestartPolicyOnFailure {
 		t.Fail()
 	}
 }
-func TestRestartPolicyforService_default(t *testing.T) {
+func TestRestartPolicyforService_Default(t *testing.T) {
 	app := newTestApp("d")
 	restartPolicy := getRestartPolicyforService(app)
 	if restartPolicy != TestRestartPolicyNever {

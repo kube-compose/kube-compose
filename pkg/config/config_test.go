@@ -2,53 +2,38 @@ package config
 
 import (
 	"testing"
+
+	dockerComposeConfig "github.com/jbrekelmans/kube-compose/pkg/docker/compose/config"
 )
 
 func newTestConfig() *Config {
-	serviceA := &Service{
-		Name: "a",
+	cfg := &Config{}
+	serviceA := cfg.AddService("a", &dockerComposeConfig.Service{})
+	serviceB := cfg.AddService("b", &dockerComposeConfig.Service{})
+	serviceC := cfg.AddService("c", &dockerComposeConfig.Service{})
+	serviceD := cfg.AddService("d", &dockerComposeConfig.Service{})
+	serviceA.DockerComposeService.DependsOn = map[*dockerComposeConfig.Service]dockerComposeConfig.ServiceHealthiness{
+		serviceB.DockerComposeService: dockerComposeConfig.ServiceHealthy,
 	}
-	serviceB := &Service{
-		Name: "b",
-	}
-	serviceC := &Service{
-		Name: "c",
-	}
-	serviceD := &Service{
-		Name: "d",
-	}
-	serviceA.DependsOn = map[*Service]ServiceHealthiness{
-		serviceB: ServiceHealthy,
-	}
-	serviceB.DependsOn = map[*Service]ServiceHealthiness{
-		serviceC: ServiceHealthy,
-		serviceD: ServiceHealthy,
-	}
-	cfg := &Config{
-		CanonicalComposeFile: CanonicalComposeFile{
-			Services: map[string]*Service{
-				serviceA.Name: serviceA,
-				serviceB.Name: serviceB,
-				serviceC.Name: serviceC,
-				serviceD.Name: serviceD,
-			},
-		},
+	serviceB.DockerComposeService.DependsOn = map[*dockerComposeConfig.Service]dockerComposeConfig.ServiceHealthiness{
+		serviceC.DockerComposeService: dockerComposeConfig.ServiceHealthy,
+		serviceD.DockerComposeService: dockerComposeConfig.ServiceHealthy,
 	}
 	return cfg
 }
 
-func TestSetFilter(t *testing.T) {
+func TestAddToFilter(t *testing.T) {
 	cfg := newTestConfig()
 
 	// Since a depends on b, and b depends on c and d, we expect the result to contain all 4 apps.
-	err := cfg.SetFilter([]string{"a"})
+	err := cfg.AddToFilter(cfg.FindServiceByName("a"))
 	if err != nil {
 		t.Fail()
 	}
-	_, resultContainsAppA := cfg.filter["a"]
-	_, resultContainsAppB := cfg.filter["b"]
-	_, resultContainsAppC := cfg.filter["c"]
-	_, resultContainsAppD := cfg.filter["d"]
+	resultContainsAppA := cfg.MatchesFilter(cfg.FindServiceByName("a"))
+	resultContainsAppB := cfg.MatchesFilter(cfg.FindServiceByName("b"))
+	resultContainsAppC := cfg.MatchesFilter(cfg.FindServiceByName("c"))
+	resultContainsAppD := cfg.MatchesFilter(cfg.FindServiceByName("d"))
 	if !resultContainsAppA || !resultContainsAppB || !resultContainsAppC || !resultContainsAppD {
 		t.Fail()
 	}
