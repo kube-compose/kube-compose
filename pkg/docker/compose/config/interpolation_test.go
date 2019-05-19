@@ -196,11 +196,7 @@ func TestInterpolateConfig_V1(t *testing.T) {
 	config := map[interface{}]interface{}{
 		"service1": "$$",
 	}
-<<<<<<< HEAD:pkg/docker/compose/config/interpolation_test.go
 	err := InterpolateConfig(config, mapValueGetter(m), v1)
-=======
-	err := InterpolateConfig("docker-compose.yml", config, mapValueGetter(m), v1)
->>>>>>> 6b79422f056a7ed41aad1825cf8d349458d1ad8c:pkg/config/interpolation_test.go
 	if len(config) != 1 || config["service1"] != "$" {
 		t.Fail()
 	}
@@ -214,11 +210,7 @@ func TestInterpolateConfig_V1Error(t *testing.T) {
 	config := map[interface{}]interface{}{
 		"service1": "$",
 	}
-<<<<<<< HEAD:pkg/docker/compose/config/interpolation_test.go
 	err := InterpolateConfig(config, mapValueGetter(m), v1)
-=======
-	err := InterpolateConfig("docker-compose.yml", config, mapValueGetter(m), v1)
->>>>>>> 6b79422f056a7ed41aad1825cf8d349458d1ad8c:pkg/config/interpolation_test.go
 	if err == nil {
 		t.Fail()
 	}
@@ -231,11 +223,7 @@ func TestInterpolateConfig_V3(t *testing.T) {
 			"secret1": "$$",
 		},
 	}
-<<<<<<< HEAD:pkg/docker/compose/config/interpolation_test.go
 	err := InterpolateConfig(config, mapValueGetter(m), v3_3)
-=======
-	err := InterpolateConfig("docker-compose.yml", config, mapValueGetter(m), v3_3)
->>>>>>> 6b79422f056a7ed41aad1825cf8d349458d1ad8c:pkg/config/interpolation_test.go
 	if !reflect.DeepEqual(config, genericMap{
 		"secrets": genericMap{
 			"secret1": "$",
