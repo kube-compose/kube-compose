@@ -757,7 +757,6 @@ func (u *upRunner) run() error {
 	defer watch.Stop()
 	eventChannel := watch.ResultChan()
 	for {
-
 		event, ok := <-eventChannel
 		if !ok {
 			return fmt.Errorf("channel unexpectedly closed")
