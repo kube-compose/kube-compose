@@ -26,19 +26,19 @@ func TestParseRetries_Default(t *testing.T) {
 
 func TestParseInterval_Normal(t *testing.T) {
 	value := new(string)
-	*value = "1m1s"
+	*value = "2m1s"
 	h := &Healthcheck{}
 	err := h.parseInterval(value)
 	if err != nil {
 		t.Error(err)
 	}
-	if h.Interval != time.Minute+time.Second {
+	if h.Interval != 2*time.Minute+time.Second {
 		t.Fail()
 	}
 }
 func TestParseInterval_InvalidDuration(t *testing.T) {
 	value := new(string)
-	*value = "asdf"
+	*value = "asdf1"
 	h := &Healthcheck{}
 	err := h.parseInterval(value)
 	if err == nil {
@@ -47,7 +47,7 @@ func TestParseInterval_InvalidDuration(t *testing.T) {
 }
 func TestParseInterval_NegativeDuration(t *testing.T) {
 	value := new(string)
-	*value = "-1m"
+	*value = "-2m"
 	h := &Healthcheck{}
 	err := h.parseInterval(value)
 	if err == nil {
@@ -80,7 +80,7 @@ func TestParseTimeout_Normal(t *testing.T) {
 }
 func TestParseTimeout_InvalidDuration(t *testing.T) {
 	value := new(string)
-	*value = "asdf"
+	*value = "asdf2"
 	h := &Healthcheck{}
 	err := h.parseTimeout(value)
 	if err == nil {
@@ -164,7 +164,7 @@ func TestParseTest_CmdAndSliceTooSmall(t *testing.T) {
 
 func TestParseTest_InvalidFirstElement(t *testing.T) {
 	h := &Healthcheck{}
-	err := h.parseTest([]string{"asdf"})
+	err := h.parseTest([]string{"asdf3"})
 	if err == nil {
 		t.Fail()
 	}
@@ -209,7 +209,7 @@ func TestParseHealthcheck_TestNone(t *testing.T) {
 func TestParseHealthcheck_TestInvalid(t *testing.T) {
 	healthcheckYAML := &ServiceHealthcheck{
 		Test: HealthcheckTest{
-			Values: []string{"asdf"},
+			Values: []string{"asdf4"},
 		},
 	}
 	_, _, err := ParseHealthcheck(healthcheckYAML)
@@ -225,7 +225,7 @@ func TestParseHealthcheck_IntervalInvalid(t *testing.T) {
 		},
 		Interval: new(string),
 	}
-	*healthcheckYAML.Interval = "asdf"
+	*healthcheckYAML.Interval = "asdf5"
 	_, _, err := ParseHealthcheck(healthcheckYAML)
 	if err == nil {
 		t.Fail()
@@ -238,7 +238,7 @@ func TestParseHealthcheck_IntervalTimeout(t *testing.T) {
 		},
 		Timeout: new(string),
 	}
-	*healthcheckYAML.Timeout = "asdf"
+	*healthcheckYAML.Timeout = "asdf6"
 	_, _, err := ParseHealthcheck(healthcheckYAML)
 	if err == nil {
 		t.Fail()
