@@ -14,7 +14,7 @@ const (
 	HealthcheckDefaultRetries  = 3
 )
 
-var errorCommandIsNone error = fmt.Errorf("test is NONE")
+var errorCommandIsNone = fmt.Errorf("test is NONE")
 
 type Healthcheck struct {
 	Interval    time.Duration

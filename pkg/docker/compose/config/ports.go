@@ -47,8 +47,6 @@ type PortBinding struct {
 //  - "127.0.0.1:5000-5010:5000-5010"
 //  - "6060:6060/udp"
 //  - "12400-12500:1240"
-// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-// nolint
 func parsePortBindings(spec string, portBindings []PortBinding) ([]PortBinding, error) {
 	matches := portBindingSpecRegexp.FindStringSubmatch(spec)
 	if matches == nil {
@@ -62,22 +60,9 @@ func parsePortBindings(spec string, portBindings []PortBinding) ([]PortBinding, 
 		protocol = "tcp"
 	}
 
-	internal := []int32{}
-	internalMin, err := parsePortUint(matchMap["internalMin"])
+	internal, err := parsePortBindingsInternal(matchMap)
 	if err != nil {
 		return nil, err
-	}
-	internalMaxStr := matchMap["internalMax"]
-	if internalMaxStr == "" {
-		internal = append(internal, internalMin)
-	} else {
-		internalMax, err := parsePortUint(internalMaxStr)
-		if err != nil {
-			return nil, err
-		}
-		for i := internalMin; i <= internalMax; i++ {
-			internal = append(internal, i)
-		}
 	}
 
 	external := []int32{}
@@ -127,6 +112,27 @@ func parsePortBindings(spec string, portBindings []PortBinding) ([]PortBinding, 
 		portBindings = append(portBindings, portBinding)
 	}
 	return portBindings, nil
+}
+
+func parsePortBindingsInternal(matchMap map[string]string) ([]int32, error) {
+	internal := []int32{}
+	internalMin, err := parsePortUint(matchMap["internalMin"])
+	if err != nil {
+		return nil, err
+	}
+	internalMaxStr := matchMap["internalMax"]
+	if internalMaxStr == "" {
+		internal = append(internal, internalMin)
+	} else {
+		internalMax, err := parsePortUint(internalMaxStr)
+		if err != nil {
+			return nil, err
+		}
+		for i := internalMin; i <= internalMax; i++ {
+			internal = append(internal, i)
+		}
+	}
+	return internal, nil
 }
 
 func parsePortUint(portStr string) (int32, error) {

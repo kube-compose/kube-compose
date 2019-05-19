@@ -26,10 +26,7 @@ func TestAddToFilter(t *testing.T) {
 	cfg := newTestConfig()
 
 	// Since a depends on b, and b depends on c and d, we expect the result to contain all 4 apps.
-	err := cfg.AddToFilter(cfg.FindServiceByName("a"))
-	if err != nil {
-		t.Fail()
-	}
+	cfg.AddToFilter(cfg.FindServiceByName("a"))
 	resultContainsAppA := cfg.MatchesFilter(cfg.FindServiceByName("a"))
 	resultContainsAppB := cfg.MatchesFilter(cfg.FindServiceByName("b"))
 	resultContainsAppC := cfg.MatchesFilter(cfg.FindServiceByName("c"))
