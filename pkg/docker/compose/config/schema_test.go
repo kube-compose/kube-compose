@@ -20,7 +20,7 @@ func TestPortDecode_SuccessInt(t *testing.T) {
 }
 
 func TestPortDecode_SuccessString(t *testing.T) {
-	src := "asdf"
+	src := "testPortDecodeSuccessString"
 	var dst port
 	err := mapdecode.Decode(&dst, src)
 	if err != nil {
