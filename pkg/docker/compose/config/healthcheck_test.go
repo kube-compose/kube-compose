@@ -231,7 +231,7 @@ func TestParseHealthcheck_IntervalInvalid(t *testing.T) {
 		t.Fail()
 	}
 }
-func TestParseHealthcheck_IntervalTimeout(t *testing.T) {
+func TestParseHealthcheck_InvalidTimeout(t *testing.T) {
 	healthcheckYAML := &ServiceHealthcheck{
 		Test: HealthcheckTest{
 			Values: []string{HealthcheckCommandShell, "echo 'Hello World 3!'"},
