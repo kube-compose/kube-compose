@@ -47,6 +47,8 @@ type PortBinding struct {
 //  - "127.0.0.1:5000-5010:5000-5010"
 //  - "6060:6060/udp"
 //  - "12400-12500:1240"
+// TODO https://github.com/jbrekelmans/kube-compose/issues/64 reduce cyclomatic complexity of this function
+//nolint
 func parsePortBindings(spec string, portBindings []PortBinding) ([]PortBinding, error) {
 	matches := portBindingSpecRegexp.FindStringSubmatch(spec)
 	if matches == nil {

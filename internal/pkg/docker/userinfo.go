@@ -35,7 +35,10 @@ func ParseUserinfo(userinfoRaw string) (*Userinfo, error) {
 		// If the string cannot be parsed into an int64 then interpret it as a user name (r.UID == nil).
 		// To find the uid we look in /etc/passwd. This is exactly the behavior of docker.
 	}
-	r.parseUserinfoGroup(userinfoRaw, i)
+	err := r.parseUserinfoGroup(userinfoRaw, i)
+	if err != nil {
+		return nil, err
+	}
 	return r, nil
 }
 
