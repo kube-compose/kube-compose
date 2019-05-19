@@ -9,24 +9,6 @@ import (
 	"github.com/uber-go/mapdecode"
 )
 
-// https://github.com/docker/compose/blob/master/compose/config/config_schema_v2.1.json
-type ServiceHealthiness int
-
-const (
-	ServiceStarted ServiceHealthiness = 0
-	ServiceHealthy ServiceHealthiness = 1
-)
-
-func (s *ServiceHealthiness) String() string {
-	switch *s {
-	case ServiceHealthy:
-		return "serviceHealthy"
-	case ServiceStarted:
-		return "serviceStarted"
-	}
-	return ""
-}
-
 type stringOrStringSlice struct {
 	Values []string
 }
@@ -224,10 +206,10 @@ type port struct {
 }
 
 func (p *port) Decode(into mapdecode.Into) error {
-	intVal := 0
-	err := into(&intVal)
+	var int64Val int64
+	err := into(&int64Val)
 	if err == nil {
-		p.Value = strconv.Itoa(intVal)
+		p.Value = strconv.FormatInt(int64Val, 10)
 		return nil
 	}
 	strVal := ""

@@ -78,10 +78,11 @@ func TestAppHasService_False(t *testing.T) {
 		t.Fail()
 	}
 }
+
 func TestAppHasService_True(t *testing.T) {
 	app := newTestApp("a")
 	app.composeService.Ports = []config.Port{
-		config.Port{
+		{
 			Port:     1234,
 			Protocol: "tcp",
 		},
