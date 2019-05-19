@@ -64,3 +64,29 @@ func TestRestartPolicyforService_Default(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestAppName(t *testing.T) {
+	app := newTestApp("a")
+	if app.name() != "a" {
+		t.Fail()
+	}
+}
+
+func TestAppHasService_False(t *testing.T) {
+	app := newTestApp("a")
+	if app.hasService() {
+		t.Fail()
+	}
+}
+func TestAppHasService_True(t *testing.T) {
+	app := newTestApp("a")
+	app.composeService.Ports = []config.Port{
+		config.Port{
+			Port:     1234,
+			Protocol: "tcp",
+		},
+	}
+	if !app.hasService() {
+		t.Fail()
+	}
+}

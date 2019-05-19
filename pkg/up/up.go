@@ -29,28 +29,7 @@ import (
 	clientV1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
-type podStatus int
-
-const (
-	podStatusReady     podStatus = 2
-	podStatusStarted   podStatus = 1
-	podStatusOther     podStatus = 0
-	podStatusCompleted podStatus = 3
-)
-
 var colorSupported = []cmdColor.Color{409600, 147456, 344064, 81920, 212992, 278528, 475136}
-
-func (podStatus *podStatus) String() string {
-	switch *podStatus {
-	case podStatusReady:
-		return "ready"
-	case podStatusStarted:
-		return "started"
-	case podStatusCompleted:
-		return "completed"
-	}
-	return "other"
-}
 
 type appImageInfo struct {
 	err              error
@@ -74,7 +53,7 @@ func (a *app) name() string {
 }
 
 func (a *app) hasService() bool {
-	return len(a.composeService.DockerComposeService.Ports) > 0
+	return len(a.composeService.Ports) > 0
 }
 
 type hostAliases struct {
