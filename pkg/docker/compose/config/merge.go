@@ -1,6 +1,5 @@
 package config
 
-// Values from right override values from left.
 func merge(into, from *composeFileParsedService) {
 	// Rules here are based on https://docs.docker.com/compose/extends/#adding-and-overriding-configuration
 	mergeStringMaps(into.service.Environment, from.service.Environment)
