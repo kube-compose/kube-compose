@@ -74,15 +74,16 @@ type upRunner struct {
 	appsThatNeedToBeReady map[*app]bool
 	appsToBeStarted       map[*app]bool
 	cfg                   *config.Config
+	completedChannels     []chan interface{}
 	ctx                   context.Context
 	dockerClient          *dockerClient.Client
-	localImagesCache      localImagesCache
 	k8sClientset          *kubernetes.Clientset
 	k8sServiceClient      clientV1.ServiceInterface
 	k8sPodClient          clientV1.PodInterface
 	hostAliases           hostAliases
-	completedChannels     []chan interface{}
+	localImagesCache      localImagesCache
 	maxServiceNameLength  int
+	opts                  *Options
 }
 
 func (u *upRunner) initKubernetesClientset() error {
@@ -203,7 +204,7 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 	}
 	app.imageInfo.imageHealthcheck = imageHealthcheck
 
-	if u.cfg.RunAsUser {
+	if u.opts.RunAsUser {
 		var user *docker.Userinfo
 		userRaw := app.composeService.DockerComposeService.User
 		if userRaw == nil {
@@ -497,7 +498,7 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	}
 
 	var securityContext *v1.PodSecurityContext
-	if u.cfg.RunAsUser {
+	if u.opts.RunAsUser {
 		securityContext = &v1.PodSecurityContext{
 			RunAsUser: app.imageInfo.user.UID,
 		}
@@ -594,7 +595,7 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 	//			// use app.containersForWhichWeAreStreamingLogs to determine the following condition
 	// 			if we are not already streaming logs for the container
 	//				start streaming logs for the container
-	if !u.cfg.Detach {
+	if !u.opts.Detach {
 		for _, containerStatus := range pod.Status.ContainerStatuses {
 			_, ok := app.containersForWhichWeAreStreamingLogs[containerStatus.Name]
 			if !ok && containerStatus.State.Running != nil {
@@ -808,11 +809,12 @@ func (u *upRunner) checkIfPodsReady() bool {
 }
 
 // Run runs an operation similar docker-compose up against a Kubernetes cluster.
-func Run(ctx context.Context, cfg *config.Config) error {
+func Run(ctx context.Context, cfg *config.Config, opts *Options) error {
 	// TODO https://github.com/jbrekelmans/kube-compose/issues/2 accept context as a parameter
 	u := &upRunner{
-		cfg: cfg,
-		ctx: context.Background(),
+		cfg:  cfg,
+		ctx:  context.Background(),
+		opts: opts,
 	}
 	u.hostAliases.once = &sync.Once{}
 	u.localImagesCache.once = &sync.Once{}

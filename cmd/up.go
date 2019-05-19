@@ -20,9 +20,10 @@ func upCommand(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	cfg.Detach, _ = cmd.Flags().GetBool("detach")
-	cfg.RunAsUser, _ = cmd.Flags().GetBool("run-as-user")
-	err = up.Run(context.Background(), cfg)
+	opts := &up.Options{}
+	opts.Detach, _ = cmd.Flags().GetBool("detach")
+	opts.RunAsUser, _ = cmd.Flags().GetBool("run-as-user")
+	err = up.Run(context.Background(), cfg, opts)
 	if err != nil {
 		log.Fatal(err)
 	}

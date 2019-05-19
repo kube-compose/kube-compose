@@ -23,7 +23,6 @@ type Service struct {
 }
 
 type Config struct {
-	Detach                bool
 	dockerComposeServices map[string]*dockerComposeConfig.Service
 
 	// All Kubernetes resources are named with "-"+EnvironmentID as a suffix,
@@ -34,10 +33,6 @@ type Config struct {
 	KubeConfig *rest.Config
 	Namespace  string
 	PushImages *PushImagesConfig
-
-	// True to set runAsUser/runAsGroup for each pod based on the user of the pod's image and the "user" key of the pod's docker-compose
-	// service.
-	RunAsUser bool
 
 	Services map[*dockerComposeConfig.Service]*Service
 }
