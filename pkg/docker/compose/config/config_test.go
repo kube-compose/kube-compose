@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 )
@@ -71,6 +72,22 @@ func TestConfigLoaderParseEnvironment_InvalidName(t *testing.T) {
 		environmentGetter: mapValueGetter(m),
 	}
 	_, err := c.parseEnvironment(input)
+	if err == nil {
+		t.Fail()
+	}
+}
+
+func TestComposeFileParsedServiceClearRecStack_Success(t *testing.T) {
+	s := &composeFileParsedService{}
+	s.recStack = true
+	s.clearRecStack()
+	if s.recStack {
+		t.Fail()
+	}
+}
+
+func TestLoadFileError_Success(t *testing.T) {
+	err := loadFileError("some file", fmt.Errorf("an error occured"))
 	if err == nil {
 		t.Fail()
 	}

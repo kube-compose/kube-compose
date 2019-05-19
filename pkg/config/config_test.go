@@ -35,3 +35,48 @@ func TestAddToFilter(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestClearFilter(t *testing.T) {
+	cfg := newTestConfig()
+	cfg.AddToFilter(cfg.FindServiceByName("a"))
+	cfg.ClearFilter()
+	for _, service := range cfg.Services {
+		if service.matchesFilter {
+			t.Fail()
+		}
+	}
+}
+
+func TestAddService_ErrorDuplicateName(t *testing.T) {
+	cfg := newTestConfig()
+	defer func() {
+		if err := recover(); err == nil {
+			t.Fail()
+		}
+	}()
+	cfg.AddService("a", &dockerComposeConfig.Service{})
+}
+
+func TestAddService_ErrorDockerComposeServiceInUse(t *testing.T) {
+	cfg := newTestConfig()
+	defer func() {
+		if err := recover(); err == nil {
+			t.Fail()
+		}
+	}()
+	cfg.AddService("z", cfg.FindServiceByName("a").DockerComposeService)
+}
+
+func TestAddService_ErrorServiceHasDependsOn(t *testing.T) {
+	cfg := newTestConfig()
+	defer func() {
+		if err := recover(); err == nil {
+			t.Fail()
+		}
+	}()
+	cfg.AddService("z", &dockerComposeConfig.Service{
+		DependsOn: map[*dockerComposeConfig.Service]dockerComposeConfig.ServiceHealthiness{
+			cfg.FindServiceByName("a").DockerComposeService: dockerComposeConfig.ServiceStarted,
+		},
+	})
+}
