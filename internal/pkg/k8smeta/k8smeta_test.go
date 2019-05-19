@@ -48,3 +48,10 @@ func TestInitObjectMeta_Success(t *testing.T) {
 	objectMeta := metav1.ObjectMeta{}
 	InitObjectMeta(cfg, &objectMeta, serviceA)
 }
+
+func Test_ErrorResourcesModifiedExternally(t *testing.T) {
+	err := ErrorResourcesModifiedExternally()
+	if err == nil {
+		t.Fail()
+	}
+}
