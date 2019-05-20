@@ -88,8 +88,8 @@ func TestTryParseInt64_Success(t *testing.T) {
 
 func TestFormatTable(t *testing.T) {
 	output := FormatTable([][]string{
-		[]string{"NAME", "VALUE"},
-		[]string{"Test", "-1"},
+		{"NAME", "VALUE"},
+		{"Test", "-1"},
 	})
 	if output != "NAME  VALUE\nTest  -1\n" {
 		t.Fail()
