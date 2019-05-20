@@ -295,7 +295,8 @@ func (c *configLoader) resolveExtends(
 // If files is an empty slice then the standard docker compose file locations (relative to the current working directory are considered).
 func New(files []string) (*CanonicalDockerComposeConfig, error) {
 	c := &configLoader{
-		environmentGetter: os.LookupEnv,
+		environmentGetter:     os.LookupEnv,
+		loadResolvedFileCache: map[string]*loadResolvedFileCacheItem{},
 	}
 	var resolvedFiles []string
 	if len(files) > 0 {
