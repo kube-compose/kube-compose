@@ -16,15 +16,15 @@ type getRunner struct {
 	k8sServiceClient clientV1.ServiceInterface
 }
 
-type KubeComposeService struct {
+type KubeComposeServiceDetails struct {
 	Service   string
 	Hostname  string
 	Namespace string
 	ClusterIP string
 }
 
-func Service(cfg *config.Config, serviceName string) (KubeComposeService, error) {
-	composeService := KubeComposeService{}
+func ServiceDetails(cfg *config.Config, serviceName string) (KubeComposeServiceDetails, error) {
+	composeService := KubeComposeServiceDetails{}
 	g := &getRunner{
 		cfg: cfg,
 	}
@@ -36,7 +36,7 @@ func Service(cfg *config.Config, serviceName string) (KubeComposeService, error)
 	if err != nil {
 		return composeService, err
 	}
-	composeService = KubeComposeService{
+	composeService = KubeComposeServiceDetails{
 		Service:   result.Name,
 		Hostname:  result.Name + "." + result.Namespace + ".svc.cluster.local",
 		Namespace: result.Namespace,
@@ -57,7 +57,7 @@ func (g *getRunner) initKubernetesClientset() error {
 
 func (g *getRunner) getK8sServiceResource(service *config.Service) (*v1.Service, error) {
 	options := &metav1.GetOptions{}
-	result, err := g.k8sServiceClient.Get(service.NameEscaped+"-"+g.cfg.EnvironmentID, *options)
+	result, err := g.k8sServiceClient.Get(getKubeServiceName(service, g.cfg), *options)
 	if err != nil {
 		return result, err
 	}
@@ -74,4 +74,8 @@ func (g *getRunner) run(service *config.Service) (*v1.Service, error) {
 		return result, err
 	}
 	return result, nil
+}
+
+func getKubeServiceName(service *config.Service, cfg *config.Config) string {
+	return fmt.Sprintf(service.NameEscaped + "-" + cfg.EnvironmentID)
 }

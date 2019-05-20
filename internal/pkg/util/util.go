@@ -126,13 +126,13 @@ func FormatTable(rows [][]string) string {
 			}
 		}
 	}
-	sb := &strings.Builder{}
+	sb := strings.Builder{}
 	for _, row := range rows {
 		for column, value := range row {
 			if column+1 >= len(maxValueWidthPerColumn) {
-				_, _ = fmt.Fprintf(sb, value)
+				_, _ = fmt.Fprintf(&sb, value)
 			} else {
-				_, _ = fmt.Fprintf(sb, fmt.Sprintf("%%-%ds  ", maxValueWidthPerColumn[column]), value)
+				_, _ = fmt.Fprintf(&sb, fmt.Sprintf("%%-%ds  ", maxValueWidthPerColumn[column]), value)
 			}
 		}
 		sb.WriteByte('\n')

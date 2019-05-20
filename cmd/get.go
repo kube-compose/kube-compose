@@ -23,6 +23,8 @@ func setupGetCli() *cobra.Command {
 	return getCmd
 }
 
+// TODO: If no service is specified then it should iterate through all services in the docker-compsoe
+// https://github.com/jbrekelmans/kube-compose/issues/126
 func getCommand(cmd *cobra.Command, args []string) {
 	if len(args) == 0 {
 		log.Fatal("No Args Provided")
@@ -38,7 +40,7 @@ func getCommand(cmd *cobra.Command, args []string) {
 			log.Fatal(err)
 		}
 	}
-	result, err := get.Service(cfg, args[0])
+	result, err := get.ServiceDetails(cfg, args[0])
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -53,8 +55,8 @@ func getCommand(cmd *cobra.Command, args []string) {
 		}
 	} else {
 		output := util.FormatTable([][]string{
-			[]string{"NAME", "NAMESPACE", "HOSTNAME", "CLUSTER-IP"},
-			[]string{result.Service, result.Namespace, result.Hostname, result.ClusterIP},
+			{"NAME", "NAMESPACE", "HOSTNAME", "CLUSTER-IP"},
+			{result.Service, result.Namespace, result.Hostname, result.ClusterIP},
 		})
 		fmt.Print(output)
 	}
