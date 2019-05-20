@@ -16,15 +16,37 @@ type getRunner struct {
 	k8sServiceClient clientV1.ServiceInterface
 }
 
-func Service(cfg *config.Config, serviceName string) (*v1.Service, error) {
+type KubeComposeService struct {
+	Service        string
+	Hostname       string
+	Namespace      string
+	ClusterIP      string
+	ExternalIP     []string
+	LoadBalancerIP string
+}
+
+func Service(cfg *config.Config, serviceName string) (KubeComposeService, error) {
+	composeService := KubeComposeService{}
 	g := &getRunner{
 		cfg: cfg,
 	}
 	service := cfg.CanonicalComposeFile.Services[serviceName]
 	if service == nil {
-		return nil, fmt.Errorf("no service named %#v exists", serviceName)
+		return composeService, fmt.Errorf("no service named %#v exists", serviceName)
 	}
-	return g.run(service)
+	result, err := g.run(service)
+	if err != nil {
+		return composeService, err
+	}
+	composeService = KubeComposeService{
+		Service:        result.Name,
+		Hostname:       result.Name + "." + result.Namespace + ".svc.cluster.local",
+		Namespace:      result.Namespace,
+		ClusterIP:      result.Spec.ClusterIP,
+		ExternalIP:     result.Spec.ExternalIPs,
+		LoadBalancerIP: result.Spec.LoadBalancerIP,
+	}
+	return composeService, nil
 }
 
 func (g *getRunner) initKubernetesClientset() error {

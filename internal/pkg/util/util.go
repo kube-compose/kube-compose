@@ -97,3 +97,23 @@ func unescapeByte(input string, i int) (byte, error) {
 	}
 	return 0, fmt.Errorf("invalid input")
 }
+
+func OutputTable(rows [][]string) {
+	maxValueWidthPerColumn := []int{}
+	for _, row := range rows {
+		for column, value := range row {
+			for len(maxValueWidthPerColumn) <= column {
+				maxValueWidthPerColumn = append(maxValueWidthPerColumn, 0)
+			}
+			if len(value) > maxValueWidthPerColumn[column] {
+				maxValueWidthPerColumn[column] = len(value)
+			}
+		}
+	}
+	for _, row := range rows {
+		for column, value := range row {
+			fmt.Printf(fmt.Sprintf("%%-%ds  ", maxValueWidthPerColumn[column]), value)
+		}
+		fmt.Println()
+	}
+}
