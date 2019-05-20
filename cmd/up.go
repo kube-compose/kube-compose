@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func SetupUpCli() *cobra.Command {
+func setupUpCli() *cobra.Command {
 	var upCmd = &cobra.Command{
 		Use:   "up",
 		Short: "Create and start containers running on K8s",
@@ -22,11 +22,7 @@ func SetupUpCli() *cobra.Command {
 }
 
 func upCommand(cmd *cobra.Command, args []string) {
-	file, err := getFileFlag(cmd)
-	if err != nil {
-		log.Fatal(err)
-	}
-	cfg, err := getCommandConfig(cmd, args, file)
+	cfg, err := getCommandConfig(cmd, args)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func SetupDownCli() *cobra.Command {
+func setupDownCli() *cobra.Command {
 	var downCmd = &cobra.Command{
 		Use: "down",
 		Short: "Deletes the pods of the specified docker compose services. " +
@@ -19,11 +19,7 @@ func SetupDownCli() *cobra.Command {
 }
 
 func downCommand(cmd *cobra.Command, args []string) {
-	file, err := getFileFlag(cmd)
-	if err != nil {
-		log.Fatal(err)
-	}
-	cfg, err := getCommandConfig(cmd, args, file)
+	cfg, err := getCommandConfig(cmd, args)
 	if err != nil {
 		log.Fatal(err)
 	}

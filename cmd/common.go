@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	"github.com/pkg/errors"
@@ -42,7 +43,11 @@ func getFileFlag(cmd *cobra.Command) (*string, error) {
 	return file, nil
 }
 
-func getCommandConfig(cmd *cobra.Command, args []string, file *string) (*config.Config, error) {
+func getCommandConfig(cmd *cobra.Command, args []string) (*config.Config, error) {
+	file, err := getFileFlag(cmd)
+	if err != nil {
+		log.Fatal(err)
+	}
 	cfg, err := config.New(file)
 	if err != nil {
 		return nil, err

@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func SetupGetCli() *cobra.Command {
+func setupGetCli() *cobra.Command {
 	var getCmd = &cobra.Command{
 		Use:   "get",
 		Short: "Show details of a specific resource",
@@ -27,11 +27,7 @@ func getCommand(cmd *cobra.Command, args []string) {
 	if len(args) == 0 {
 		log.Fatal("No Args Provided")
 	}
-	file, err := getFileFlag(cmd)
-	if err != nil {
-		log.Fatal(err)
-	}
-	cfg, err := getCommandConfig(cmd, args, file)
+	cfg, err := getCommandConfig(cmd, args)
 	if err != nil {
 		log.Fatal(err)
 	}
