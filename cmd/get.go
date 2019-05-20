@@ -7,7 +7,7 @@ import (
 
 	"text/template"
 
-	details "github.com/jbrekelmans/kube-compose/internal/pkg/get"
+	details "github.com/jbrekelmans/kube-compose/internal/app/get"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 	"github.com/spf13/cobra"
 )
