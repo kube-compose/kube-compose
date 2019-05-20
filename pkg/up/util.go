@@ -20,14 +20,14 @@ import (
 	"github.com/jbrekelmans/kube-compose/internal/pkg/docker"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/linux"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
-	"github.com/jbrekelmans/kube-compose/pkg/config"
+	dockerComposeConfig "github.com/jbrekelmans/kube-compose/pkg/docker/compose/config"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 )
 
 // https://docs.docker.com/engine/reference/builder/#healthcheck
 // https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
-func createReadinessProbeFromDockerHealthcheck(healthcheck *config.Healthcheck) *v1.Probe {
+func createReadinessProbeFromDockerHealthcheck(healthcheck *dockerComposeConfig.Healthcheck) *v1.Probe {
 	if healthcheck == nil {
 		return nil
 	}
@@ -78,7 +78,7 @@ type hasTag interface {
 	Tag() string
 }
 
-func inspectImageRawParseHealthcheck(inspectRaw []byte) (*config.Healthcheck, error) {
+func inspectImageRawParseHealthcheck(inspectRaw []byte) (*dockerComposeConfig.Healthcheck, error) {
 	// inspectInfo's type is similar to dockerClient.ImageInspect, but it allows us to detect absent fields so we can apply default values.
 	var inspectInfo struct {
 		Config struct {
@@ -94,15 +94,15 @@ func inspectImageRawParseHealthcheck(inspectRaw []byte) (*config.Healthcheck, er
 	if err != nil {
 		return nil, err
 	}
-	if len(inspectInfo.Config.Healthcheck.Test) == 0 || inspectInfo.Config.Healthcheck.Test[0] == config.HealthcheckCommandNone {
+	if len(inspectInfo.Config.Healthcheck.Test) == 0 || inspectInfo.Config.Healthcheck.Test[0] == dockerComposeConfig.HealthcheckCommandNone {
 		return nil, nil
 	}
-	healthcheck := &config.Healthcheck{
-		Interval: config.HealthcheckDefaultInterval,
-		Timeout:  config.HealthcheckDefaultTimeout,
-		Retries:  config.HealthcheckDefaultRetries,
+	healthcheck := &dockerComposeConfig.Healthcheck{
+		Interval: dockerComposeConfig.HealthcheckDefaultInterval,
+		Timeout:  dockerComposeConfig.HealthcheckDefaultTimeout,
+		Retries:  dockerComposeConfig.HealthcheckDefaultRetries,
 	}
-	if inspectInfo.Config.Healthcheck.Test[0] == config.HealthcheckCommandShell {
+	if inspectInfo.Config.Healthcheck.Test[0] == dockerComposeConfig.HealthcheckCommandShell {
 		healthcheck.IsShell = true
 	}
 	healthcheck.Test = inspectInfo.Config.Healthcheck.Test[1:]
@@ -167,9 +167,17 @@ func getUserinfoFromImage(ctx context.Context, dc *dockerClient.Client, image st
 			fmt.Println(err)
 		}
 	}()
+	err = getUserinfoFromImageUID(ctx, dc, resp.ID, tmpDir, user)
+	if err != nil {
+		return err
+	}
+	return getUserinfoFromImageGID(ctx, dc, resp.ID, tmpDir, user)
+}
+
+func getUserinfoFromImageUID(ctx context.Context, dc *dockerClient.Client, containerID, tmpDir string, user *docker.Userinfo) error {
 	// TODO https://github.com/jbrekelmans/kube-compose/issues/70 this is not correct for non-Linux containers
 	if user.UID == nil {
-		err = copyFileFromContainer(ctx, dc, resp.ID, "/etc/passwd", tmpDir)
+		err := copyFileFromContainer(ctx, dc, containerID, "/etc/passwd", tmpDir)
 		if err != nil {
 			return err
 		}
@@ -183,8 +191,13 @@ func getUserinfoFromImage(ctx context.Context, dc *dockerClient.Client, image st
 		}
 		user.UID = uid
 	}
+	return nil
+}
+
+func getUserinfoFromImageGID(ctx context.Context, dc *dockerClient.Client, containerID, tmpDir string, user *docker.Userinfo) error {
+	// TODO https://github.com/jbrekelmans/kube-compose/issues/70 this is not correct for non-Linux containers
 	if user.GID == nil && user.Group != "" {
-		err = copyFileFromContainer(ctx, dc, resp.ID, "/etc/group", tmpDir)
+		err := copyFileFromContainer(ctx, dc, containerID, "/etc/group", tmpDir)
 		if err != nil {
 			return err
 		}
@@ -203,8 +216,6 @@ func getUserinfoFromImage(ctx context.Context, dc *dockerClient.Client, image st
 
 // resolveLocalImageID resolves an image ID against a cached list (like the one output by the command "docker images").
 // ref is assumed not to be a partial image ID.
-// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-// nolint
 func resolveLocalImageID(ref dockerRef.Reference, localImageIDSet *digestset.Set, localImagesCache []dockerTypes.ImageSummary) string {
 	named, isNamed := ref.(dockerRef.Named)
 	digested, isDigested := ref.(dockerRef.Digested)
@@ -231,6 +242,10 @@ func resolveLocalImageID(ref dockerRef.Reference, localImageIDSet *digestset.Set
 			}
 		}
 	}
+	return resolveLocalImageIDTag(ref, familiarName, localImagesCache)
+}
+
+func resolveLocalImageIDTag(ref dockerRef.Reference, familiarName string, localImagesCache []dockerTypes.ImageSummary) string {
 	tag := getTag(ref)
 	if len(tag) > 0 {
 		// docker images returns RepoTags as a familiar name with a tag

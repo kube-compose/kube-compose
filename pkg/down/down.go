@@ -33,38 +33,38 @@ func (d *downRunner) initKubernetesClientset() error {
 	return nil
 }
 
-func (d *downRunner) deleteCommon(errorChannel chan<- error, kind string, lister lister, deleter deleter) {
-	defer close(errorChannel)
+func (d *downRunner) deleteCommon(kind string, lister lister, deleter deleter) (bool, error) {
 	listOptions := metav1.ListOptions{
 		LabelSelector: d.cfg.EnvironmentLabel + "=" + d.cfg.EnvironmentID,
 	}
 	list, err := lister(listOptions)
 	if err != nil {
-		errorChannel <- err
-		return
+		return false, err
 	}
 	deleteOptions := &metav1.DeleteOptions{}
+	deletedAll := true
 	for _, item := range list {
 		composeService, err := k8smeta.FindFromObjectMeta(d.cfg, item)
 		if err != nil {
-			errorChannel <- err
-			return
+			return false, err
 		}
-		if d.cfg.MatchesFilter(composeService.Name) {
+		if d.cfg.MatchesFilter(composeService) {
 			err = deleter(item.Name, deleteOptions)
 			if err != nil {
-				errorChannel <- err
-				return
+				return false, err
 			}
 			fmt.Printf("deleted %s %s\n", kind, item.Name)
+		} else {
+			deletedAll = false
 		}
 	}
+	return deletedAll, nil
 }
 
 // Linter reports code duplication amongst deleteServices and deletePods. Although this is true, deduplicating would require the use of
 // generics, so we choose to nolint.
 // nolint
-func (d *downRunner) deleteServices(errorChannel chan<- error) {
+func (d *downRunner) deleteServices() (bool, error) {
 	lister := func(listOptions metav1.ListOptions) ([]*v1.ObjectMeta, error) {
 		serviceList, err := d.k8sServiceClient.List(listOptions)
 		if err != nil {
@@ -76,13 +76,13 @@ func (d *downRunner) deleteServices(errorChannel chan<- error) {
 		}
 		return list, nil
 	}
-	d.deleteCommon(errorChannel, "Service", lister, d.k8sServiceClient.Delete)
+	return d.deleteCommon("Service", lister, d.k8sServiceClient.Delete)
 }
 
 // Linter reports code duplication amongst deleteServices and deletePods. Although this is true, deduplicating would require the use of
 // generics, so we choose to nolint.
 // nolint
-func (d *downRunner) deletePods(errorChannel chan<- error) {
+func (d *downRunner) deletePods() (bool, error) {
 	lister := func(listOptions metav1.ListOptions) ([]*v1.ObjectMeta, error) {
 		podList, err := d.k8sPodClient.List(listOptions)
 		if err != nil {
@@ -94,7 +94,7 @@ func (d *downRunner) deletePods(errorChannel chan<- error) {
 		}
 		return list, nil
 	}
-	d.deleteCommon(errorChannel, "Pod", lister, d.k8sPodClient.Delete)
+	return d.deleteCommon("Pod", lister, d.k8sPodClient.Delete)
 }
 
 func (d *downRunner) run() error {
@@ -102,33 +102,21 @@ func (d *downRunner) run() error {
 	if err != nil {
 		return err
 	}
-	errorChannels := []chan error{}
+
+	deletedAllPods, err := d.deletePods()
+	if err != nil {
+		return err
+	}
 
 	// Only delete services if all pods are to be deleted. This is so that existing pods will not have
 	// their host aliases invalidated.
-	if d.cfg.FilterMatchesAll() {
-		errorChannel := make(chan error)
-		errorChannels = append(errorChannels, errorChannel)
-		go d.deleteServices(errorChannel)
-	}
-
-	errorChannel := make(chan error)
-	errorChannels = append(errorChannels, errorChannel)
-	go d.deletePods(errorChannel)
-
-	var firstError error
-	for _, errorChannel := range errorChannels {
-		err, more := <-errorChannel
-		if !more {
-			continue
-		}
-		if firstError == nil {
-			firstError = err
-		} else {
-			fmt.Println(err)
+	if deletedAllPods {
+		_, err = d.deleteServices()
+		if err != nil {
+			return err
 		}
 	}
-	return firstError
+	return nil
 }
 
 // Run runs a docker-compose down command...

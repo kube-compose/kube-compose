@@ -2,8 +2,35 @@ package util
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 )
+
+type testHasSubexpNames struct {
+	subexpNames []string
+}
+
+func (t *testHasSubexpNames) SubexpNames() []string {
+	return t.subexpNames
+}
+
+func TestBuildRegexpMatchMap(t *testing.T) {
+	subexpNamesContainer := &testHasSubexpNames{
+		subexpNames: []string{
+			"",
+			"group1",
+		},
+	}
+	m := BuildRegexpMatchMap(subexpNamesContainer, []string{
+		"",
+		"group1Match",
+	})
+	if !reflect.DeepEqual(m, map[string]string{
+		"group1": "group1Match",
+	}) {
+		t.Fail()
+	}
+}
 
 type testCloser struct {
 	closed bool

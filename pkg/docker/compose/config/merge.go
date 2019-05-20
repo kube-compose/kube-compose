@@ -1,11 +1,10 @@
 package config
 
-// extendedService is merged into service
-func merge(service, extendedService *Service) {
-	// rules based on https://docs.docker.com/compose/extends/#adding-and-overriding-configuration
-	mergeStringMaps(service.Environment, extendedService.Environment)
-	service.Ports = mergePortBindings(service.Ports, extendedService.Ports)
-	// TODO https://github.com/jbrekelmans/kube-compose/issues/48
+func merge(into, from *composeFileParsedService) {
+	// Rules here are based on https://docs.docker.com/compose/extends/#adding-and-overriding-configuration
+	mergeStringMaps(into.service.Environment, from.service.Environment)
+	into.service.Ports = mergePortBindings(into.service.Ports, from.service.Ports)
+	// TODO https://github.com/jbrekelmans/kube-compose/issues/48 add missing rules here
 }
 
 func mergeStringMaps(intoStringMap, fromStringMap map[string]string) {

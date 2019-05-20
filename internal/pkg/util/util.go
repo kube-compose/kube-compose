@@ -9,6 +9,24 @@ import (
 
 const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
 
+type HasSubexpNames interface {
+	SubexpNames() []string
+}
+
+// BuildRegexpMatchMap creates a map from a regular expression, and a match slice obtained from r.FindStringSubmatch or
+// r.FindAllStringSubmatch.
+func BuildRegexpMatchMap(r HasSubexpNames, matches []string) map[string]string {
+	subexpNames := r.SubexpNames()
+	n := len(subexpNames)
+	matchMap := map[string]string{}
+	for i := 1; i < n; i++ {
+		if len(subexpNames[i]) > 0 {
+			matchMap[subexpNames[i]] = matches[i]
+		}
+	}
+	return matchMap
+}
+
 // CloseAndLogError closes the closer and logs any error it returns.
 func CloseAndLogError(closer io.Closer) {
 	err := closer.Close()
