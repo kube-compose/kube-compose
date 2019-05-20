@@ -91,7 +91,6 @@ func TestFormatTable(t *testing.T) {
 		[]string{"NAME", "VALUE"},
 		[]string{"Test", "-1"},
 	})
-	t.Logf("%#v\n", output)
 	if output != "NAME  VALUE\nTest  -1\n" {
 		t.Fail()
 	}
