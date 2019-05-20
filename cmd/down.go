@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func setupDownCli() *cobra.Command {
+func newDownCli() *cobra.Command {
 	var downCmd = &cobra.Command{
 		Use: "down",
 		Short: "Deletes the pods of the specified docker compose services. " +

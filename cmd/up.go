@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func setupUpCli() *cobra.Command {
+func newUpCli() *cobra.Command {
 	var upCmd = &cobra.Command{
 		Use:   "up",
 		Short: "Create and start containers running on K8s",

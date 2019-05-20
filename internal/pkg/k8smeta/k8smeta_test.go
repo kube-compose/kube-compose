@@ -31,6 +31,15 @@ func TestFindFromObjectMeta_AnnotationSuccess(t *testing.T) {
 	}
 }
 
+func TestGetK8sName(t *testing.T) {
+	service := &config.Service{NameEscaped: "Test"}
+	cfg := &config.Config{EnvironmentID: "123"}
+	serviceName := GetK8sName(service, cfg)
+	if serviceName != "Test-123" {
+		t.Fail()
+	}
+}
+
 func TestFindFromObjectMeta_NotFound(t *testing.T) {
 	cfg := config.Config{}
 	objectMeta := metav1.ObjectMeta{}

@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func setupGetCli() *cobra.Command {
+func newGetCli() *cobra.Command {
 	var getCmd = &cobra.Command{
 		Use:   "get",
 		Short: "Show details of a specific resource",
@@ -40,7 +40,11 @@ func getCommand(cmd *cobra.Command, args []string) {
 			log.Fatal(err)
 		}
 	}
-	result, err := details.GetServiceDetails(cfg, args[0])
+	service := cfg.FindServiceByName(args[0])
+	if service == nil {
+		log.Fatalf("no service named %#v exists", args[0])
+	}
+	result, err := details.GetServiceDetails(cfg, service)
 	if err != nil {
 		log.Fatal(err)
 	}
