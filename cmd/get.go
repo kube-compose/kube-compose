@@ -7,7 +7,7 @@ import (
 
 	"text/template"
 
-	"github.com/jbrekelmans/kube-compose/internal/pkg/get"
+	details "github.com/jbrekelmans/kube-compose/internal/pkg/get"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 	"github.com/spf13/cobra"
 )
@@ -40,7 +40,7 @@ func getCommand(cmd *cobra.Command, args []string) {
 			log.Fatal(err)
 		}
 	}
-	result, err := get.ServiceDetails(cfg, args[0])
+	result, err := details.GetServiceDetails(cfg, args[0])
 	if err != nil {
 		log.Fatal(err)
 	}

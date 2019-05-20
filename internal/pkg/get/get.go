@@ -1,8 +1,9 @@
-package get
+package details
 
 import (
 	"fmt"
 
+	"github.com/jbrekelmans/kube-compose/internal/pkg/k8smeta"
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,7 +24,7 @@ type KubeComposeServiceDetails struct {
 	ClusterIP string
 }
 
-func ServiceDetails(cfg *config.Config, serviceName string) (KubeComposeServiceDetails, error) {
+func GetServiceDetails(cfg *config.Config, serviceName string) (KubeComposeServiceDetails, error) {
 	composeService := KubeComposeServiceDetails{}
 	g := &getRunner{
 		cfg: cfg,
@@ -57,7 +58,7 @@ func (g *getRunner) initKubernetesClientset() error {
 
 func (g *getRunner) getK8sServiceResource(service *config.Service) (*v1.Service, error) {
 	options := &metav1.GetOptions{}
-	result, err := g.k8sServiceClient.Get(getKubeServiceName(service, g.cfg), *options)
+	result, err := g.k8sServiceClient.Get(k8smeta.GetKubeServiceName(service, g.cfg), *options)
 	if err != nil {
 		return result, err
 	}
@@ -74,8 +75,4 @@ func (g *getRunner) run(service *config.Service) (*v1.Service, error) {
 		return result, err
 	}
 	return result, nil
-}
-
-func getKubeServiceName(service *config.Service, cfg *config.Config) string {
-	return fmt.Sprintf(service.NameEscaped + "-" + cfg.EnvironmentID)
 }
