@@ -17,12 +17,10 @@ type getRunner struct {
 }
 
 type KubeComposeService struct {
-	Service        string
-	Hostname       string
-	Namespace      string
-	ClusterIP      string
-	ExternalIP     []string
-	LoadBalancerIP string
+	Service   string
+	Hostname  string
+	Namespace string
+	ClusterIP string
 }
 
 func Service(cfg *config.Config, serviceName string) (KubeComposeService, error) {
@@ -30,7 +28,7 @@ func Service(cfg *config.Config, serviceName string) (KubeComposeService, error)
 	g := &getRunner{
 		cfg: cfg,
 	}
-	service := cfg.CanonicalComposeFile.Services[serviceName]
+	service := cfg.FindServiceByName(serviceName)
 	if service == nil {
 		return composeService, fmt.Errorf("no service named %#v exists", serviceName)
 	}
@@ -39,12 +37,10 @@ func Service(cfg *config.Config, serviceName string) (KubeComposeService, error)
 		return composeService, err
 	}
 	composeService = KubeComposeService{
-		Service:        result.Name,
-		Hostname:       result.Name + "." + result.Namespace + ".svc.cluster.local",
-		Namespace:      result.Namespace,
-		ClusterIP:      result.Spec.ClusterIP,
-		ExternalIP:     result.Spec.ExternalIPs,
-		LoadBalancerIP: result.Spec.LoadBalancerIP,
+		Service:   result.Name,
+		Hostname:  result.Name + "." + result.Namespace + ".svc.cluster.local",
+		Namespace: result.Namespace,
+		ClusterIP: result.Spec.ClusterIP,
 	}
 	return composeService, nil
 }
@@ -61,7 +57,7 @@ func (g *getRunner) initKubernetesClientset() error {
 
 func (g *getRunner) getK8sServiceResource(service *config.Service) (*v1.Service, error) {
 	options := &metav1.GetOptions{}
-	result, err := g.k8sServiceClient.Get(service.NameEscaped()+"-"+g.cfg.EnvironmentID, *options)
+	result, err := g.k8sServiceClient.Get(service.NameEscaped+"-"+g.cfg.EnvironmentID, *options)
 	if err != nil {
 		return result, err
 	}

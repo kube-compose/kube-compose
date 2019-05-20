@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -55,9 +56,10 @@ func getCommand(cmd *cobra.Command, args []string) {
 			panic(err)
 		}
 	} else {
-		util.OutputTable([][]string{
-			[]string{"NAME", "HOSTNAME", "CLUSTER-IP"},
-			[]string{result.Service, result.Hostname, result.ClusterIP},
+		output := util.FormatTable([][]string{
+			[]string{"NAME", "NAMESPACE", "HOSTNAME", "CLUSTER-IP"},
+			[]string{result.Service, result.Namespace, result.Hostname, result.ClusterIP},
 		})
+		fmt.Print(output)
 	}
 }

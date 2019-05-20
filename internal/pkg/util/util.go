@@ -114,7 +114,7 @@ func unescapeByte(input string, i int) (byte, error) {
 	return 0, fmt.Errorf("invalid input")
 }
 
-func OutputTable(rows [][]string) {
+func FormatTable(rows [][]string) string {
 	maxValueWidthPerColumn := []int{}
 	for _, row := range rows {
 		for column, value := range row {
@@ -126,10 +126,12 @@ func OutputTable(rows [][]string) {
 			}
 		}
 	}
+	sb := &strings.Builder{}
 	for _, row := range rows {
 		for column, value := range row {
-			fmt.Printf(fmt.Sprintf("%%-%ds  ", maxValueWidthPerColumn[column]), value)
+			_, _ = fmt.Fprintf(sb, fmt.Sprintf("%%-%ds  ", maxValueWidthPerColumn[column]), value)
 		}
-		fmt.Println()
+		sb.WriteByte('\n')
 	}
+	return sb.String()
 }
