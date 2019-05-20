@@ -1,7 +1,7 @@
 package get
 
 import (
-	"context"
+	"fmt"
 
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	v1 "k8s.io/api/core/v1"
@@ -12,15 +12,17 @@ import (
 
 type getRunner struct {
 	cfg              *config.Config
-	ctx              context.Context
 	k8sClientset     *kubernetes.Clientset
 	k8sServiceClient clientV1.ServiceInterface
 }
 
-func Service(ctx context.Context, cfg *config.Config, service string) (*v1.Service, error) {
+func Service(cfg *config.Config, serviceName string) (*v1.Service, error) {
 	g := &getRunner{
 		cfg: cfg,
-		ctx: context.Background(),
+	}
+	service := cfg.CanonicalComposeFile.Services[serviceName]
+	if service == nil {
+		return nil, fmt.Errorf("no service named %#v exists", serviceName)
 	}
 	return g.run(service)
 }
@@ -35,16 +37,16 @@ func (g *getRunner) initKubernetesClientset() error {
 	return nil
 }
 
-func (g *getRunner) getK8sServiceResource(service string) (*v1.Service, error) {
+func (g *getRunner) getK8sServiceResource(service *config.Service) (*v1.Service, error) {
 	options := &metav1.GetOptions{}
-	result, err := g.k8sServiceClient.Get(service, *options)
+	result, err := g.k8sServiceClient.Get(service.NameEscaped()+"-"+g.cfg.EnvironmentID, *options)
 	if err != nil {
 		return result, err
 	}
 	return result, nil
 }
 
-func (g *getRunner) run(service string) (*v1.Service, error) {
+func (g *getRunner) run(service *config.Service) (*v1.Service, error) {
 	err := g.initKubernetesClientset()
 	if err != nil {
 		return nil, err

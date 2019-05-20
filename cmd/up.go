@@ -22,7 +22,11 @@ func SetupUpCli() *cobra.Command {
 }
 
 func upCommand(cmd *cobra.Command, args []string) {
-	cfg, err := upOrDownCommandCommon(cmd, args)
+	file, err := getFileFlag(cmd)
+	if err != nil {
+		log.Fatal(err)
+	}
+	cfg, err := getCommandConfig(cmd, args, file)
 	if err != nil {
 		log.Fatal(err)
 	}

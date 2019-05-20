@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"context"
-	"fmt"
 	"log"
 	"os"
 
@@ -24,18 +22,25 @@ func SetupGetCli() *cobra.Command {
 }
 
 type KubeComposeService struct {
-	Service  string
-	Hostname string
-	IP       string
+	Service        string
+	Hostname       string
+	Namespace      string
+	ClusterIP      string
+	ExternalIP     []string
+	LoadBalancerIP string
 }
 
 func getCommand(cmd *cobra.Command, args []string) {
-	filter := "Service\tHostname\tIP\n{{.Service}}\t{{.Hostname}}\t{{.IP}}"
+	filter := "Service\tHostname\tClusterIP\n{{.Service}}\t{{.Hostname}}\t{{.ClusterIP}}"
 	var err error
 	if len(args) == 0 {
 		log.Fatal("No Args Provided")
 	}
-	cfg, err := upOrDownCommandCommon(cmd, args)
+	file, err := getFileFlag(cmd)
+	if err != nil {
+		log.Fatal(err)
+	}
+	cfg, err := getCommandConfig(cmd, args, file)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -45,12 +50,18 @@ func getCommand(cmd *cobra.Command, args []string) {
 			log.Fatal(err)
 		}
 	}
-	result, err := get.Service(context.Background(), cfg, args[0])
+	result, err := get.Service(cfg, args[0])
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(result)
-	service := KubeComposeService{args[0], "TestServiceName", "0.0.0.0"}
+	service := KubeComposeService{
+		Service:        result.Name,
+		Hostname:       result.Name + "." + result.Namespace + ".svc.cluster.local",
+		Namespace:      result.Namespace,
+		ClusterIP:      result.Spec.ClusterIP,
+		ExternalIP:     result.Spec.ExternalIPs,
+		LoadBalancerIP: result.Spec.LoadBalancerIP,
+	}
 	tmpl, err := template.New(args[0]).Parse(filter)
 	if err != nil {
 		panic(err)
