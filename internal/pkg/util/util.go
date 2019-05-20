@@ -9,6 +9,24 @@ import (
 
 const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
 
+type HasSubexpNames interface {
+	SubexpNames() []string
+}
+
+// BuildRegexpMatchMap creates a map from a regular expression, and a match slice obtained from r.FindStringSubmatch or
+// r.FindAllStringSubmatch.
+func BuildRegexpMatchMap(r HasSubexpNames, matches []string) map[string]string {
+	subexpNames := r.SubexpNames()
+	n := len(subexpNames)
+	matchMap := map[string]string{}
+	for i := 1; i < n; i++ {
+		if len(subexpNames[i]) > 0 {
+			matchMap[subexpNames[i]] = matches[i]
+		}
+	}
+	return matchMap
+}
+
 // CloseAndLogError closes the closer and logs any error it returns.
 func CloseAndLogError(closer io.Closer) {
 	err := closer.Close()
@@ -18,33 +36,31 @@ func CloseAndLogError(closer io.Closer) {
 }
 
 func decodeBase36(b int) int {
-	if b <= 0x39 {
-		if 0x30 <= b {
-			return 26 - 0x30 + b
+	if b <= '9' {
+		if '0' <= b {
+			return 26 - '0' + b
 		}
-	} else if 0x61 <= b && b <= 0x7A {
-		return b - 0x61
+	} else if 'a' <= b && b <= 'z' {
+		return b - 'a'
 	}
 	return -1
 }
 
-// EscapeName takes an arbitrary string and maps it bijectively to the grammar ^[a-z0-9]+$.
+// EscapeName takes an arbitrary string and maps it bijectively to the grammar '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'.
 // This is useful when creating Kubernetes resources.
 func EscapeName(input string) string {
 	n := len(input)
 	var sb strings.Builder
 	for i := 0; i < n; i++ {
 		b := input[i]
-		if b <= 0x38 {
-			if 0x30 <= b {
-				sb.WriteByte(b)
-				continue
-			}
-		} else if 0x61 <= b && b <= 0x7A {
+		if (b >= '0' && b <= '8') || (b >= 'a' && b <= 'z') {
+			sb.WriteByte(b)
+			continue
+		} else if b == '-' && i > 0 && i < n-1 {
 			sb.WriteByte(b)
 			continue
 		}
-		sb.WriteByte(0x39)
+		sb.WriteByte('9')
 		sb.WriteByte(chars[b/36])
 		sb.WriteByte(chars[b%36])
 	}
@@ -66,7 +82,7 @@ func UnescapeName(input string) (string, error) {
 	var sb strings.Builder
 	i := 0
 	for i < len(input) {
-		if input[i] == 0x39 {
+		if input[i] == '9' {
 			b, err := unescapeByte(input, i)
 			if err != nil {
 				return "", err

@@ -13,22 +13,19 @@ type ValueGetter func(name string) (string, bool)
 type configInterpolator struct {
 	config      genericMap
 	errorList   []error
-	fileName    string
 	valueGetter ValueGetter
 	version     *version.Version
 }
 
 type stringOrInt struct {
-	str string
-	i   int
+	str   string
+	i     int
+	isInt bool
 }
 
 type path []stringOrInt
 
 func (p path) appendStr(str string) path {
-	if str == "" {
-		panic(fmt.Errorf("s must not be empty"))
-	}
 	return append(p, stringOrInt{
 		str: str,
 	})
@@ -36,7 +33,8 @@ func (p path) appendStr(str string) path {
 
 func (p path) appendInt(i int) path {
 	return append(p, stringOrInt{
-		i: i,
+		i:     i,
+		isInt: true,
 	})
 }
 
@@ -92,10 +90,9 @@ func (c *configInterpolator) addError(err error, _ path) {
 // The implementation substitutes exactly the same sections as docker compose:
 // https://github.com/docker/compose/master/compose/config/config.py.
 // TODO https://github.com/jbrekelmans/kube-compose/issues/11 support arbitrary map types instead of genericMap.
-func InterpolateConfig(fileName string, config genericMap, valueGetter ValueGetter, v *version.Version) error {
+func InterpolateConfig(config genericMap, valueGetter ValueGetter, v *version.Version) error {
 	c := &configInterpolator{
 		config:      config,
-		fileName:    fileName,
 		valueGetter: valueGetter,
 		version:     v,
 	}

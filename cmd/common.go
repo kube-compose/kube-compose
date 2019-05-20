@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -54,11 +56,16 @@ func getCommandConfig(cmd *cobra.Command, args []string, file *string) (*config.
 		cfg.Namespace = namespace
 	}
 	if len(args) == 0 {
-		cfg.SetFilterToMatchAll()
+		for _, service := range cfg.Services {
+			cfg.AddToFilter(service)
+		}
 	} else {
-		err = cfg.SetFilter(args)
-		if err != nil {
-			return nil, err
+		for _, arg := range args {
+			service := cfg.FindServiceByName(arg)
+			if service == nil {
+				return nil, fmt.Errorf("no service named %#v does exists", arg)
+			}
+			cfg.AddToFilter(service)
 		}
 	}
 	return cfg, nil

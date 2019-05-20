@@ -9,24 +9,6 @@ import (
 	"github.com/uber-go/mapdecode"
 )
 
-// https://github.com/docker/compose/blob/master/compose/config/config_schema_v2.1.json
-type ServiceHealthiness int
-
-const (
-	ServiceStarted ServiceHealthiness = 0
-	ServiceHealthy ServiceHealthiness = 1
-)
-
-func (s *ServiceHealthiness) String() string {
-	switch *s {
-	case ServiceHealthy:
-		return "serviceHealthy"
-	case ServiceStarted:
-		return "serviceStarted"
-	}
-	return ""
-}
-
 type stringOrStringSlice struct {
 	Values []string
 }
@@ -224,10 +206,10 @@ type port struct {
 }
 
 func (p *port) Decode(into mapdecode.Into) error {
-	intVal := 0
-	err := into(&intVal)
+	var int64Val int64
+	err := into(&int64Val)
 	if err == nil {
-		p.Value = strconv.Itoa(intVal)
+		p.Value = strconv.FormatInt(int64Val, 10)
 		return nil
 	}
 	strVal := ""
@@ -236,7 +218,7 @@ func (p *port) Decode(into mapdecode.Into) error {
 	return err
 }
 
-type service2_1 struct {
+type composeFileService struct {
 	Build *struct {
 		Context    string `mapdecode:"context"`
 		Dockerfile string `mapdecode:"dockerfile"`
@@ -254,7 +236,7 @@ type service2_1 struct {
 	Restart     string              `mapdecode:"restart"`
 }
 
-type composeFile2_1 struct {
-	Services map[string]*service2_1 `mapdecode:"services"`
-	Volumes  map[string]interface{} `mapdecode:"volumes"`
+type composeFile struct {
+	Services map[string]*composeFileService `mapdecode:"services"`
+	Volumes  map[string]interface{}         `mapdecode:"volumes"`
 }
