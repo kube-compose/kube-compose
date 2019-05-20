@@ -58,7 +58,7 @@ func (g *getRunner) initKubernetesClientset() error {
 
 func (g *getRunner) getK8sServiceResource(service *config.Service) (*v1.Service, error) {
 	options := &metav1.GetOptions{}
-	result, err := g.k8sServiceClient.Get(k8smeta.GetKubeServiceName(service, g.cfg), *options)
+	result, err := g.k8sServiceClient.Get(k8smeta.GetK8sName(service, g.cfg), *options)
 	if err != nil {
 		return result, err
 	}

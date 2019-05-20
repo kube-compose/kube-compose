@@ -28,7 +28,7 @@ func InitCommonLabels(cfg *config.Config, composeService *config.Service, labels
 
 // InitObjectMeta sets the name, labels and annotations of a resource for the specified docker compose service.
 func InitObjectMeta(cfg *config.Config, objectMeta *metav1.ObjectMeta, composeService *config.Service) {
-	objectMeta.Name = GetKubeServiceName(composeService, cfg)
+	objectMeta.Name = GetK8sName(composeService, cfg)
 	objectMeta.Labels = InitCommonLabels(cfg, composeService, objectMeta.Labels)
 	if objectMeta.Annotations == nil {
 		objectMeta.Annotations = map[string]string{}
@@ -47,6 +47,6 @@ func FindFromObjectMeta(cfg *config.Config, objectMeta *metav1.ObjectMeta) (*con
 	return nil, nil
 }
 
-func GetKubeServiceName(service *config.Service, cfg *config.Config) string {
+func GetK8sName(service *config.Service, cfg *config.Config) string {
 	return service.NameEscaped + "-" + cfg.EnvironmentID
 }
