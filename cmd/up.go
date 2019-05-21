@@ -28,8 +28,5 @@ func upCommand(cmd *cobra.Command, args []string) error {
 	opts := &up.Options{}
 	opts.Detach, _ = cmd.Flags().GetBool("detach")
 	opts.RunAsUser, _ = cmd.Flags().GetBool("run-as-user")
-	if err := up.Run(context.Background(), cfg, opts); err != nil {
-		return err
-	}
-	return nil
+	return up.Run(context.Background(), cfg, opts)
 }

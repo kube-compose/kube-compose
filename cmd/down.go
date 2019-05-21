@@ -21,8 +21,5 @@ func downCommand(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := down.Run(cfg); err != nil {
-		return err
-	}
-	return nil
+	return down.Run(cfg)
 }
