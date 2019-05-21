@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	"github.com/pkg/errors"
@@ -11,6 +12,10 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/tools/clientcmd"
 )
+
+const envVarPrefix = "KUBECOMPOSE_"
+
+var envGetter = os.LookupEnv
 
 func setFromKubeConfig(cfg *config.Config) error {
 	loader := clientcmd.NewDefaultClientConfigLoadingRules()
@@ -31,8 +36,8 @@ func setFromKubeConfig(cfg *config.Config) error {
 
 func getFileFlag(cmd *cobra.Command) (*string, error) {
 	var file *string
-	if cmd.Flags().Changed("file") {
-		fileStr, err := cmd.Flags().GetString("file")
+	if cmd.Flags().Changed(fileFlagName) {
+		fileStr, err := cmd.Flags().GetString(fileFlagName)
 		if err != nil {
 			return nil, err
 		}
@@ -42,7 +47,39 @@ func getFileFlag(cmd *cobra.Command) (*string, error) {
 	return file, nil
 }
 
+func getEnvIDFlag(cmd *cobra.Command) (string, error) {
+	var envID string
+	var exists bool
+	if !cmd.Flags().Changed(envIDFlagName) {
+		envID, exists = envGetter(envVarPrefix + "ENVID")
+		if !exists {
+			return "", fmt.Errorf("either the flag --env-id or the environment variable %sENVID must be set", envVarPrefix)
+		}
+		return envID, nil
+	}
+	envID, _ = cmd.Flags().GetString(envIDFlagName)
+	return envID, nil
+}
+
+func getNamespaceFlag(cmd *cobra.Command) (string, bool) {
+	var namespace string
+	var exists bool
+	if !cmd.Flags().Changed(namespaceFlagName) {
+		namespace, exists = envGetter(envVarPrefix + "NAMESPACE")
+		if !exists {
+			return "", false
+		}
+		return namespace, true
+	}
+	namespace, _ = cmd.Flags().GetString(namespaceFlagName)
+	return namespace, true
+}
+
 func getCommandConfig(cmd *cobra.Command, args []string) (*config.Config, error) {
+	envID, err := getEnvIDFlag(cmd)
+	if err != nil {
+		return nil, err
+	}
 	file, err := getFileFlag(cmd)
 	if err != nil {
 		return nil, err
@@ -51,12 +88,11 @@ func getCommandConfig(cmd *cobra.Command, args []string) (*config.Config, error)
 	if err != nil {
 		return nil, err
 	}
-	err = setFromKubeConfig(cfg)
-	if err != nil {
+	if err := setFromKubeConfig(cfg); err != nil {
 		return nil, err
 	}
-	cfg.EnvironmentID, _ = cmd.Flags().GetString("env-id")
-	if namespace, _ := cmd.Flags().GetString("namespace"); namespace != "" {
+	cfg.EnvironmentID = envID
+	if namespace, exists := getNamespaceFlag(cmd); exists {
 		cfg.Namespace = namespace
 	}
 	if len(args) == 0 {
