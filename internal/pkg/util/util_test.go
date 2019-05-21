@@ -86,6 +86,15 @@ func TestTryParseInt64_Success(t *testing.T) {
 	}
 }
 
+func TestFormatTable(t *testing.T) {
+	output := FormatTable([][]string{
+		{"NAME", "VALUE"},
+		{"Test", "-1"},
+	})
+	if output != "NAME  VALUE\nTest  -1\n" {
+		t.Fail()
+	}
+}
 func TestUnescapeName_Success(t *testing.T) {
 	r, err := UnescapeName("9aa9bv0a9dp9a7")
 	if r != "\x00\x390a\x7B!" || err != nil {

@@ -42,7 +42,7 @@ func getFileFlag(cmd *cobra.Command) (*string, error) {
 	return file, nil
 }
 
-func upOrDownCommandCommon(cmd *cobra.Command, args []string) (*config.Config, error) {
+func getCommandConfig(cmd *cobra.Command, args []string) (*config.Config, error) {
 	file, err := getFileFlag(cmd)
 	if err != nil {
 		return nil, err

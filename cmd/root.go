@@ -1,24 +1,20 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "kube-compose",
-	Short: "k8s",
-	Long:  "Environments on k8s made easy",
+	Use:     "kube-compose",
+	Short:   "k8s",
+	Long:    "Environments on k8s made easy",
+	Version: "0.3.0",
 }
 
-func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+func Execute() error {
+	rootCmd.AddCommand(newDownCli(), newUpCli(), newGetCli())
+	return rootCmd.Execute()
 }
 
 // This method is generated when cobra is initialized.
