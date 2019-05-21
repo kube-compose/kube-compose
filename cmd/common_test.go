@@ -34,7 +34,19 @@ func TestGetEnvIDFlag_EnvLookUpNotExists(t *testing.T) {
 	withMockedEnv(map[string]string{}, func() {
 		cmd := &cobra.Command{}
 		key, err := getEnvIDFlag(cmd)
-		if key == "123" || err == nil {
+		if key != "" || err == nil {
+			t.Fail()
+		}
+	})
+}
+
+func TestGetEnvIDFlag_FlagIsSet(t *testing.T) {
+	withMockedEnv(map[string]string{}, func() {
+		cmd := &cobra.Command{}
+		setRootCommandFlags(cmd)
+		cmd.ParseFlags([]string{"--env-id", "123"})
+		key, err := getEnvIDFlag(cmd)
+		if key != "123" || err != nil {
 			t.Fail()
 		}
 	})
@@ -56,7 +68,19 @@ func TestGetNamespaceFlag_EnvLookUpNotExists(t *testing.T) {
 	withMockedEnv(map[string]string{}, func() {
 		cmd := &cobra.Command{}
 		key, exists := getNamespaceFlag(cmd)
-		if key == "12" || exists == true {
+		if key != "" || exists == true {
+			t.Fail()
+		}
+	})
+}
+
+func TestGetNamespaceFlag_FlagIsSet(t *testing.T) {
+	withMockedEnv(map[string]string{}, func() {
+		cmd := &cobra.Command{}
+		setRootCommandFlags(cmd)
+		cmd.ParseFlags([]string{"--namespace", "test"})
+		key, exists := getNamespaceFlag(cmd)
+		if key != "test" || exists != true {
 			t.Fail()
 		}
 	})
