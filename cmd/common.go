@@ -13,6 +13,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+var envGetter = os.LookupEnv
+
 func setFromKubeConfig(cfg *config.Config) error {
 	loader := clientcmd.NewDefaultClientConfigLoadingRules()
 	overrides := clientcmd.ConfigOverrides{}
@@ -47,7 +49,7 @@ func getEnvIDFlag(cmd *cobra.Command) (string, error) {
 	var envID string
 	var exists bool
 	if !cmd.Flags().Changed("env-id") {
-		envID, exists = os.LookupEnv("KUBECOMPOSE_ENVID")
+		envID, exists = envGetter("KUBECOMPOSE_ENVID")
 		if !exists {
 			return "", fmt.Errorf("either the flag --env-id or the environment variable KUBECOMPOSE_ENVID must be set")
 		}
@@ -61,7 +63,7 @@ func getNamespaceFlag(cmd *cobra.Command) (string, bool) {
 	var namespace string
 	var exists bool
 	if !cmd.Flags().Changed("namespace") {
-		namespace, exists = os.LookupEnv("KUBECOMPOSE_NAMESPACE")
+		namespace, exists = envGetter("KUBECOMPOSE_NAMESPACE")
 		if !exists {
 			return "", false
 		}
