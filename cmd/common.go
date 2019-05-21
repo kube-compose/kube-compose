@@ -68,7 +68,7 @@ func getNamespaceFlag(cmd *cobra.Command) (string, bool) {
 		return namespace, true
 	}
 	namespace, _ = cmd.Flags().GetString("namespace")
-	return namespace, false
+	return namespace, true
 }
 
 func getCommandConfig(cmd *cobra.Command, args []string) (*config.Config, error) {
