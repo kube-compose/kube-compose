@@ -92,3 +92,77 @@ func TestLoadFileError_Success(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestParseComposeFileService_InvalidPortsError(t *testing.T) {
+	m := map[string]string{}
+	c := &configLoader{
+		environmentGetter: mapValueGetter(m),
+	}
+	cfService := &composeFileService{
+		Ports: []port{
+			port{
+				Value: "asdf",
+			},
+		},
+	}
+	_, err := c.parseComposeFileService(cfService)
+	if err == nil {
+		t.Fail()
+	}
+}
+
+func TestParseComposeFileService_InvalidHealthcheckError(t *testing.T) {
+	m := map[string]string{}
+	c := &configLoader{
+		environmentGetter: mapValueGetter(m),
+	}
+	cfService := &composeFileService{
+		Healthcheck: &ServiceHealthcheck{
+			Timeout: new(string),
+		},
+	}
+	*cfService.Healthcheck.Timeout = "henkie"
+	_, err := c.parseComposeFileService(cfService)
+	if err == nil {
+		t.Fail()
+	}
+}
+
+/*
+
+func (c *configLoader) parseComposeFileService(cfService *composeFileService) (*composeFileParsedService, error) {
+	service := &Service{
+		Entrypoint: cfService.Entrypoint.Values,
+		Image:      cfService.Image,
+		User:       cfService.User,
+		WorkingDir: cfService.WorkingDir,
+		Restart:    cfService.Restart,
+	}
+	composeFileParsedService := &composeFileParsedService{
+		service: service,
+	}
+	if cfService.DependsOn != nil {
+		composeFileParsedService.dependsOn = cfService.DependsOn.Values
+	}
+	ports, err := parsePorts(cfService.Ports)
+	if err != nil {
+		return nil, err
+	}
+	service.Ports = ports
+
+	healthcheck, healthcheckDisabled, err := ParseHealthcheck(cfService.Healthcheck)
+	if err != nil {
+		return nil, err
+	}
+	service.Healthcheck = healthcheck
+	service.HealthcheckDisabled = healthcheckDisabled
+
+	environment, err := c.parseEnvironment(cfService.Environment.Values)
+	if err != nil {
+		return nil, err
+	}
+	service.Environment = environment
+
+	return composeFileParsedService, nil
+}
+*/
