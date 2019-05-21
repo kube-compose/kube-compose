@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"text/template"
@@ -17,45 +16,45 @@ func newGetCli() *cobra.Command {
 		Use:   "get",
 		Short: "Show details of a specific resource",
 		Long:  "Print a detailed description of the selected resources, including related resources such as hostname or host IP.",
-		Run:   getCommand,
+		RunE:  getCommand,
 	}
 	getCmd.PersistentFlags().StringP("format", "", "", "Return specified format")
 	return getCmd
 }
 
-// TODO: If no service is specified then it should iterate through all services in the docker-compsoe
+// TODO: If no service is specified then it should iterate through all services in the docker-compose
 // https://github.com/jbrekelmans/kube-compose/issues/126
-func getCommand(cmd *cobra.Command, args []string) {
+func getCommand(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
-		log.Fatal("No Args Provided")
+		return fmt.Errorf("no args provided")
 	}
 	cfg, err := getCommandConfig(cmd, args)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	var format string
 	if cmd.Flags().Changed("format") {
 		format, err = cmd.Flags().GetString("format")
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 	}
 	service := cfg.FindServiceByName(args[0])
 	if service == nil {
-		log.Fatalf("no service named %#v exists", args[0])
+		return fmt.Errorf("no service named %#v exists", args[0])
 	}
 	result, err := details.GetServiceDetails(cfg, service)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	if format != "" {
 		tmpl, err := template.New(args[0]).Parse(format)
 		if err != nil {
-			panic(err)
+			return err
 		}
 		err = tmpl.Execute(os.Stdout, result)
 		if err != nil {
-			panic(err)
+			return err
 		}
 	} else {
 		output := util.FormatTable([][]string{
@@ -64,4 +63,5 @@ func getCommand(cmd *cobra.Command, args []string) {
 		})
 		fmt.Print(output)
 	}
+	return nil
 }

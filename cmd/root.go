@@ -1,9 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -15,12 +12,9 @@ var rootCmd = &cobra.Command{
 	Version: "0.3.0",
 }
 
-func Execute() {
+func Execute() error {
 	rootCmd.AddCommand(newDownCli(), newUpCli(), newGetCli())
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	return rootCmd.Execute()
 }
 
 // This method is generated when cobra is initialized.
