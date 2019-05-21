@@ -5,32 +5,25 @@ import (
 	"github.com/spf13/viper"
 )
 
-var rootCmd = &cobra.Command{
-	Use:     "kube-compose",
-	Short:   "k8s",
-	Long:    "Environments on k8s made easy",
-	Version: "0.3.0",
-}
-
 func Execute() error {
-	rootCmd.AddCommand(newDownCli(), newUpCli(), newGetCli())
-	return rootCmd.Execute()
-}
-
-// This method is generated when cobra is initialized.
-// Flags and configuration settings are meant to be
-// configured here.
-// nolint
-func init() {
 	viper.SetEnvPrefix("kubecompose")
-	namespace := new(string)
-	rootCmd.PersistentFlags().StringVarP(namespace, "namespace", "n", "", "namespace for environment")
-	rootCmd.PersistentFlags().StringP("file", "f", "", "Specify an alternate compose file")
 	envID := new(string)
+	namespace := new(string)
+
+	rootCmd := &cobra.Command{
+		Use:     "kube-compose",
+		Short:   "k8s",
+		Long:    "Environments on k8s made easy",
+		Version: "0.3.0",
+	}
+
+	rootCmd.AddCommand(newDownCli(), newUpCli(), newGetCli())
+	rootCmd.PersistentFlags().StringP("file", "f", "", "Specify an alternate compose file")
 	rootCmd.PersistentFlags().StringVarP(envID, "env-id", "e", "", "used to isolate environments deployed to a shared namespace, "+
 		"by (1) using this value as a suffix of pod and service names and (2) using this value to isolate selectors. Either this flag or "+
 		"the environment variable KUBECOMPOSE_ENVID must be set")
 	viper.AutomaticEnv()
+
 	if *namespace == "" && viper.GetString("namespace") != "" {
 		// check if environment variable is set
 		*namespace = viper.GetString("namespace")
@@ -42,4 +35,5 @@ func init() {
 	} else {
 		_ = rootCmd.MarkPersistentFlagRequired("env-id")
 	}
+	return rootCmd.Execute()
 }
