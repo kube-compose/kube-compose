@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/jbrekelmans/kube-compose/pkg/config"
 	"github.com/pkg/errors"
@@ -42,7 +43,39 @@ func getFileFlag(cmd *cobra.Command) (*string, error) {
 	return file, nil
 }
 
+func getEnvIDFlag(cmd *cobra.Command) (string, error) {
+	var envID string
+	var exists bool
+	if !cmd.Flags().Changed("env-id") {
+		envID, exists = os.LookupEnv("KUBECOMPOSE_ENVID")
+		if !exists {
+			return "", fmt.Errorf("either the flag --env-id or the environment variable KUBECOMPOSE_ENVID must be set")
+		}
+		return envID, nil
+	}
+	envID, _ = cmd.Flags().GetString("env-id")
+	return envID, nil
+}
+
+func getNamespaceFlag(cmd *cobra.Command) (string, bool) {
+	var namespace string
+	var exists bool
+	if !cmd.Flags().Changed("namespace") {
+		namespace, exists = os.LookupEnv("KUBECOMPOSE_NAMESPACE")
+		if !exists {
+			return "", false
+		}
+		return namespace, true
+	}
+	namespace, _ = cmd.Flags().GetString("namespace")
+	return namespace, false
+}
+
 func getCommandConfig(cmd *cobra.Command, args []string) (*config.Config, error) {
+	envID, err := getEnvIDFlag(cmd)
+	if err != nil {
+		return nil, err
+	}
 	file, err := getFileFlag(cmd)
 	if err != nil {
 		return nil, err
@@ -51,12 +84,11 @@ func getCommandConfig(cmd *cobra.Command, args []string) (*config.Config, error)
 	if err != nil {
 		return nil, err
 	}
-	err = setFromKubeConfig(cfg)
-	if err != nil {
+	if err := setFromKubeConfig(cfg); err != nil {
 		return nil, err
 	}
-	cfg.EnvironmentID, _ = cmd.Flags().GetString("env-id")
-	if namespace, _ := cmd.Flags().GetString("namespace"); namespace != "" {
+	cfg.EnvironmentID = envID
+	if namespace, exists := getNamespaceFlag(cmd); exists {
 		cfg.Namespace = namespace
 	}
 	if len(args) == 0 {
