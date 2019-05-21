@@ -44,7 +44,7 @@ func TestGetEnvIDFlag_FlagIsSet(t *testing.T) {
 	withMockedEnv(map[string]string{}, func() {
 		cmd := &cobra.Command{}
 		setRootCommandFlags(cmd)
-		cmd.ParseFlags([]string{"--env-id", "123"})
+		_ = cmd.ParseFlags([]string{"--" + envIDFlagName, "123"})
 		key, err := getEnvIDFlag(cmd)
 		if key != "123" || err != nil {
 			t.Fail()
@@ -78,7 +78,7 @@ func TestGetNamespaceFlag_FlagIsSet(t *testing.T) {
 	withMockedEnv(map[string]string{}, func() {
 		cmd := &cobra.Command{}
 		setRootCommandFlags(cmd)
-		cmd.ParseFlags([]string{"--namespace", "test"})
+		_ = cmd.ParseFlags([]string{"--" + namespaceFlagName, "test"})
 		key, exists := getNamespaceFlag(cmd)
 		if key != "test" || exists != true {
 			t.Fail()
