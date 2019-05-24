@@ -768,20 +768,27 @@ func TestParseComposeFileService_InvalidHealthcheckError(t *testing.T) {
 	}
 }
 
-func TestParseComposeFileService_InvalidEnvironmentError(t *testing.T) {
+func TestParseComposeFile_InvalidEnvironmentError(t *testing.T) {
 	c := newTestConfigLoader(nil)
-	cfService := &composeFileService{
-		Environment: environment{
-			Values: []environmentNameValuePair{
-				{
-					Name: "",
+	cf := &composeFile{
+		Services: map[string]*composeFileService{
+			"service1": {
+				Environment: environment{
+					Values: []environmentNameValuePair{
+						{
+							Name: "",
+						},
+					},
 				},
 			},
 		},
 	}
-	_, err := c.parseComposeFileService(cfService)
+	cfParsed := &composeFileParsed{}
+	err := c.parseComposeFile(cf, cfParsed)
 	if err == nil {
 		t.Fail()
+	} else {
+		t.Log(err)
 	}
 }
 
