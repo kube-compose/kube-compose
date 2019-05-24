@@ -1,7 +1,14 @@
 package main
 
-import "github.com/jbrekelmans/kube-compose/cmd"
+import (
+	"log"
+
+	"github.com/jbrekelmans/kube-compose/cmd"
+)
 
 func main() {
-	cmd.Execute()
+	err := cmd.Execute()
+	if err != nil {
+		log.Fatal(err)
+	}
 }

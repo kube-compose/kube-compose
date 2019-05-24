@@ -50,6 +50,7 @@ services:
       timeout: 5s
       retries: 5
     user: root
-# x-kube-compose:
-#   push_images:
-#     docker_registry: 'localhost:5000'
+
+x-kube-compose:
+  push_images:
+    docker_registry: 'localhost:5000'
