@@ -14,6 +14,7 @@ const testDockerComposeYmlIOError = "docker-compose.io-error.yaml"
 const testDockerComposeYmlInvalidVersion = "docker-compose.invalid-version.yml"
 const testDockerComposeYmlInterpolationIssue = "docker-compose.interpolation-issue.yml"
 const testDockerComposeYmlDecodeIssue = "docker-compose.decode-issue.yml"
+const testDockerComposeYmlExtends = "docker-compose.extends.yml"
 const testDockerComposeYmlExtendsCycle = "docker-compose.extends-cycle.yml"
 
 var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
@@ -40,6 +41,22 @@ services:
 services:
   testservice:
     environment: 3
+`),
+	},
+	testDockerComposeYmlExtends: {
+		Content: []byte(`version: '2'
+services:
+  service1:
+    environment:
+      KEY1: VALUE1
+    extends:
+      service: service2
+  service2:
+    environment:
+      KEY2: VALUE2
+    extends:
+      file: '` + testDockerComposeYml + `'
+      service: testservice
 `),
 	},
 	testDockerComposeYmlExtendsCycle: {
@@ -196,6 +213,20 @@ func assertComposeFileServicesEqual(t *testing.T, services1, services2 map[strin
 	}
 }
 
+func assertServiceMapsEqual(t *testing.T, services1, services2 map[string]*Service) {
+	if len(services1) != len(services2) {
+		t.Fail()
+	}
+	for name, service1 := range services1 {
+		service2 := services2[name]
+		if service2 == nil {
+			t.Fail()
+		} else {
+			assertServicesEqual(t, service1, service2)
+		}
+	}
+}
+
 func assertServicesEqual(t *testing.T, service1, service2 *Service) {
 	if service1.Restart != service2.Restart {
 		t.Fail()
@@ -215,8 +246,31 @@ func assertServicesEqual(t *testing.T, service1, service2 *Service) {
 	assertServicesEqualContinued(t, service1, service2)
 }
 
+func portsIsSubsetOf(ports1, ports2 []PortBinding) bool {
+	for _, port1 := range ports1 {
+		found := false
+		for _, port2 := range ports2 {
+			if port1 == port2 {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+func arePortsEqual(ports1, ports2 []PortBinding) bool {
+	if len(ports1) != len(ports2) {
+		return false
+	}
+	return portsIsSubsetOf(ports1, ports2) && portsIsSubsetOf(ports2, ports1)
+}
+
 func assertServicesEqualContinued(t *testing.T, service1, service2 *Service) {
-	if !reflect.DeepEqual(service1.Ports, service2.Ports) {
+	if !arePortsEqual(service1.Ports, service2.Ports) {
 		t.Logf("ports1: %+v\n", service1.Ports)
 		t.Logf("ports2: %+v\n", service2.Ports)
 		t.Fail()
@@ -333,6 +387,28 @@ func TestNew_Success(t *testing.T) {
 		_, err := New([]string{})
 		if err != nil {
 			t.Error(err)
+		}
+	})
+}
+func TestNew_ExtendsSuccess(t *testing.T) {
+	withMockFS(func() {
+		c, err := New([]string{testDockerComposeYmlExtends})
+		if err != nil {
+			t.Error(err)
+		} else {
+			assertServiceMapsEqual(t, c.Services, map[string]*Service{
+				"service1": &Service{
+					Environment: map[string]string{
+						"KEY1": "VALUE1",
+						"KEY2": "VALUE2",
+					},
+				},
+				"service2": &Service{
+					Environment: map[string]string{
+						"KEY2": "VALUE2",
+					},
+				},
+			})
 		}
 	})
 }
