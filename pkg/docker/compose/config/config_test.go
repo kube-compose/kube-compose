@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/pkg/errors"
 	fsPackage "github.com/jbrekelmans/kube-compose/internal/pkg/fs"
+	"github.com/pkg/errors"
 )
 
 const testDockerComposeYml1 = "docker-compose.yml"
