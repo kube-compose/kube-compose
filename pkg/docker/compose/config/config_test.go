@@ -4,7 +4,34 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	fsPackage "github.com/jbrekelmans/kube-compose/internal/pkg/fs"
 )
+
+var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
+	"docker-compose.yml": {
+		Content: []byte(`audit-service:
+  image: ubuntu:latest
+`),
+	},
+})
+
+func withMockFS(cb func()) {
+	fsOld := fs
+	defer func() {
+		fs = fsOld
+	}()
+	fs = mockFileSystem
+	cb()
+}
+
+func newTestConfigLoader(env map[string]string) *configLoader {
+	c := &configLoader{
+		environmentGetter:     mapValueGetter(env),
+		loadResolvedFileCache: map[string]*loadResolvedFileCacheItem{},
+	}
+	return c
+}
 
 func TestConfigLoaderParseEnvironment_Success(t *testing.T) {
 	name1 := "CFGLOADER_PARSEENV_VAR1"
@@ -42,12 +69,9 @@ func TestConfigLoaderParseEnvironment_Success(t *testing.T) {
 			Name: "CFGLOADER_PARSEENV_VAR6",
 		},
 	}
-	m := map[string]string{
+	c := newTestConfigLoader(map[string]string{
 		name1: value1,
-	}
-	c := &configLoader{
-		environmentGetter: mapValueGetter(m),
-	}
+	})
 	output, err := c.parseEnvironment(input)
 	if err != nil {
 		t.Error(err)
@@ -67,14 +91,47 @@ func TestConfigLoaderParseEnvironment_InvalidName(t *testing.T) {
 			Name: "",
 		},
 	}
-	m := map[string]string{}
-	c := &configLoader{
-		environmentGetter: mapValueGetter(m),
-	}
+	c := newTestConfigLoader(nil)
 	_, err := c.parseEnvironment(input)
 	if err == nil {
 		t.Fail()
 	}
+}
+
+func TestConfigLoaderLoadFile(t *testing.T) {
+	withMockFS(func() {
+		c := newTestConfigLoader(nil)
+		cfParsed, err := c.loadFile("docker-compose.yml")
+		if err != nil {
+			t.Fail()
+		} else {
+			if !cfParsed.version.Equal(v1) {
+				t.Fail()
+			}
+			if len(cfParsed.services) != 1 {
+				t.Fail()
+			}
+			if !reflect.DeepEqual(cfParsed.xProperties, map[string]interface{}{}) {
+				t.Fail()
+			}
+			if cfParsed.resolvedFile != "docker-compose.yml" {
+				t.Fail() 
+			}
+			for name, cfServiceParsed := range cfParsed.services {
+				if name != "audit-service" {
+					t.Fail()
+				}
+				if cfServiceParsed.dependsOn != nil || cfServiceParsed.extends != nil {
+					t.Fail()
+				}
+				if cfServiceParsed.service == nil || !reflect.DeepEqual(*cfServiceParsed.service, Service{
+					Image: "ubuntu:latest",
+				}) {
+					t.Fail()
+				}
+			}
+		}
+	})
 }
 
 func TestComposeFileParsedServiceClearRecStack_Success(t *testing.T) {
@@ -94,10 +151,7 @@ func TestLoadFileError_Success(t *testing.T) {
 }
 
 func TestParseComposeFileService_InvalidPortsError(t *testing.T) {
-	m := map[string]string{}
-	c := &configLoader{
-		environmentGetter: mapValueGetter(m),
-	}
+	c := newTestConfigLoader(nil)
 	cfService := &composeFileService{
 		Ports: []port{
 			{
@@ -112,10 +166,7 @@ func TestParseComposeFileService_InvalidPortsError(t *testing.T) {
 }
 
 func TestParseComposeFileService_InvalidHealthcheckError(t *testing.T) {
-	m := map[string]string{}
-	c := &configLoader{
-		environmentGetter: mapValueGetter(m),
-	}
+	c := newTestConfigLoader(nil)
 	cfService := &composeFileService{
 		Healthcheck: &ServiceHealthcheck{
 			Timeout: new(string),

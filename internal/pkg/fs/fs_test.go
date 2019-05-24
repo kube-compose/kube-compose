@@ -21,8 +21,12 @@ func Test_OSFileSystem_Open(t *testing.T) {
 	}
 }
 
+func Test_OSFileSystem_EvalSymlinks(t *testing.T) {
+	_, _ = OSFileSystem().EvalSymlinks("")
+}
+
 func Test_MockFileSystem_Open_ENOENT(t *testing.T) {
-	fs := MockFileSystem(map[string][]byte{})
+	fs := MockFileSystem(map[string]MockFile{})
 	file, err := fs.Open("")
 	if file != nil {
 		defer file.Close()
@@ -33,8 +37,8 @@ func Test_MockFileSystem_Open_ENOENT(t *testing.T) {
 }
 func Test_MockFileSystem(t *testing.T) {
 	dataExpected := []byte("root:x:0:")
-	fs := MockFileSystem(map[string][]byte{
-		"/passwd": dataExpected,
+	fs := MockFileSystem(map[string]MockFile{
+		"/passwd": { Content: dataExpected },
 	})
 	file, err := fs.Open("/passwd")
 	if file != nil {

@@ -7,28 +7,31 @@ import (
 	fsPackage "github.com/jbrekelmans/kube-compose/internal/pkg/fs"
 )
 
-var mockFileSystem = fsPackage.MockFileSystem(map[string][]byte{
-	"/passwd": []byte("root:x:0:"),
+var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
+	"/passwd": { Content: []byte("root:x:0:") },
 })
 
-func TestFindUserInPasswd_Success(t *testing.T) {
+func withMockFS(cb func()) {
 	fsOld := fs
 	defer func() {
 		fs = fsOld
 	}()
 	fs = mockFileSystem
-	_, _ = FindUserInPasswd("/passwd", "")
+	cb()
+}
+
+func TestFindUserInPasswd_Success(t *testing.T) {
+	withMockFS(func() {
+		_, _ = FindUserInPasswd("/passwd", "")
+	})
 }
 func TestFindUserInPasswd_ENOENT(t *testing.T) {
-	fsOld := fs
-	defer func() {
-		fs = fsOld
-	}()
-	fs = mockFileSystem
-	_, err := FindUserInPasswd("", "")
-	if err == nil {
-		t.Fail()
-	}
+	withMockFS(func() {
+		_, err := FindUserInPasswd("", "")
+		if err == nil {
+			t.Fail()
+		}
+	})
 }
 
 func TestFindUserInPasswdReader_Success(t *testing.T) {

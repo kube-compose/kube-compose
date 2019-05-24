@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	version "github.com/hashicorp/go-version"
+	fsPackage "github.com/jbrekelmans/kube-compose/internal/pkg/fs"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 	"github.com/pkg/errors"
 	"github.com/uber-go/mapdecode"
@@ -16,6 +17,7 @@ import (
 )
 
 var (
+	fs   = fsPackage.OSFileSystem()
 	v1   = version.Must(version.NewVersion("1"))
 	v2_1 = version.Must(version.NewVersion("2.1"))
 	v3_1 = version.Must(version.NewVersion("3.1"))
@@ -101,7 +103,7 @@ func loadFileError(file string, err error) error {
 // loadFile loads the specified file. If the file has already been loaded then a cache lookup is performed.
 // If file is relative then it is interpreted relative to the current working directory.
 func (c *configLoader) loadFile(file string) (*composeFileParsed, error) {
-	resolvedFile, err := filepath.EvalSymlinks(file)
+	resolvedFile, err := fs.EvalSymlinks(file)
 	if err != nil {
 		return nil, loadFileError(file, err)
 	}
@@ -201,10 +203,10 @@ func (c *configLoader) loadResolvedFileCore(resolvedFile string, cfParsed *compo
 // loadStandardFile loads the docker compose file at a standard location.
 func (c *configLoader) loadStandardFile() (*composeFileParsed, error) {
 	file := "docker-compose.yml"
-	resolvedFile, err := filepath.EvalSymlinks(file)
+	resolvedFile, err := fs.EvalSymlinks(file)
 	if os.IsNotExist(err) {
 		file = "docker-compose.yaml"
-		resolvedFile, err = filepath.EvalSymlinks(file)
+		resolvedFile, err = fs.EvalSymlinks(file)
 	}
 	if err == nil {
 		return c.loadResolvedFile(resolvedFile)

@@ -4,23 +4,29 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"path/filepath"
 )
 
-// File is an abstraction of os.File to improve testability of code.
-type File interface {
+// FileDescriptor is an abstraction of os.File to improve testability of code.
+type FileDescriptor interface {
 	io.ReadCloser
 }
 
 // FileSystem is an abstraction of the file system to improve testability of code.
 type FileSystem interface {
-	Open(name string) (File, error)
+	EvalSymlinks(path string) (string, error)
+	Open(name string) (FileDescriptor, error)
 }
 
 type osFileSystem struct {
 }
 
-func (fs *osFileSystem) Open(name string) (File, error) {
+func (fs *osFileSystem) Open(name string) (FileDescriptor, error) {
 	return os.Open(name)
+}
+
+func (fs *osFileSystem) EvalSymlinks(path string) (string, error) {
+	return filepath.EvalSymlinks(path)
 }
 
 var osfs FileSystem = &osFileSystem{}
@@ -31,33 +37,53 @@ func OSFileSystem() FileSystem {
 }
 
 type mockFileSystem struct {
-	data map[string][]byte
+	data map[string]MockFile
 }
 
-func MockFileSystem(data map[string][]byte) FileSystem {
+// MockFile represents a file in a mock file system. If Error is set then all file system operations will produce an error when this file
+// is accessed, otherwise Content is the content of the file.
+type MockFile struct {
+	Content []byte
+	Error   error
+}
+
+// MockFileSystem creates a mock file system based on the provided data.
+func MockFileSystem(data map[string]MockFile) FileSystem {
 	return &mockFileSystem{
 		data: data,
 	}
 }
 
-type mockFile struct {
+type mockFileDescriptor struct {
 	reader *bytes.Reader
 }
 
-func (r *mockFile) Read(b []byte) (n int, err error) {
+func (r *mockFileDescriptor) Read(b []byte) (n int, err error) {
 	return r.reader.Read(b)
 }
 
-func (r *mockFile) Close() error {
+func (r *mockFileDescriptor) Close() error {
 	return nil
 }
 
-func (fs *mockFileSystem) Open(name string) (File, error) {
-	data, ok := fs.data[name]
+func (fs *mockFileSystem) Open(name string) (FileDescriptor, error) {
+	mockFile, ok := fs.data[name]
 	if !ok {
 		return nil, os.ErrNotExist
 	}
-	return &mockFile{
-		reader: bytes.NewReader(data),
+	if mockFile.Error != nil {
+		return nil, mockFile.Error
+	}
+	return &mockFileDescriptor{
+		reader: bytes.NewReader(mockFile.Content),
 	}, nil
+}
+
+func (fs *mockFileSystem) EvalSymlinks(path string) (string, error) {
+	mockFile, ok := fs.data[path]
+	if ok && mockFile.Error != nil {
+		return "", mockFile.Error
+	}
+	// Symbolic links are not supported in the mock file system.
+	return path, nil
 }
