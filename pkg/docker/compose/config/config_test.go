@@ -206,15 +206,19 @@ func assertServicesEqual(t *testing.T, service1, service2 *Service) {
 	if (service1.User != service2.User) || (service1.User != nil && *service1.User != *service2.User) {
 		t.Fail()
 	}
-	if !reflect.DeepEqual(service1.Ports, service2.Ports) {
-		t.Logf("ports1: %+v\n", service1.Ports)
-		t.Logf("ports2: %+v\n", service2.Ports)
-		t.Fail()
-	}
 	if service1.HealthcheckDisabled != service2.HealthcheckDisabled {
 		t.Fail()
 	}
 	if service1.Healthcheck != nil || service2.Healthcheck != nil {
+		t.Fail()
+	}
+	assertServicesEqualContinued(t, service1, service2)
+}
+
+func assertServicesEqualContinued(t *testing.T, service1, service2 *Service) {
+	if !reflect.DeepEqual(service1.Ports, service2.Ports) {
+		t.Logf("ports1: %+v\n", service1.Ports)
+		t.Logf("ports2: %+v\n", service2.Ports)
 		t.Fail()
 	}
 	if !reflect.DeepEqual(service1.Environment, service2.Environment) {
@@ -344,7 +348,6 @@ func TestNew_StandardFileError(t *testing.T) {
 		t.Fail()
 	}
 }
-
 
 func TestGetVersion_Default(t *testing.T) {
 	m := genericMap{}
