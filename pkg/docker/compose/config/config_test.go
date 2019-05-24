@@ -156,18 +156,95 @@ func TestConfigLoaderLoadFile_Success(t *testing.T) {
 			if !cfParsed.version.Equal(v1) {
 				t.Fail()
 			}
-			if !reflect.DeepEqual(cfParsed.xProperties, map[string]interface{}{}) {
+			if len(cfParsed.xProperties) != 0 {
 				t.Fail()
 			}
-			assertComposeFileParsedServicesEqual(t, cfParsed.services, map[string]*composeFileParsedService{
-				"audit-service": {
+			expected := map[string]*composeFileParsedService{
+				"testservice": &composeFileParsedService{
+					dependsOn: map[string]ServiceHealthiness{},
 					service: &Service{
-						Image: "ubuntu:latest",
+						DependsOn:   map[*Service]ServiceHealthiness{},
+						Entrypoint:  []string{},
+						Environment: map[string]string{},
+						Image:       "ubuntu:latest",
+						Ports:       []PortBinding{},
 					},
 				},
-			})
+			}
+			assertComposeFileServicesEqual(t, cfParsed.services, expected)
 		}
 	})
+}
+
+func assertComposeFileServicesEqual(t *testing.T, services1, services2 map[string]*composeFileParsedService) {
+	if len(services1) != len(services2) {
+		t.Fail()
+	}
+	for name, service1 := range services1 {
+		service2 := services2[name]
+		if service2 == nil {
+			t.Fail()
+		} else {
+			if len(service1.dependsOn) > 0 || len(service2.dependsOn) > 0 {
+				t.Fail()
+			}
+			if service1.extends != nil || service2.extends != nil {
+				t.Fail()
+			}
+			assertServicesEqual(t, service1.service, service2.service)
+		}
+	}
+}
+
+func assertServicesEqual(t *testing.T, service1 *Service, service2 *Service) {
+	if service1.Restart != service2.Restart {
+		t.Fail()
+	}
+	if service1.WorkingDir != service2.WorkingDir {
+		t.Fail()
+	}
+	if (service1.User != service2.User) || (service1.User != nil && *service1.User != *service2.User) {
+		t.Fail()
+	}
+	if !reflect.DeepEqual(service1.Ports, service2.Ports) {
+		t.Logf("ports1: %+v\n", service1.Ports)
+		t.Logf("ports2: %+v\n", service2.Ports)
+		t.Fail()
+	}
+	if service1.HealthcheckDisabled != service2.HealthcheckDisabled {
+		t.Fail()
+	}
+	if service1.Healthcheck != nil || service2.Healthcheck != nil {
+		t.Fail()
+	}
+	if !reflect.DeepEqual(service1.Environment, service2.Environment) {
+		t.Logf("env1: %+v\n", service1.Environment)
+		t.Logf("env2: %+v\n", service2.Environment)
+		t.Fail()
+	}
+	if !areStringSlicesEqual(service1.Entrypoint, service2.Entrypoint) {
+		t.Logf("entrypoint1: %+v\n", service1.Entrypoint)
+		t.Logf("entrypoint2: %+v\n", service2.Entrypoint)
+		t.Fail()
+	}
+	if len(service1.DependsOn) > 0 || len(service2.DependsOn) > 0 {
+		t.Logf("dependsOn1: %+v\n", service1.DependsOn)
+		t.Logf("dependsOn2: %+v\n", service2.DependsOn)
+		t.Fail()
+	}
+}
+
+func areStringSlicesEqual(slice1 []string, slice2 []string) bool {
+	n := len(slice1)
+	if n != len(slice2) {
+		return false
+	}
+	for i := 0 ; i < n ; i++ {
+		if slice1[i] != slice2[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func TestConfigLoaderLoadFile_Error(t *testing.T) {
@@ -314,33 +391,6 @@ func TestGetVersion_Success(t *testing.T) {
 	}
 }
 
-func assertComposeFileParsedServicesEqual(t *testing.T, services1, services2 map[string]*composeFileParsedService) {
-	if len(services1) != len(services2) {
-		t.Fail()
-	}
-	for name, cfServiceParsed1 := range services1 {
-		cfServiceParsed2 := services2[name]
-		if cfServiceParsed2 == nil {
-			t.Fail()
-		} else {
-			// Comparing the depends on is not implemented in this assert function.
-			if cfServiceParsed1.dependsOn != nil || cfServiceParsed2.dependsOn != nil {
-				t.Fail()
-			}
-			if cfServiceParsed1.extends != cfServiceParsed2.extends {
-				t.Fail()
-			}
-			if cfServiceParsed1.service == nil {
-				if cfServiceParsed2.service != nil {
-					t.Fail()
-				}
-			} else if !reflect.DeepEqual(*cfServiceParsed1.service, *cfServiceParsed2.service) {
-				t.Fail()
-			}
-		}
-	}
-}
-
 func TestComposeFileParsedServiceClearRecStack_Success(t *testing.T) {
 	s := &composeFileParsedService{}
 	s.recStack = true
@@ -433,10 +483,13 @@ func TestGetXProperties_Success(t *testing.T) {
 		key1: val1,
 		key2: val2,
 	})
-	if !reflect.DeepEqual(v, map[string]interface{}{
-		key1: val1,
-		key2: val2,
-	}) {
+	if len(v) != 2 {
+		t.Fail()
+	}
+	if v[key1] != val1 {
+		t.Fail()
+	}
+	if v[key2] != val2 {
 		t.Fail()
 	}
 }

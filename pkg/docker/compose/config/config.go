@@ -175,13 +175,19 @@ func (c *configLoader) loadResolvedFileCore(resolvedFile string, cfParsed *compo
 		return err
 	}
 
-	// extract x- properties
-	cfParsed.xProperties = getXProperties(dataMap)
-
 	// Substitute variables with environment variables.
 	err = InterpolateConfig(dataMap, c.environmentGetter, cfParsed.version)
 	if err != nil {
 		return err
+	}
+
+	if !cfParsed.version.Equal(v1) {
+		// extract x- properties
+		cfParsed.xProperties = getXProperties(dataMap)
+	} else {
+		dataMap = map[interface{}]interface{}{
+			"services": dataMap,
+		}
 	}
 
 	// mapdecode based on docker compose file schema
