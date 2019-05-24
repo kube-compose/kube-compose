@@ -68,11 +68,10 @@ func New(file *string) (*Config, error) {
 	cfg.dockerComposeServices = dcCfg.Services
 	cfg.Services = map[*dockerComposeConfig.Service]*Service{}
 	for name, dcService := range dcCfg.Services {
-		nameEscaped := util.EscapeName(name)
 		service := &Service{
 			DockerComposeService: dcService,
 			Name:                 name,
-			NameEscaped:          nameEscaped,
+			NameEscaped:          util.EscapeName(name),
 		}
 		for _, portBinding := range dcService.Ports {
 			service.Ports = append(service.Ports, Port{
