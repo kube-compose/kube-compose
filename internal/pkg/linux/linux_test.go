@@ -8,7 +8,7 @@ import (
 )
 
 var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
-	"/passwd": { Content: []byte("root:x:0:") },
+	"/passwd": {Content: []byte("root:x:0:")},
 })
 
 func withMockFS(cb func()) {

@@ -38,7 +38,7 @@ func Test_MockFileSystem_Open_ENOENT(t *testing.T) {
 func Test_MockFileSystem(t *testing.T) {
 	dataExpected := []byte("root:x:0:")
 	fs := MockFileSystem(map[string]MockFile{
-		"/passwd": { Content: dataExpected },
+		"/passwd": {Content: dataExpected},
 	})
 	file, err := fs.Open("/passwd")
 	if file != nil {

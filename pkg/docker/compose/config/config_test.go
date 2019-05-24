@@ -8,8 +8,10 @@ import (
 	fsPackage "github.com/jbrekelmans/kube-compose/internal/pkg/fs"
 )
 
+const testDockerComposeYml = "docker-compose.yml"
+
 var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
-	"docker-compose.yml": {
+	testDockerComposeYml: {
 		Content: []byte(`audit-service:
   image: ubuntu:latest
 `),
@@ -101,37 +103,52 @@ func TestConfigLoaderParseEnvironment_InvalidName(t *testing.T) {
 func TestConfigLoaderLoadFile(t *testing.T) {
 	withMockFS(func() {
 		c := newTestConfigLoader(nil)
-		cfParsed, err := c.loadFile("docker-compose.yml")
+		cfParsed, err := c.loadFile(testDockerComposeYml)
 		if err != nil {
 			t.Fail()
 		} else {
 			if !cfParsed.version.Equal(v1) {
 				t.Fail()
 			}
-			if len(cfParsed.services) != 1 {
-				t.Fail()
-			}
 			if !reflect.DeepEqual(cfParsed.xProperties, map[string]interface{}{}) {
 				t.Fail()
 			}
-			if cfParsed.resolvedFile != "docker-compose.yml" {
-				t.Fail() 
-			}
-			for name, cfServiceParsed := range cfParsed.services {
-				if name != "audit-service" {
-					t.Fail()
-				}
-				if cfServiceParsed.dependsOn != nil || cfServiceParsed.extends != nil {
-					t.Fail()
-				}
-				if cfServiceParsed.service == nil || !reflect.DeepEqual(*cfServiceParsed.service, Service{
-					Image: "ubuntu:latest",
-				}) {
-					t.Fail()
-				}
-			}
+			assertComposeFileParsedServicesEqual(t, cfParsed.services, map[string]*composeFileParsedService{
+				"audit-service": {
+					service: &Service{
+						Image: "ubuntu:latest",
+					},
+				},
+			})
 		}
 	})
+}
+
+func assertComposeFileParsedServicesEqual(t *testing.T, services1, services2 map[string]*composeFileParsedService) {
+	if len(services1) != len(services2) {
+		t.Fail()
+	}
+	for name, cfServiceParsed1 := range services1 {
+		cfServiceParsed2 := services2[name]
+		if cfServiceParsed2 == nil {
+			t.Fail()
+		} else {
+			// Comparing the depends on is not implemented in this assert function.
+			if cfServiceParsed1.dependsOn != nil || cfServiceParsed2.dependsOn != nil {
+				t.Fail()
+			}
+			if cfServiceParsed1.extends != cfServiceParsed2.extends {
+				t.Fail()
+			}
+			if cfServiceParsed1.service == nil {
+				if cfServiceParsed2.service != nil {
+					t.Fail()
+				}
+			} else if !reflect.DeepEqual(*cfServiceParsed1.service, *cfServiceParsed2.service) {
+				t.Fail()
+			}
+		}
+	}
 }
 
 func TestComposeFileParsedServiceClearRecStack_Success(t *testing.T) {
