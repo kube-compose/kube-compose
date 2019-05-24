@@ -5,16 +5,25 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/pkg/errors"
 	fsPackage "github.com/jbrekelmans/kube-compose/internal/pkg/fs"
 )
 
-const testDockerComposeYml = "docker-compose.yml"
+const testDockerComposeYml1 = "docker-compose.yml"
+const testDockerComposeYml2 = "docker-compose.yaml"
+const testDockerComposeYmlInvalidVersion = "docker-compose.invalid-version.yml"
 
 var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
-	testDockerComposeYml: {
+	testDockerComposeYml1: {
 		Content: []byte(`audit-service:
   image: ubuntu:latest
 `),
+	},
+	testDockerComposeYml2: {
+		Error: errors.New("unknown error"),
+	},
+	testDockerComposeYmlInvalidVersion: {
+		Content: []byte("version: ''"),
 	},
 })
 
@@ -100,12 +109,12 @@ func TestConfigLoaderParseEnvironment_InvalidName(t *testing.T) {
 	}
 }
 
-func TestConfigLoaderLoadFile(t *testing.T) {
+func TestConfigLoaderLoadFile_Success(t *testing.T) {
 	withMockFS(func() {
 		c := newTestConfigLoader(nil)
-		cfParsed, err := c.loadFile(testDockerComposeYml)
+		cfParsed, err := c.loadFile(testDockerComposeYml1)
 		if err != nil {
-			t.Fail()
+			t.Error(err)
 		} else {
 			if !cfParsed.version.Equal(v1) {
 				t.Fail()
@@ -122,6 +131,97 @@ func TestConfigLoaderLoadFile(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestConfigLoaderLoadFile_Error(t *testing.T) {
+	withMockFS(func() {
+		c := newTestConfigLoader(nil)
+		_, err := c.loadFile(testDockerComposeYml2)
+		if err == nil {
+			t.Fail()
+		}
+	})
+}
+
+func TestConfigLoaderLoadResolvedFile_Caching(t *testing.T) {
+	withMockFS(func() {
+		c := newTestConfigLoader(nil)
+		cfParsed1, err := c.loadResolvedFile(testDockerComposeYml1)
+		if err != nil {
+			t.Error(err)
+		}
+		cfParsed2, err := c.loadResolvedFile(testDockerComposeYml1)
+		if err != nil {
+			t.Error(err)
+		}
+		if cfParsed1 != cfParsed2 {
+			t.Fail()
+		}
+	})
+}
+
+func TestConfigLoaderLoadResolvedFile_OpenFileError(t *testing.T) {
+	withMockFS(func() {
+		c := newTestConfigLoader(nil)
+		_, err := c.loadResolvedFile(testDockerComposeYml2)
+		if err == nil {
+			t.Fail()
+		}
+	})
+}
+
+func TestConfigLoaderLoadResolvedFile_VersionError(t *testing.T) {
+	withMockFS(func() {
+		c := newTestConfigLoader(nil)
+		_, err := c.loadResolvedFile(testDockerComposeYmlInvalidVersion)
+		if err == nil {
+			t.Fail()
+		}
+	})
+}
+
+func TestGetVersion_Default(t *testing.T) {
+	m := genericMap{}
+	v, err := getVersion(m)
+	if err != nil {
+		t.Error(err)
+	}
+	if v == nil || !v.Equal(v1) {
+		t.Fail()
+	}
+}
+
+func TestGetVersion_FormatError(t *testing.T) {
+	m := genericMap{
+		"version": "",
+	}
+	_, err := getVersion(m)
+	if err == nil {
+		t.Fail()
+	}
+}
+
+func TestGetVersion_TypeError(t *testing.T) {
+	m := genericMap{
+		"version": 0,
+	}
+	_, err := getVersion(m)
+	if err == nil {
+		t.Fail()
+	}
+}
+
+func TestGetVersion_Success(t *testing.T) {
+	m := genericMap{
+		"version": "1.0",
+	}
+	v, err := getVersion(m)
+	if err != nil {
+		t.Error(err)
+	}
+	if v == nil || !v.Equal(v1) {
+		t.Fail()
+	}
 }
 
 func assertComposeFileParsedServicesEqual(t *testing.T, services1, services2 map[string]*composeFileParsedService) {
