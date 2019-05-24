@@ -237,10 +237,11 @@ func TestConfigLoaderLoadResolvedFile_DecodeError(t *testing.T) {
 	})
 }
 
-func TestConfigLoaderLoadFile_ExtendsCycle(t *testing.T) {
+func TestNew_ExtendsCycle(t *testing.T) {
 	withMockFS(func() {
-		c := newTestConfigLoader(nil)
-		_, err := c.loadResolvedFile(testDockerComposeYmlExtendsCycle)
+		_, err := New([]string{
+			testDockerComposeYmlExtendsCycle,
+		})
 		if err == nil {
 			t.Fail()
 		}
@@ -356,6 +357,20 @@ func TestLoadFileError_Success(t *testing.T) {
 	}
 }
 
+func TestParseComposeFile_InvalidServiceNameError(t *testing.T) {
+	c := newTestConfigLoader(nil)
+	cfParsed := &composeFileParsed{}
+	cf := &composeFile{
+		Services: map[string]*composeFileService{
+			"!!": &composeFileService{},
+		},
+	}
+	err := c.parseComposeFile(cf, cfParsed)
+	if err == nil {
+		t.Fail()
+	}
+}
+
 func TestParseComposeFileService_InvalidPortsError(t *testing.T) {
 	c := newTestConfigLoader(nil)
 	cfService := &composeFileService{
@@ -398,6 +413,30 @@ func TestParseComposeFileService_InvalidEnvironmentError(t *testing.T) {
 	}
 	_, err := c.parseComposeFileService(cfService)
 	if err == nil {
+		t.Fail()
+	}
+}
+
+func TestGetXProperties_NotGenericMap(t *testing.T) {
+	v := getXProperties("")
+	if v != nil {
+		t.Fail()
+	}
+}
+
+func TestGetXProperties_Success(t *testing.T) {
+	key1 := "x-key1"
+	val1 := "val1"
+	key2 := "x-key2"
+	val2 := "val2"
+	v := getXProperties(genericMap{
+	  key1: val1,
+		key2: val2,
+	})
+	if !reflect.DeepEqual(v, map[string]interface{}{
+		key1: val1,
+		key2: val2,
+	}) {
 		t.Fail()
 	}
 }
