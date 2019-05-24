@@ -100,7 +100,7 @@ func TestParseComposeFileService_InvalidPortsError(t *testing.T) {
 	}
 	cfService := &composeFileService{
 		Ports: []port{
-			port{
+			{
 				Value: "asdf",
 			},
 		},
