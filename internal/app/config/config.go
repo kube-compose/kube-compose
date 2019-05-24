@@ -7,8 +7,8 @@ import (
 	dockerComposeConfig "github.com/jbrekelmans/kube-compose/pkg/docker/compose/config"
 	"github.com/pkg/errors"
 	"github.com/uber-go/mapdecode"
-	"k8s.io/client-go/rest"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/client-go/rest"
 )
 
 type PushImagesConfig struct {
