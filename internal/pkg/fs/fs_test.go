@@ -63,7 +63,6 @@ func Test_MockFileSystem(t *testing.T) {
 	}
 }
 
-
 func Test_MockFileSystem_Stat(t *testing.T) {
 	dataExpected := []byte("root:x:0:")
 	fs := MockFileSystem(map[string]MockFile{

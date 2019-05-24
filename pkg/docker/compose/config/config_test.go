@@ -160,7 +160,7 @@ func TestConfigLoaderLoadFile_Success(t *testing.T) {
 				t.Fail()
 			}
 			expected := map[string]*composeFileParsedService{
-				"testservice": &composeFileParsedService{
+				"testservice": {
 					dependsOn: map[string]ServiceHealthiness{},
 					service: &Service{
 						DependsOn:   map[*Service]ServiceHealthiness{},
@@ -196,7 +196,7 @@ func assertComposeFileServicesEqual(t *testing.T, services1, services2 map[strin
 	}
 }
 
-func assertServicesEqual(t *testing.T, service1 *Service, service2 *Service) {
+func assertServicesEqual(t *testing.T, service1, service2 *Service) {
 	if service1.Restart != service2.Restart {
 		t.Fail()
 	}
@@ -234,12 +234,12 @@ func assertServicesEqual(t *testing.T, service1 *Service, service2 *Service) {
 	}
 }
 
-func areStringSlicesEqual(slice1 []string, slice2 []string) bool {
+func areStringSlicesEqual(slice1, slice2 []string) bool {
 	n := len(slice1)
 	if n != len(slice2) {
 		return false
 	}
-	for i := 0 ; i < n ; i++ {
+	for i := 0; i < n; i++ {
 		if slice1[i] != slice2[i] {
 			return false
 		}
