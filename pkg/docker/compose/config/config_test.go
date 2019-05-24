@@ -29,14 +29,16 @@ var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
 	},
 	testDockerComposeYmlInterpolationIssue: {
 		Content: []byte(`version: '2'
-testservice:
-  image: '$'
+services:
+  testservice:
+    image: '$'
 `),
 	},
 	testDockerComposeYmlDecodeIssue: {
 		Content: []byte(`version: '2'
-testservice:
-  environment: 3
+services:
+  testservice:
+    environment: 3
 `),
 	},
 })
