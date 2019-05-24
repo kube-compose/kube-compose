@@ -16,6 +16,10 @@ const testDockerComposeYmlInterpolationIssue = "docker-compose.interpolation-iss
 const testDockerComposeYmlDecodeIssue = "docker-compose.decode-issue.yml"
 const testDockerComposeYmlExtends = "docker-compose.extends.yml"
 const testDockerComposeYmlExtendsCycle = "docker-compose.extends-cycle.yml"
+const testDockerComposeYmlExtendsIOError = "docker-compose.extends-io-error.yml"
+const testDockerComposeYmlExtendsDoesNotExist = "docker-compose.extends-does-not-exist.yml"
+const testDockerComposeYmlExtendsDoesNotExistFile = "docker-compose.extends-does-not-exist-file.yml"
+const testDockerComposeYmlExtendsInvalidDependsOn = "docker-compose.extends-invalid-depends-on.yml"
 
 var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
 	testDockerComposeYml: {
@@ -56,7 +60,7 @@ services:
       KEY2: VALUE2
     extends:
       file: '` + testDockerComposeYml + `'
-			service: testservice
+      service: testservice
   service3:
     extends:
       file: '` + testDockerComposeYml + `'
@@ -75,6 +79,45 @@ services:
   service3:
     extends:
       service: service2
+`),
+	},
+	testDockerComposeYmlExtendsIOError: {
+		Content: []byte(`version: '2'
+services:
+  service1:
+    environment:
+      KEY2: VALUE2
+    extends:
+      file: '` + testDockerComposeYmlIOError + `'
+      service: testservice
+`),
+	},
+	testDockerComposeYmlExtendsDoesNotExist: {
+		Content: []byte(`version: '2'
+services:
+  service1:
+    extends:
+      service: service2
+`),
+	},
+	testDockerComposeYmlExtendsDoesNotExistFile: {
+		Content: []byte(`version: '2'
+services:
+  service1:
+    extends:
+      file: '` + testDockerComposeYml + `'
+      service: service2
+`),
+	},
+	testDockerComposeYmlExtendsInvalidDependsOn: {
+		Content: []byte(`version: '2'
+services:
+  service1:
+    extends:
+      service: service2
+  service2:
+    depends_on:
+    - service1
 `),
 	},
 })
@@ -279,7 +322,7 @@ func assertServicesEqualContinued(t *testing.T, service1, service2 *Service) {
 		t.Logf("ports2: %+v\n", service2.Ports)
 		t.Fail()
 	}
-	if !reflect.DeepEqual(service1.Environment, service2.Environment) {
+	if !areStringMapsEqual(service1.Environment, service2.Environment) {
 		t.Logf("env1: %+v\n", service1.Environment)
 		t.Logf("env2: %+v\n", service2.Environment)
 		t.Fail()
@@ -294,6 +337,19 @@ func assertServicesEqualContinued(t *testing.T, service1, service2 *Service) {
 		t.Logf("dependsOn2: %+v\n", service2.DependsOn)
 		t.Fail()
 	}
+}
+
+func areStringMapsEqual(m1 map[string]string, m2 map[string]string) bool {
+	if len(m1) != len(m2) {
+		return false
+	}
+	for key, value1 := range m1 {
+		value2, ok := m2[key]
+		if !ok || value1 != value2 {
+			return false
+		}
+	}
+	return true
 }
 
 func areStringSlicesEqual(slice1, slice2 []string) bool {
@@ -383,17 +439,12 @@ func TestNew_ExtendsCycle(t *testing.T) {
 		})
 		if err == nil {
 			t.Fail()
+		} else {
+			t.Log(err)
 		}
 	})
 }
-func TestNew_Success(t *testing.T) {
-	withMockFS(func() {
-		_, err := New([]string{})
-		if err != nil {
-			t.Error(err)
-		}
-	})
-}
+
 func TestNew_ExtendsSuccess(t *testing.T) {
 	withMockFS(func() {
 		c, err := New([]string{testDockerComposeYmlExtends})
@@ -412,16 +463,61 @@ func TestNew_ExtendsSuccess(t *testing.T) {
 						"KEY2": "VALUE2",
 					},
 				},
-				"service3": &Service{
-					Environment: map[string]string{
-						"KEY2": "VALUE2",
-					},
-				},
+				"service3": &Service{},
 			})
 		}
 	})
 }
 
+func TestNew_ExtendsIOError(t *testing.T) {
+	withMockFS(func() {
+		_, err := New([]string{testDockerComposeYmlExtendsIOError})
+		if err == nil {
+			t.Fail()
+		} else {
+			t.Log(err)
+		}
+	})
+}
+func TestNew_ExtendsDoesNotExist(t *testing.T) {
+	withMockFS(func() {
+		_, err := New([]string{testDockerComposeYmlExtendsDoesNotExist})
+		if err == nil {
+			t.Fail()
+		} else {
+			t.Log(err)
+		}
+	})
+}
+func TestNew_ExtendsDoesNotExistFile(t *testing.T) {
+	withMockFS(func() {
+		_, err := New([]string{testDockerComposeYmlExtendsDoesNotExistFile})
+		if err == nil {
+			t.Fail()
+		} else {
+			t.Log(err)
+		}
+	})
+}
+func TestNew_ExtendsInvalidDependsOn(t *testing.T) {
+	withMockFS(func() {
+		_, err := New([]string{testDockerComposeYmlExtendsInvalidDependsOn})
+		if err == nil {
+			t.Fail()
+		} else {
+			t.Log(err)
+		}
+	})
+}
+
+func TestNew_Success(t *testing.T) {
+	withMockFS(func() {
+		_, err := New([]string{})
+		if err != nil {
+			t.Error(err)
+		}
+	})
+}
 func TestNew_StandardFileError(t *testing.T) {
 	fsOld := fs
 	defer func() {
