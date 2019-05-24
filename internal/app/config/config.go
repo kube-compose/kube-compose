@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/uber-go/mapdecode"
 	"k8s.io/client-go/rest"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 type PushImagesConfig struct {
@@ -68,6 +69,9 @@ func New(file *string) (*Config, error) {
 	cfg.dockerComposeServices = dcCfg.Services
 	cfg.Services = map[*dockerComposeConfig.Service]*Service{}
 	for name, dcService := range dcCfg.Services {
+		if e := validation.IsDNS1123Subdomain(name); len(e) > 0 {
+			return nil, fmt.Errorf("sorry, we do not support the potentially valid docker-compose service named %s: %s", name, e[0])
+		}
 		service := &Service{
 			DockerComposeService: dcService,
 			Name:                 name,

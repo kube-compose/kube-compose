@@ -13,7 +13,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/uber-go/mapdecode"
 	yaml "gopkg.in/yaml.v2"
-	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 var (
@@ -414,9 +413,6 @@ func ensureNoDependsOnCycle(name1 string, cfServiceParsed *composeFileParsedServ
 func (c *configLoader) parseComposeFile(cf *composeFile, cfParsed *composeFileParsed) error {
 	cfParsed.services = make(map[string]*composeFileParsedService, len(cf.Services))
 	for name, cfService := range cf.Services {
-		if e := validation.IsDNS1123Subdomain(name); len(e) > 0 {
-			return fmt.Errorf("sorry, we do not support the potentially valid docker-compose service named %s: %s", name, e[0])
-		}
 		composeFileParsedService, err := c.parseComposeFileService(cfService)
 		if err != nil {
 			return err

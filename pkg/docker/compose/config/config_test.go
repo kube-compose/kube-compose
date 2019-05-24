@@ -56,6 +56,10 @@ services:
       KEY2: VALUE2
     extends:
       file: '` + testDockerComposeYml + `'
+			service: testservice
+  service3:
+    extends:
+      file: '` + testDockerComposeYml + `'
       service: testservice
 `),
 	},
@@ -408,6 +412,11 @@ func TestNew_ExtendsSuccess(t *testing.T) {
 						"KEY2": "VALUE2",
 					},
 				},
+				"service3": &Service{
+					Environment: map[string]string{
+						"KEY2": "VALUE2",
+					},
+				},
 			})
 		}
 	})
@@ -480,20 +489,6 @@ func TestComposeFileParsedServiceClearRecStack_Success(t *testing.T) {
 
 func TestLoadFileError_Success(t *testing.T) {
 	err := loadFileError("some file", fmt.Errorf("an error occured"))
-	if err == nil {
-		t.Fail()
-	}
-}
-
-func TestParseComposeFile_InvalidServiceNameError(t *testing.T) {
-	c := newTestConfigLoader(nil)
-	cfParsed := &composeFileParsed{}
-	cf := &composeFile{
-		Services: map[string]*composeFileService{
-			"!!": {},
-		},
-	}
-	err := c.parseComposeFile(cf, cfParsed)
 	if err == nil {
 		t.Fail()
 	}
