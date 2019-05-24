@@ -9,21 +9,41 @@ import (
 	"github.com/pkg/errors"
 )
 
-const testDockerComposeYml1 = "docker-compose.yml"
-const testDockerComposeYml2 = "docker-compose.yaml"
+const testDockerComposeYml = "docker-compose.yaml"
+const testDockerComposeYmlIOError = "docker-compose.io-error.yaml"
 const testDockerComposeYmlInvalidVersion = "docker-compose.invalid-version.yml"
+const testDockerComposeYmlInterpolationIssue = "docker-compose.interpolation-issue.yml"
+const testDockerComposeYmlDecodeIssue = "docker-compose.decode-issue.yml"
 
 var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
-	testDockerComposeYml1: {
-		Content: []byte(`audit-service:
+	testDockerComposeYml: {
+		Content: []byte(`testservice:
   image: ubuntu:latest
 `),
 	},
-	testDockerComposeYml2: {
-		Error: errors.New("unknown error"),
+	testDockerComposeYmlIOError: {
+		Error: errors.New("unknown error 1"),
 	},
 	testDockerComposeYmlInvalidVersion: {
 		Content: []byte("version: ''"),
+	},
+	testDockerComposeYmlInterpolationIssue: {
+		Content: []byte(`version: '2'
+testservice:
+  image: '$'
+`),
+	},
+	testDockerComposeYmlDecodeIssue: {
+		Content: []byte(`version: '2'
+testservice:
+  environment: 3
+`),
+	},
+})
+
+var mockFileSystemStandardFileError = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
+	"docker-compose.yml": {
+		Error: errors.New("unknown error 2"),
 	},
 })
 
@@ -112,7 +132,7 @@ func TestConfigLoaderParseEnvironment_InvalidName(t *testing.T) {
 func TestConfigLoaderLoadFile_Success(t *testing.T) {
 	withMockFS(func() {
 		c := newTestConfigLoader(nil)
-		cfParsed, err := c.loadFile(testDockerComposeYml1)
+		cfParsed, err := c.loadFile(testDockerComposeYml)
 		if err != nil {
 			t.Error(err)
 		} else {
@@ -136,7 +156,7 @@ func TestConfigLoaderLoadFile_Success(t *testing.T) {
 func TestConfigLoaderLoadFile_Error(t *testing.T) {
 	withMockFS(func() {
 		c := newTestConfigLoader(nil)
-		_, err := c.loadFile(testDockerComposeYml2)
+		_, err := c.loadFile(testDockerComposeYmlIOError)
 		if err == nil {
 			t.Fail()
 		}
@@ -146,11 +166,11 @@ func TestConfigLoaderLoadFile_Error(t *testing.T) {
 func TestConfigLoaderLoadResolvedFile_Caching(t *testing.T) {
 	withMockFS(func() {
 		c := newTestConfigLoader(nil)
-		cfParsed1, err := c.loadResolvedFile(testDockerComposeYml1)
+		cfParsed1, err := c.loadResolvedFile(testDockerComposeYml)
 		if err != nil {
 			t.Error(err)
 		}
-		cfParsed2, err := c.loadResolvedFile(testDockerComposeYml1)
+		cfParsed2, err := c.loadResolvedFile(testDockerComposeYml)
 		if err != nil {
 			t.Error(err)
 		}
@@ -163,7 +183,7 @@ func TestConfigLoaderLoadResolvedFile_Caching(t *testing.T) {
 func TestConfigLoaderLoadResolvedFile_OpenFileError(t *testing.T) {
 	withMockFS(func() {
 		c := newTestConfigLoader(nil)
-		_, err := c.loadResolvedFile(testDockerComposeYml2)
+		_, err := c.loadResolvedFile(testDockerComposeYmlIOError)
 		if err == nil {
 			t.Fail()
 		}
@@ -178,6 +198,48 @@ func TestConfigLoaderLoadResolvedFile_VersionError(t *testing.T) {
 			t.Fail()
 		}
 	})
+}
+
+func TestConfigLoaderLoadResolvedFile_InterpolationError(t *testing.T) {
+	withMockFS(func() {
+		c := newTestConfigLoader(nil)
+		_, err := c.loadResolvedFile(testDockerComposeYmlInterpolationIssue)
+		if err == nil {
+			t.Fail()
+		}
+	})
+}
+
+func TestConfigLoaderLoadResolvedFile_DecodeError(t *testing.T) {
+	withMockFS(func() {
+		c := newTestConfigLoader(nil)
+		_, err := c.loadResolvedFile(testDockerComposeYmlDecodeIssue)
+		if err == nil {
+			t.Fail()
+		}
+	})
+}
+
+func TestConfigLoaderLoadStandardFile_Success(t *testing.T) {
+	withMockFS(func() {
+		c := newTestConfigLoader(nil)
+		_, err := c.loadStandardFile()
+		if err != nil {
+			t.Error(err)
+		}
+	})
+}
+func TestConfigLoaderLoadStandardFile_Error(t *testing.T) {
+	fsOld := fs
+	defer func(){
+		fs = fsOld
+	}()
+	fs = mockFileSystemStandardFileError
+	c := newTestConfigLoader(nil)
+	_, err := c.loadStandardFile()
+	if err == nil {
+		t.Fail()
+	}
 }
 
 func TestGetVersion_Default(t *testing.T) {
@@ -296,41 +358,19 @@ func TestParseComposeFileService_InvalidHealthcheckError(t *testing.T) {
 	}
 }
 
-/*
-
-func (c *configLoader) parseComposeFileService(cfService *composeFileService) (*composeFileParsedService, error) {
-	service := &Service{
-		Entrypoint: cfService.Entrypoint.Values,
-		Image:      cfService.Image,
-		User:       cfService.User,
-		WorkingDir: cfService.WorkingDir,
-		Restart:    cfService.Restart,
+func TestParseComposeFileService_InvalidEnvironmentError(t *testing.T) {
+	c := newTestConfigLoader(nil)
+	cfService := &composeFileService{
+		Environment: environment{
+			Values: []environmentNameValuePair{
+				{
+					Name: "",
+				},
+			},
+		},
 	}
-	composeFileParsedService := &composeFileParsedService{
-		service: service,
+	_, err := c.parseComposeFileService(cfService)
+	if err == nil {
+		t.Fail()
 	}
-	if cfService.DependsOn != nil {
-		composeFileParsedService.dependsOn = cfService.DependsOn.Values
-	}
-	ports, err := parsePorts(cfService.Ports)
-	if err != nil {
-		return nil, err
-	}
-	service.Ports = ports
-
-	healthcheck, healthcheckDisabled, err := ParseHealthcheck(cfService.Healthcheck)
-	if err != nil {
-		return nil, err
-	}
-	service.Healthcheck = healthcheck
-	service.HealthcheckDisabled = healthcheckDisabled
-
-	environment, err := c.parseEnvironment(cfService.Environment.Values)
-	if err != nil {
-		return nil, err
-	}
-	service.Environment = environment
-
-	return composeFileParsedService, nil
 }
-*/

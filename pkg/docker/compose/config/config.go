@@ -146,7 +146,7 @@ func (c *configLoader) loadResolvedFile(resolvedFile string) (*composeFileParsed
 
 // loadYamlFileAsGenericMap is a helper used to YAML decode a file into a map[interface{}]interface{}.
 func loadYamlFileAsGenericMap(file string) (genericMap, error) {
-	reader, err := os.Open(file)
+	reader, err := fs.Open(file)
 	if err != nil {
 		return nil, err
 	}
@@ -192,12 +192,7 @@ func (c *configLoader) loadResolvedFileCore(resolvedFile string, cfParsed *compo
 	}
 
 	// validation after parsing
-	err = c.parseComposeFile(&cf, cfParsed)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return c.parseComposeFile(&cf, cfParsed)
 }
 
 // loadStandardFile loads the docker compose file at a standard location.
