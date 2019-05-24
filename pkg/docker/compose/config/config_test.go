@@ -20,6 +20,9 @@ const testDockerComposeYmlExtendsIOError = "docker-compose.extends-io-error.yml"
 const testDockerComposeYmlExtendsDoesNotExist = "docker-compose.extends-does-not-exist.yml"
 const testDockerComposeYmlExtendsDoesNotExistFile = "docker-compose.extends-does-not-exist-file.yml"
 const testDockerComposeYmlExtendsInvalidDependsOn = "docker-compose.extends-invalid-depends-on.yml"
+const testDockerComposeYmlDependsOnDoesNotExist = "docker-compose.depends-on-does-not-exist.yml"
+const testDockerComposeYmlDependsOnCycle = "docker-compose.depends-on-cycle.yml"
+const testDockerComposeYmlDependsOn = "docker-compose.depends-on.yml"
 
 var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
 	testDockerComposeYml: {
@@ -34,21 +37,21 @@ var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
 		Content: []byte("version: ''"),
 	},
 	testDockerComposeYmlInterpolationIssue: {
-		Content: []byte(`version: '2'
+		Content: []byte(`version: '2.3'
 services:
   testservice:
     image: '$'
 `),
 	},
 	testDockerComposeYmlDecodeIssue: {
-		Content: []byte(`version: '2'
+		Content: []byte(`version: '2.3'
 services:
   testservice:
     environment: 3
 `),
 	},
 	testDockerComposeYmlExtends: {
-		Content: []byte(`version: '2'
+		Content: []byte(`version: '2.3'
 services:
   service1:
     environment:
@@ -68,7 +71,7 @@ services:
 `),
 	},
 	testDockerComposeYmlExtendsCycle: {
-		Content: []byte(`version: '2'
+		Content: []byte(`version: '2.3'
 services:
   service1:
     extends:
@@ -82,7 +85,7 @@ services:
 `),
 	},
 	testDockerComposeYmlExtendsIOError: {
-		Content: []byte(`version: '2'
+		Content: []byte(`version: '2.3'
 services:
   service1:
     environment:
@@ -93,7 +96,7 @@ services:
 `),
 	},
 	testDockerComposeYmlExtendsDoesNotExist: {
-		Content: []byte(`version: '2'
+		Content: []byte(`version: '2.3'
 services:
   service1:
     extends:
@@ -101,7 +104,7 @@ services:
 `),
 	},
 	testDockerComposeYmlExtendsDoesNotExistFile: {
-		Content: []byte(`version: '2'
+		Content: []byte(`version: '2.3'
 services:
   service1:
     extends:
@@ -110,7 +113,7 @@ services:
 `),
 	},
 	testDockerComposeYmlExtendsInvalidDependsOn: {
-		Content: []byte(`version: '2'
+		Content: []byte(`version: '2.3'
 services:
   service1:
     extends:
@@ -118,6 +121,38 @@ services:
   service2:
     depends_on:
     - service1
+`),
+	},
+	testDockerComposeYmlDependsOnDoesNotExist: {
+		Content: []byte(`version: '2.3'
+services:
+  service1:
+    depends_on:
+    - service2
+`),
+	},
+	testDockerComposeYmlDependsOnCycle: {
+		Content: []byte(`version: '2.3'
+services:
+  service1:
+    depends_on:
+    - service2
+  service2:
+    depends_on:
+    - service1
+`),
+	},
+	testDockerComposeYmlDependsOn: {
+		Content: []byte(`version: '2.3'
+services:
+  service1:
+    depends_on:
+    - service2
+  service2:
+    depends_on:
+      service3:
+        condition: service_healthy
+  service3: {}
 `),
 	},
 })
@@ -255,7 +290,7 @@ func assertComposeFileServicesEqual(t *testing.T, services1, services2 map[strin
 			if service1.extends != nil || service2.extends != nil {
 				t.Fail()
 			}
-			assertServicesEqual(t, service1.service, service2.service)
+			assertServicesEqual(t, service1.service, service2.service, true)
 		}
 	}
 }
@@ -269,12 +304,49 @@ func assertServiceMapsEqual(t *testing.T, services1, services2 map[string]*Servi
 		if service2 == nil {
 			t.Fail()
 		} else {
-			assertServicesEqual(t, service1, service2)
+			assertServicesEqual(t, service1, service2, true)
+			if !areDependsOnMapsEqual(services1, services2, name) {
+				t.Logf("dependsOn1: %+v\n", service1.DependsOn)
+				t.Logf("dependsOn2: %+v\n", service2.DependsOn)
+				t.Fail()
+			}
 		}
 	}
 }
 
-func assertServicesEqual(t *testing.T, service1, service2 *Service) {
+func buildNameMap(services map[string]*Service) map[*Service]string {
+	names := map[*Service]string{}
+	for name, service := range services {
+		if _, ok := names[service]; ok {
+			panic(errors.New("invalid services map"))
+		}
+		names[service] = name
+	}
+	return names
+}
+
+func areDependsOnMapsEqual(services1, services2 map[string]*Service, name string) bool {
+	dependsOn1 := services1[name].DependsOn
+	dependsOn2 := services2[name].DependsOn
+	if len(dependsOn1) != len(dependsOn2) {
+		return false
+	}
+	names1 := buildNameMap(services1)
+	for service1, healthiness1 := range dependsOn1 {
+		name = names1[service1]
+		service2 := services2[name]
+		if service2 == nil {
+			return false
+		}
+		healthiness2, ok := dependsOn2[service2]
+		if !ok || healthiness1 != healthiness2 {
+			return false
+		}
+	}
+	return true
+}
+
+func assertServicesEqual(t *testing.T, service1, service2 *Service, ignoreDependsOn bool) {
 	if service1.Restart != service2.Restart {
 		t.Fail()
 	}
@@ -290,7 +362,7 @@ func assertServicesEqual(t *testing.T, service1, service2 *Service) {
 	if service1.Healthcheck != nil || service2.Healthcheck != nil {
 		t.Fail()
 	}
-	assertServicesEqualContinued(t, service1, service2)
+	assertServicesEqualContinued(t, service1, service2, ignoreDependsOn)
 }
 
 func portsIsSubsetOf(ports1, ports2 []PortBinding) bool {
@@ -316,7 +388,7 @@ func arePortsEqual(ports1, ports2 []PortBinding) bool {
 	return portsIsSubsetOf(ports1, ports2) && portsIsSubsetOf(ports2, ports1)
 }
 
-func assertServicesEqualContinued(t *testing.T, service1, service2 *Service) {
+func assertServicesEqualContinued(t *testing.T, service1, service2 *Service, ignoreDependsOn bool) {
 	if !arePortsEqual(service1.Ports, service2.Ports) {
 		t.Logf("ports1: %+v\n", service1.Ports)
 		t.Logf("ports2: %+v\n", service2.Ports)
@@ -332,7 +404,7 @@ func assertServicesEqualContinued(t *testing.T, service1, service2 *Service) {
 		t.Logf("entrypoint2: %+v\n", service2.Entrypoint)
 		t.Fail()
 	}
-	if len(service1.DependsOn) > 0 || len(service2.DependsOn) > 0 {
+	if !ignoreDependsOn && (len(service1.DependsOn) > 0 || len(service2.DependsOn) > 0) {
 		t.Logf("dependsOn1: %+v\n", service1.DependsOn)
 		t.Logf("dependsOn2: %+v\n", service2.DependsOn)
 		t.Fail()
@@ -432,6 +504,83 @@ func TestConfigLoaderLoadResolvedFile_DecodeError(t *testing.T) {
 	})
 }
 
+func TestNew_DependsOnDoesNotExist(t *testing.T) {
+	withMockFS(func() {
+		_, err := New([]string{
+			testDockerComposeYmlDependsOnDoesNotExist,
+		})
+		if err == nil {
+			t.Fail()
+		} else {
+			t.Log(err)
+		}
+	})
+}
+func TestNew_DependsOnCycle(t *testing.T) {
+	withMockFS(func() {
+		_, err := New([]string{
+			testDockerComposeYmlDependsOnCycle,
+		})
+		if err == nil {
+			t.Fail()
+		} else {
+			t.Log(err)
+		}
+	})
+}
+func TestNew_DependsOn(t *testing.T) {
+	withMockFS(func() {
+		c, err := New([]string{
+			testDockerComposeYmlDependsOn,
+		})
+		if err != nil {
+			t.Error(err)
+		} else {
+			service1 := &Service{}
+			service2 := &Service{}
+			service3 := &Service{}
+			service1.DependsOn = map[*Service]ServiceHealthiness{
+				service2: ServiceStarted,
+			}
+			service2.DependsOn = map[*Service]ServiceHealthiness{
+				service3: ServiceHealthy,
+			}
+			assertServiceMapsEqual(t, c.Services, map[string]*Service{
+				"service1": service1,
+				"service2": service2,
+				"service3": service3,
+			})
+		}
+	})
+}
+
+func TestNew_IOError(t *testing.T) {
+	withMockFS(func() {
+		_, err := New([]string{
+			testDockerComposeYmlIOError,
+		})
+		if err == nil {
+			t.Fail()
+		} else {
+			t.Log(err)
+		}
+	})
+}
+
+func TestNew_MultipleFiles(t *testing.T) {
+	withMockFS(func() {
+		_, err := New([]string{
+			testDockerComposeYml,
+			testDockerComposeYmlExtends,
+		})
+		if err == nil {
+			t.Fail()
+		} else {
+			t.Log(err)
+		}
+	})
+}
+
 func TestNew_ExtendsCycle(t *testing.T) {
 	withMockFS(func() {
 		_, err := New([]string{
@@ -452,18 +601,18 @@ func TestNew_ExtendsSuccess(t *testing.T) {
 			t.Error(err)
 		} else {
 			assertServiceMapsEqual(t, c.Services, map[string]*Service{
-				"service1": &Service{
+				"service1": {
 					Environment: map[string]string{
 						"KEY1": "VALUE1",
 						"KEY2": "VALUE2",
 					},
 				},
-				"service2": &Service{
+				"service2": {
 					Environment: map[string]string{
 						"KEY2": "VALUE2",
 					},
 				},
-				"service3": &Service{},
+				"service3": {},
 			})
 		}
 	})
