@@ -362,7 +362,7 @@ func TestParseComposeFile_InvalidServiceNameError(t *testing.T) {
 	cfParsed := &composeFileParsed{}
 	cf := &composeFile{
 		Services: map[string]*composeFileService{
-			"!!": &composeFileService{},
+			"!!": {},
 		},
 	}
 	err := c.parseComposeFile(cf, cfParsed)
@@ -430,7 +430,7 @@ func TestGetXProperties_Success(t *testing.T) {
 	key2 := "x-key2"
 	val2 := "val2"
 	v := getXProperties(genericMap{
-	  key1: val1,
+		key1: val1,
 		key2: val2,
 	})
 	if !reflect.DeepEqual(v, map[string]interface{}{
