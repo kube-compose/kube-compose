@@ -433,6 +433,7 @@ func (c *configLoader) parseComposeFileService(cfService *composeFileService) (*
 	}
 	composeFileParsedService := &composeFileParsedService{
 		service: service,
+		extends: cfService.Extends,
 	}
 	if cfService.DependsOn != nil {
 		composeFileParsedService.dependsOn = cfService.DependsOn.Values
