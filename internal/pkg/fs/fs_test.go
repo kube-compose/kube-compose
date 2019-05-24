@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+
+	"github.com/pkg/errors"
 )
 
 // The main criticism here is that we don't have to test os.Open, but we want 100% coverage.
@@ -63,10 +65,9 @@ func Test_MockFileSystem(t *testing.T) {
 	}
 }
 
-func Test_MockFileSystem_Stat(t *testing.T) {
-	dataExpected := []byte("root:x:0:")
+func Test_MockFileSystem_Stat_Success(t *testing.T) {
 	fs := MockFileSystem(map[string]MockFile{
-		"/passwd": {Content: dataExpected},
+		"/passwd": {Content: []byte("root:x:0:")},
 	})
 	fileInfo, err := fs.Stat("/passwd")
 	if err != nil {
@@ -84,4 +85,23 @@ func Test_MockFileSystem_Stat(t *testing.T) {
 	fileInfo.Sys()
 	fileInfo.ModTime()
 	fileInfo.Mode()
+}
+
+func Test_MockFileSystem_Stat_ENOENT(t *testing.T) {
+	fs := MockFileSystem(map[string]MockFile{})
+	_, err := fs.Stat("/passwd")
+	if err == nil || !os.IsNotExist(err) {
+		t.Fail()
+	}
+}
+
+func Test_MockFileSystem_Stat_Error(t *testing.T) {
+	errExpected := errors.New("unknown error 12")
+	fs := MockFileSystem(map[string]MockFile{
+		"/passwd": {Error: errExpected},
+	})
+	_, errActual := fs.Stat("/passwd")
+	if errActual != errExpected {
+		t.Fail()
+	}
 }

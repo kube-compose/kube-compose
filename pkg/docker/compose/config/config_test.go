@@ -45,15 +45,15 @@ services:
 	testDockerComposeYmlExtendsCycle: {
 		Content: []byte(`version: '2'
 services:
-	service1:
-		extends:
-			service: service2
-	service2:
-		extends:
-			service: service3
-	service3:
-		extends:
-			service: service2
+  service1:
+    extends:
+      service: service2
+  service2:
+    extends:
+      service: service3
+  service3:
+    extends:
+      service: service2
 `),
 	},
 })
@@ -324,28 +324,27 @@ func TestNew_ExtendsCycle(t *testing.T) {
 		}
 	})
 }
-
-func TestConfigLoaderLoadStandardFile_Success(t *testing.T) {
+func TestNew_Success(t *testing.T) {
 	withMockFS(func() {
-		c := newTestConfigLoader(nil)
-		_, err := c.loadStandardFile()
+		_, err := New([]string{})
 		if err != nil {
 			t.Error(err)
 		}
 	})
 }
-func TestConfigLoaderLoadStandardFile_Error(t *testing.T) {
+
+func TestNew_StandardFileError(t *testing.T) {
 	fsOld := fs
 	defer func() {
 		fs = fsOld
 	}()
 	fs = mockFileSystemStandardFileError
-	c := newTestConfigLoader(nil)
-	_, err := c.loadStandardFile()
+	_, err := New([]string{})
 	if err == nil {
 		t.Fail()
 	}
 }
+
 
 func TestGetVersion_Default(t *testing.T) {
 	m := genericMap{}
