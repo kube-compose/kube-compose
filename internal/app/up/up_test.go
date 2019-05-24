@@ -3,7 +3,7 @@ package up
 import (
 	"testing"
 
-	"github.com/jbrekelmans/kube-compose/pkg/config"
+	"github.com/jbrekelmans/kube-compose/internal/app/config"
 	dockerComposeConfig "github.com/jbrekelmans/kube-compose/pkg/docker/compose/config"
 )
 
