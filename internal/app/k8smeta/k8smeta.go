@@ -3,7 +3,7 @@ package k8smeta
 import (
 	"fmt"
 
-	"github.com/jbrekelmans/kube-compose/pkg/config"
+	"github.com/jbrekelmans/kube-compose/internal/app/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

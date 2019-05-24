@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jbrekelmans/kube-compose/pkg/config"
+	"github.com/jbrekelmans/kube-compose/internal/app/config"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 

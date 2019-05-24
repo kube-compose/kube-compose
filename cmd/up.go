@@ -3,7 +3,7 @@ package cmd
 import (
 	"context"
 
-	"github.com/jbrekelmans/kube-compose/pkg/up"
+	"github.com/jbrekelmans/kube-compose/internal/app/up"
 	"github.com/spf13/cobra"
 )
 
