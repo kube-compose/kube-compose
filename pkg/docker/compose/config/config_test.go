@@ -411,7 +411,7 @@ func assertServicesEqualContinued(t *testing.T, service1, service2 *Service, ign
 	}
 }
 
-func areStringMapsEqual(m1 map[string]string, m2 map[string]string) bool {
+func areStringMapsEqual(m1, m2 map[string]string) bool {
 	if len(m1) != len(m2) {
 		return false
 	}
