@@ -14,6 +14,7 @@ const testDockerComposeYmlIOError = "docker-compose.io-error.yaml"
 const testDockerComposeYmlInvalidVersion = "docker-compose.invalid-version.yml"
 const testDockerComposeYmlInterpolationIssue = "docker-compose.interpolation-issue.yml"
 const testDockerComposeYmlDecodeIssue = "docker-compose.decode-issue.yml"
+const testDockerComposeYmlExtendsCycle = "docker-compose.extends-cycle.yml"
 
 var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
 	testDockerComposeYml: {
@@ -39,6 +40,20 @@ services:
 services:
   testservice:
     environment: 3
+`),
+	},
+	testDockerComposeYmlExtendsCycle: {
+		Content: []byte(`version: '2'
+services:
+	service1:
+		extends:
+			service: service2
+	service2:
+		extends:
+			service: service3
+	service3:
+		extends:
+			service: service2
 `),
 	},
 })
@@ -216,6 +231,16 @@ func TestConfigLoaderLoadResolvedFile_DecodeError(t *testing.T) {
 	withMockFS(func() {
 		c := newTestConfigLoader(nil)
 		_, err := c.loadResolvedFile(testDockerComposeYmlDecodeIssue)
+		if err == nil {
+			t.Fail()
+		}
+	})
+}
+
+func TestConfigLoaderLoadFile_ExtendsCycle(t *testing.T) {
+	withMockFS(func() {
+		c := newTestConfigLoader(nil)
+		_, err := c.loadResolvedFile(testDockerComposeYmlExtendsCycle)
 		if err == nil {
 			t.Fail()
 		}
