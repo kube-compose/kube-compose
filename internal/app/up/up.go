@@ -2,7 +2,6 @@ package up
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -75,7 +74,6 @@ type upRunner struct {
 	appsToBeStarted       map[*app]bool
 	cfg                   *config.Config
 	completedChannels     []chan interface{}
-	ctx                   context.Context
 	dockerClient          *dockerClient.Client
 	k8sClientset          *kubernetes.Clientset
 	k8sServiceClient      clientV1.ServiceInterface
@@ -158,11 +156,11 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 			return fmt.Errorf("could not find image %#v locally, and building images is not supported", sourceImage)
 		}
 		var digest string
-		digest, err = pullImageWithLogging(u.ctx, u.dockerClient, app.name(), sourceImageRef.String())
+		digest, err = pullImageWithLogging(u.opts.Context, u.dockerClient, app.name(), sourceImageRef.String())
 		if err != nil {
 			return err
 		}
-		sourceImageID, podImage, err = resolveLocalImageAfterPull(u.ctx, u.dockerClient, sourceImageNamed, digest)
+		sourceImageID, podImage, err = resolveLocalImageAfterPull(u.opts.Context, u.dockerClient, sourceImageNamed, digest)
 		if err != nil {
 			return err
 		}
@@ -172,19 +170,19 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 		}
 		// len(podImage) > 0 by definition of resolveLocalImageAfterPull
 	}
-	inspect, inspectRaw, err := u.dockerClient.ImageInspectWithRaw(u.ctx, sourceImageID)
+	inspect, inspectRaw, err := u.dockerClient.ImageInspectWithRaw(u.opts.Context, sourceImageID)
 	if err != nil {
 		return err
 	}
 	if u.cfg.PushImages != nil {
 		destinationImage := fmt.Sprintf("%s/%s/%s", u.cfg.PushImages.DockerRegistry, u.cfg.Namespace, app.composeService.NameEscaped)
 		destinationImagePush := destinationImage + ":latest"
-		err = u.dockerClient.ImageTag(u.ctx, sourceImageID, destinationImagePush)
+		err = u.dockerClient.ImageTag(u.opts.Context, sourceImageID, destinationImagePush)
 		if err != nil {
 			return err
 		}
 		var digest string
-		digest, err = pushImageWithLogging(u.ctx, u.dockerClient, app.name(), destinationImagePush, u.cfg.KubeConfig.BearerToken)
+		digest, err = pushImageWithLogging(u.opts.Context, u.dockerClient, app.name(), destinationImagePush, u.cfg.KubeConfig.BearerToken)
 		if err != nil {
 			return err
 		}
@@ -221,7 +219,7 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 		if user.UID == nil || (user.Group != "" && user.GID == nil) {
 			// TODO https://github.com/jbrekelmans/kube-compose/issues/70 confirm whether docker and our pod spec will produce the same default
 			// group if a UID is set but no GID
-			err = getUserinfoFromImage(u.ctx, u.dockerClient, sourceImageID, user)
+			err = getUserinfoFromImage(u.opts.Context, u.dockerClient, sourceImageID, user)
 			if err != nil {
 				return errors.Wrap(err, fmt.Sprintf("error getting uid/gid from image %#v", sourceImage))
 			}
@@ -397,7 +395,7 @@ func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) 
 
 func (u *upRunner) initLocalImages() error {
 	u.localImagesCache.once.Do(func() {
-		imageSummarySlice, err := u.dockerClient.ImageList(u.ctx, dockerTypes.ImageListOptions{
+		imageSummarySlice, err := u.dockerClient.ImageList(u.opts.Context, dockerTypes.ImageListOptions{
 			All: true,
 		})
 		var imageIDSet *digestset.Set
@@ -808,11 +806,10 @@ func (u *upRunner) checkIfPodsReady() bool {
 }
 
 // Run runs an operation similar docker-compose up against a Kubernetes cluster.
-func Run(ctx context.Context, cfg *config.Config, opts *Options) error {
+func Run(cfg *config.Config, opts *Options) error {
 	// TODO https://github.com/jbrekelmans/kube-compose/issues/2 accept context as a parameter
 	u := &upRunner{
 		cfg:  cfg,
-		ctx:  context.Background(),
 		opts: opts,
 	}
 	u.hostAliases.once = &sync.Once{}

@@ -26,7 +26,8 @@ func upCommand(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	opts := &up.Options{}
+	opts.Context = context.Background()
 	opts.Detach, _ = cmd.Flags().GetBool("detach")
 	opts.RunAsUser, _ = cmd.Flags().GetBool("run-as-user")
-	return up.Run(context.Background(), cfg, opts)
+	return up.Run(cfg, opts)
 }
