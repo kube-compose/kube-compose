@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // FileDescriptor is an abstraction of os.File to improve testability of code.
@@ -16,17 +17,22 @@ type FileDescriptor interface {
 type FileSystem interface {
 	EvalSymlinks(path string) (string, error)
 	Open(name string) (FileDescriptor, error)
+	Stat(name string) (os.FileInfo, error)
 }
 
 type osFileSystem struct {
+}
+
+func (fs *osFileSystem) EvalSymlinks(path string) (string, error) {
+	return filepath.EvalSymlinks(path)
 }
 
 func (fs *osFileSystem) Open(name string) (FileDescriptor, error) {
 	return os.Open(name)
 }
 
-func (fs *osFileSystem) EvalSymlinks(path string) (string, error) {
-	return filepath.EvalSymlinks(path)
+func (fs *osFileSystem) Stat(name string) (os.FileInfo, error) {
+	return os.Stat(name)
 }
 
 var osfs FileSystem = &osFileSystem{}
@@ -66,6 +72,18 @@ func (r *mockFileDescriptor) Close() error {
 	return nil
 }
 
+func (fs *mockFileSystem) EvalSymlinks(path string) (string, error) {
+	mockFile, ok := fs.data[path]
+	if !ok {
+		return "", os.ErrNotExist
+	}
+	if mockFile.Error != nil {
+		return "", mockFile.Error
+	}
+	// Symbolic links are not supported in the mock file system.
+	return path, nil
+}
+
 func (fs *mockFileSystem) Open(name string) (FileDescriptor, error) {
 	mockFile, ok := fs.data[name]
 	if !ok {
@@ -79,11 +97,45 @@ func (fs *mockFileSystem) Open(name string) (FileDescriptor, error) {
 	}, nil
 }
 
-func (fs *mockFileSystem) EvalSymlinks(path string) (string, error) {
-	mockFile, ok := fs.data[path]
-	if ok && mockFile.Error != nil {
-		return "", mockFile.Error
+type mockFileInfo struct {
+	name string
+	size int64
+}
+
+func (fileInfo *mockFileInfo) IsDir() bool {
+	return false
+}
+
+func (fileInfo *mockFileInfo) Mode() os.FileMode {
+	return os.ModePerm
+}
+
+func (fileInfo *mockFileInfo) ModTime() time.Time {
+	return time.Now()
+}
+
+func (fileInfo *mockFileInfo) Name() string {
+	return fileInfo.name
+}
+
+func (fileInfo *mockFileInfo) Size() int64 {
+	return fileInfo.size
+}
+
+func (fileInfo *mockFileInfo) Sys() interface{} {
+	return nil
+}
+
+func (fs *mockFileSystem) Stat(name string) (os.FileInfo, error) {
+	mockFile, ok := fs.data[name]
+	if !ok {
+		return nil, os.ErrNotExist
 	}
-	// Symbolic links are not supported in the mock file system.
-	return path, nil
+	if mockFile.Error != nil {
+		return nil, mockFile.Error
+	}
+	return &mockFileInfo{
+		name: filepath.Base(name),
+		size: int64(len(mockFile.Content)),
+	}, nil
 }
