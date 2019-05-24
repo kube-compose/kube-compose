@@ -231,7 +231,7 @@ func TestConfigLoaderLoadStandardFile_Success(t *testing.T) {
 }
 func TestConfigLoaderLoadStandardFile_Error(t *testing.T) {
 	fsOld := fs
-	defer func(){
+	defer func() {
 		fs = fsOld
 	}()
 	fs = mockFileSystemStandardFileError
