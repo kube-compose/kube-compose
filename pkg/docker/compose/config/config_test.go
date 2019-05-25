@@ -28,6 +28,8 @@ const testDockerComposeYmlDependsOn = "docker-compose.depends-on.yml"
 var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
 	testDockerComposeYml: {
 		Content: []byte(`testservice:
+  entrypoint: []
+  command: ["bash", "-c", "echo 'Hello World!'"]
   image: ubuntu:latest
 `),
 	},
@@ -165,11 +167,11 @@ var mockFileSystemStandardFileError = fsPackage.MockFileSystem(map[string]fsPack
 })
 
 func withMockFS(cb func()) {
-	fsOld := fs
+	fsOld := FS
 	defer func() {
-		fs = fsOld
+		FS = fsOld
 	}()
-	fs = mockFileSystem
+	FS = mockFileSystem
 	cb()
 }
 
@@ -263,11 +265,9 @@ func TestConfigLoaderLoadFile_Success(t *testing.T) {
 				"testservice": {
 					dependsOn: map[string]ServiceHealthiness{},
 					service: &Service{
-						DependsOn:   map[*Service]ServiceHealthiness{},
-						Entrypoint:  []string{},
-						Environment: map[string]string{},
-						Image:       "ubuntu:latest",
-						Ports:       []PortBinding{},
+						Command:           []string{"bash", "-c", "echo 'Hello World!'"},
+						EntrypointPresent: true,
+						Image:             "ubuntu:latest",
 					},
 				},
 			}
@@ -363,6 +363,11 @@ func assertServicesEqual(t *testing.T, service1, service2 *Service, ignoreDepend
 	if service1.Healthcheck != nil || service2.Healthcheck != nil {
 		t.Fail()
 	}
+	if !arePortsEqual(service1.Ports, service2.Ports) {
+		t.Logf("ports1: %+v\n", service1.Ports)
+		t.Logf("ports2: %+v\n", service2.Ports)
+		t.Fail()
+	}
 	assertServicesEqualContinued(t, service1, service2, ignoreDependsOn)
 }
 
@@ -390,19 +395,21 @@ func arePortsEqual(ports1, ports2 []PortBinding) bool {
 }
 
 func assertServicesEqualContinued(t *testing.T, service1, service2 *Service, ignoreDependsOn bool) {
-	if !arePortsEqual(service1.Ports, service2.Ports) {
-		t.Logf("ports1: %+v\n", service1.Ports)
-		t.Logf("ports2: %+v\n", service2.Ports)
-		t.Fail()
-	}
 	if !areStringMapsEqual(service1.Environment, service2.Environment) {
 		t.Logf("env1: %+v\n", service1.Environment)
 		t.Logf("env2: %+v\n", service2.Environment)
 		t.Fail()
 	}
-	if !areStringSlicesEqual(service1.Entrypoint, service2.Entrypoint) {
+	if service1.EntrypointPresent != service2.EntrypointPresent {
+		t.Fail()
+	} else if service1.EntrypointPresent && !areStringSlicesEqual(service1.Entrypoint, service2.Entrypoint) {
 		t.Logf("entrypoint1: %+v\n", service1.Entrypoint)
 		t.Logf("entrypoint2: %+v\n", service2.Entrypoint)
+		t.Fail()
+	}
+	if !areStringSlicesEqual(service1.Command, service2.Command) {
+		t.Logf("command1: %+v\n", service1.Command)
+		t.Logf("command2: %+v\n", service2.Command)
 		t.Fail()
 	}
 	if !ignoreDependsOn && (len(service1.DependsOn) > 0 || len(service2.DependsOn) > 0) {
@@ -667,11 +674,11 @@ func TestNew_Success(t *testing.T) {
 	})
 }
 func TestNew_StandardFileError(t *testing.T) {
-	fsOld := fs
+	fsOld := FS
 	defer func() {
-		fs = fsOld
+		FS = fsOld
 	}()
-	fs = mockFileSystemStandardFileError
+	FS = mockFileSystemStandardFileError
 	_, err := New([]string{})
 	if err == nil {
 		t.Fail()

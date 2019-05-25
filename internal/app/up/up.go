@@ -544,6 +544,7 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 			AutomountServiceAccountToken: new(bool),
 			Containers: []v1.Container{
 				{
+					Args:            app.composeService.DockerComposeService.Command,
 					Command:         app.composeService.DockerComposeService.Entrypoint,
 					Env:             envVars,
 					Image:           app.imageInfo.podImage,

@@ -16,7 +16,8 @@ import (
 )
 
 var (
-	fs   = fsPackage.OSFileSystem()
+	// FS is the file system used by the config package. This is useful for unit testing.
+	FS   = fsPackage.OSFileSystem()
 	v1   = version.Must(version.NewVersion("1"))
 	v2_1 = version.Must(version.NewVersion("2.1"))
 	v3_1 = version.Must(version.NewVersion("3.1"))
@@ -41,8 +42,11 @@ type CanonicalDockerComposeConfig struct {
 // Service is the final representation of a docker-compose service, after all docker compose files have been merged. Service
 // is a smaller piece of CanonicalDockerComposeConfig.
 type Service struct {
-	DependsOn           map[*Service]ServiceHealthiness
-	Entrypoint          []string
+	Command    []string
+	DependsOn  map[*Service]ServiceHealthiness
+	Entrypoint []string
+	// docker-compose distinguishes between an empty Entrypoint and an absent Entrypoint.
+	EntrypointPresent   bool
 	Environment         map[string]string
 	Healthcheck         *Healthcheck
 	HealthcheckDisabled bool
@@ -102,7 +106,7 @@ func loadFileError(file string, err error) error {
 // loadFile loads the specified file. If the file has already been loaded then a cache lookup is performed.
 // If file is relative then it is interpreted relative to the current working directory.
 func (c *configLoader) loadFile(file string) (*composeFileParsed, error) {
-	resolvedFile, err := fs.EvalSymlinks(file)
+	resolvedFile, err := FS.EvalSymlinks(file)
 	if err != nil {
 		return nil, loadFileError(file, err)
 	}
@@ -145,7 +149,7 @@ func (c *configLoader) loadResolvedFile(resolvedFile string) (*composeFileParsed
 
 // loadYamlFileAsGenericMap is a helper used to YAML decode a file into a map[interface{}]interface{}.
 func loadYamlFileAsGenericMap(file string) (genericMap, error) {
-	reader, err := fs.Open(file)
+	reader, err := FS.Open(file)
 	if err != nil {
 		return nil, err
 	}
@@ -203,10 +207,10 @@ func (c *configLoader) loadResolvedFileCore(resolvedFile string, cfParsed *compo
 // loadStandardFile loads the docker compose file at a standard location.
 func (c *configLoader) loadStandardFile() (*composeFileParsed, error) {
 	file := "docker-compose.yml"
-	resolvedFile, err := fs.EvalSymlinks(file)
+	resolvedFile, err := FS.EvalSymlinks(file)
 	if os.IsNotExist(err) {
 		file = "docker-compose.yaml"
-		resolvedFile, err = fs.EvalSymlinks(file)
+		resolvedFile, err = FS.EvalSymlinks(file)
 	}
 	if err == nil {
 		return c.loadResolvedFile(resolvedFile)
@@ -424,7 +428,7 @@ func (c *configLoader) parseComposeFile(cf *composeFile, cfParsed *composeFilePa
 
 func (c *configLoader) parseComposeFileService(cfService *composeFileService) (*composeFileParsedService, error) {
 	service := &Service{
-		Entrypoint: cfService.Entrypoint.Values,
+		Command:    cfService.Command.Values,
 		Image:      cfService.Image,
 		User:       cfService.User,
 		WorkingDir: cfService.WorkingDir,
@@ -433,6 +437,10 @@ func (c *configLoader) parseComposeFileService(cfService *composeFileService) (*
 	composeFileParsedService := &composeFileParsedService{
 		service: service,
 		extends: cfService.Extends,
+	}
+	if cfService.Entrypoint != nil {
+		service.Entrypoint = cfService.Entrypoint.Values
+		service.EntrypointPresent = true
 	}
 	if cfService.DependsOn != nil {
 		composeFileParsedService.dependsOn = cfService.DependsOn.Values
