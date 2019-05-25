@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/uber-go/mapdecode"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
+	"github.com/uber-go/mapdecode"
 )
 
 type stringOrStringSlice struct {

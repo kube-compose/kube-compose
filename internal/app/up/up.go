@@ -211,7 +211,7 @@ func (u *upRunner) getAppImageInfoEnsureSourceImageID(sourceImage string, source
 		return err
 	}
 	if a.imageInfo.sourceImageID == "" {
-		return  fmt.Errorf("could get ID of image %#v, this is either a bug or images were removed by an external process (please try again)",
+		return fmt.Errorf("could get ID of image %#v, this is either a bug or images were removed by an external process (please try again)",
 			sourceImage)
 	}
 	// len(podImage) > 0 by definition of resolveLocalImageAfterPull
@@ -587,7 +587,7 @@ func parsePodStatus(pod *v1.Pod) (podStatus, error) {
 	return podStatusOther, nil
 }
 
-func parsePodStatusTerminatedContainer(podName, containerName string,t *v1.ContainerStateTerminated) (podStatus, error) {
+func parsePodStatusTerminatedContainer(podName, containerName string, t *v1.ContainerStateTerminated) (podStatus, error) {
 	if t.Reason != "Completed" {
 		return podStatusOther, fmt.Errorf("aborting because container %s of pod %s terminated (code=%d,signal=%d,reason=%s): %s",
 			containerName,

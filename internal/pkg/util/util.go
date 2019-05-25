@@ -2,8 +2,8 @@ package util
 
 import (
 	"fmt"
-	"math"
 	"io"
+	"math"
 	"strconv"
 	"strings"
 )

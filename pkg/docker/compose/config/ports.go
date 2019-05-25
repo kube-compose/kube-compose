@@ -42,8 +42,8 @@ type portBindingParser struct {
 	internal       []int32
 	host           string
 	protocol       string
-	done		   bool
-	result		   []PortBinding
+	done           bool
+	result         []PortBinding
 }
 
 func (parser *portBindingParser) parseInternal(matchMap map[string]string) error {
