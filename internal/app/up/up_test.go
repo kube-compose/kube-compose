@@ -5,6 +5,7 @@ import (
 
 	"github.com/jbrekelmans/kube-compose/internal/app/config"
 	dockerComposeConfig "github.com/jbrekelmans/kube-compose/pkg/docker/compose/config"
+	"k8s.io/client-go/rest"
 )
 
 const (
@@ -89,5 +90,21 @@ func TestAppHasService_True(t *testing.T) {
 	}
 	if !app.hasService() {
 		t.Fail()
+	}
+}
+
+func TestUpRunnerInitKubernetesClientset(t *testing.T) {
+	kubeConfig := &rest.Config{
+		Host: "http://localhost:8443/",
+	}
+	cfg := &config.Config{
+		KubeConfig: kubeConfig,
+	}
+	u := &upRunner{
+		cfg: cfg,
+	}
+	err := u.initKubernetesClientset()
+	if err != nil {
+		t.Error(err)
 	}
 }

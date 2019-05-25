@@ -136,6 +136,19 @@ func TestInterpolate_BracesError2(t *testing.T) {
 	}
 }
 
+func TestInterpolate_BracesError3(t *testing.T) {
+	expected := "value"
+	m := map[string]string{
+		"VAR1": expected,
+	}
+	actual, err := Interpolate("${VAR1:?errorMsg1}", mapValueGetter(m), true)
+	if err != nil {
+		t.Error(err)
+	} else if actual != expected {
+		t.Fail()
+	}
+}
+
 func TestInterpolate_BracesInvalidDelimiter(t *testing.T) {
 	m := map[string]string{
 		"VAR:ABLE": testValue,
