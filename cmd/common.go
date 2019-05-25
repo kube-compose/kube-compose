@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/jbrekelmans/kube-compose/internal/app/config"
+	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
@@ -41,8 +42,7 @@ func getFileFlag(cmd *cobra.Command) (*string, error) {
 		if err != nil {
 			return nil, err
 		}
-		file = new(string)
-		*file = fileStr
+		file = util.NewString(fileStr)
 	}
 	return file, nil
 }

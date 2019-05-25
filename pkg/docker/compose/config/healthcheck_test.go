@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 )
 
 func TestParseRetries_Normal(t *testing.T) {
@@ -25,10 +27,8 @@ func TestParseRetries_Default(t *testing.T) {
 }
 
 func TestParseInterval_Normal(t *testing.T) {
-	value := new(string)
-	*value = "2m1s"
 	h := &Healthcheck{}
-	err := h.parseInterval(value)
+	err := h.parseInterval(util.NewString("2m1s"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -37,19 +37,15 @@ func TestParseInterval_Normal(t *testing.T) {
 	}
 }
 func TestParseInterval_InvalidDuration(t *testing.T) {
-	value := new(string)
-	*value = "asdf1"
 	h := &Healthcheck{}
-	err := h.parseInterval(value)
+	err := h.parseInterval(util.NewString("asdf1"))
 	if err == nil {
 		t.Fail()
 	}
 }
 func TestParseInterval_NegativeDuration(t *testing.T) {
-	value := new(string)
-	*value = "-2m"
 	h := &Healthcheck{}
-	err := h.parseInterval(value)
+	err := h.parseInterval(util.NewString("-2m"))
 	if err == nil {
 		t.Fail()
 	}
@@ -67,10 +63,8 @@ func TestParseInterval_Default(t *testing.T) {
 }
 
 func TestParseTimeout_Normal(t *testing.T) {
-	value := new(string)
-	*value = "1m1s"
 	h := &Healthcheck{}
-	err := h.parseTimeout(value)
+	err := h.parseTimeout(util.NewString("1m1s"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -79,19 +73,15 @@ func TestParseTimeout_Normal(t *testing.T) {
 	}
 }
 func TestParseTimeout_InvalidDuration(t *testing.T) {
-	value := new(string)
-	*value = "asdf2"
 	h := &Healthcheck{}
-	err := h.parseTimeout(value)
+	err := h.parseTimeout(util.NewString("asdf2"))
 	if err == nil {
 		t.Fail()
 	}
 }
 func TestParseTimeout_NegativeDuration(t *testing.T) {
-	value := new(string)
-	*value = "-1m"
 	h := &Healthcheck{}
-	err := h.parseTimeout(value)
+	err := h.parseTimeout(util.NewString("-1m"))
 	if err == nil {
 		t.Fail()
 	}
@@ -223,9 +213,8 @@ func TestParseHealthcheck_IntervalInvalid(t *testing.T) {
 		Test: HealthcheckTest{
 			Values: []string{HealthcheckCommandShell, "echo 'Hello World 2!'"},
 		},
-		Interval: new(string),
+		Interval: util.NewString("asdf5"),
 	}
-	*healthcheckYAML.Interval = "asdf5"
 	_, _, err := ParseHealthcheck(healthcheckYAML)
 	if err == nil {
 		t.Fail()
@@ -236,9 +225,8 @@ func TestParseHealthcheck_InvalidTimeout(t *testing.T) {
 		Test: HealthcheckTest{
 			Values: []string{HealthcheckCommandShell, "echo 'Hello World 3!'"},
 		},
-		Timeout: new(string),
+		Timeout: util.NewString("asdf6"),
 	}
-	*healthcheckYAML.Timeout = "asdf6"
 	_, _, err := ParseHealthcheck(healthcheckYAML)
 	if err == nil {
 		t.Fail()

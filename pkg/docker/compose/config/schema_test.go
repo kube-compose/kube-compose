@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/uber-go/mapdecode"
+	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 )
 
 func TestPortDecode_SuccessInt(t *testing.T) {
@@ -56,10 +57,9 @@ func TestExtendsDecode_SuccessComplex(t *testing.T) {
 	file := "another-file"
 	service := "my-service-in-another-file"
 	src := &extendsHelper{
-		File:    new(string),
+		File:    util.NewString(file),
 		Service: service,
 	}
-	*src.File = file
 	var dst extends
 	err := mapdecode.Decode(&dst, src)
 	if err != nil {
@@ -73,36 +73,46 @@ func TestExtendsDecode_SuccessComplex(t *testing.T) {
 func TestEnvironmentValueDecode_SmallIntegralFloat64Success(t *testing.T) {
 	src := 123.0
 	var dst environmentValue
+	expected := environmentValue{
+		Int64Value: new(int64),
+	}
+	*expected.Int64Value = int64(src)
 	err := mapdecode.Decode(&dst, src)
 	if err != nil {
 		t.Error(err)
-	}
-	if dst.FloatValue != nil || dst.StringValue != nil || dst.Int64Value == nil || *dst.Int64Value != 123 {
-		t.Error(dst)
+	} else if !areEnvironmentValuesEqual(&dst, &expected) {
+		t.Fail()
 	}
 }
 
 func TestEnvironmentValueDecode_FractionalFloat64Success(t *testing.T) {
 	src := 123.5
 	var dst environmentValue
+	expected := environmentValue{
+		FloatValue: new(float64),
+	}
+	*expected.FloatValue = src
 	err := mapdecode.Decode(&dst, src)
 	if err != nil {
 		t.Error(err)
-	}
-	if dst.FloatValue == nil || dst.StringValue != nil || dst.Int64Value != nil || *dst.FloatValue != 123.5 {
-		t.Error(dst)
+	} else if !areEnvironmentValuesEqual(&dst, &expected) {
+		t.Fail()
 	}
 }
 
 func TestEnvironmentValueDecode_StringSuccess(t *testing.T) {
 	src := "environmentValueStringSuccess"
 	var dst environmentValue
+	expected := environmentValue{
+		StringValue: util.NewString(src),
+	}
 	err := mapdecode.Decode(&dst, src)
 	if err != nil {
 		t.Error(err)
-	}
-	if dst.FloatValue != nil || dst.StringValue == nil || dst.Int64Value != nil || *dst.StringValue != src {
-		t.Error(dst)
+	} else if !areEnvironmentValuesEqual(&dst, &expected) {
+		t.Logf("actual  : %+v\n", dst)
+		t.Logf("expected: %+v\n", expected)
+		t.Fail()
 	}
 }
 
@@ -111,9 +121,8 @@ func TestEnvironmentValueDecode_NilSuccess(t *testing.T) {
 	err := mapdecode.Decode(&dst, nil)
 	if err != nil {
 		t.Error(err)
-	}
-	if dst.FloatValue != nil || dst.StringValue != nil || dst.Int64Value != nil {
-		t.Error(dst)
+	} else if !areEnvironmentValuesEqual(&dst, &environmentValue{}) {
+		t.Fail()
 	}
 }
 
@@ -126,55 +135,51 @@ func TestEnvironmentValueDecode_Error(t *testing.T) {
 	}
 }
 
-// TODO https://github.com/jbrekelmans/kube-compose/issues/64 ignoring cyclomatic complexity errors
-// nolint
 func TestEnvironmentDecode_MapSuccess(t *testing.T) {
 	src := map[string]interface{}{
 		"VAR1": "VAL1",
-		"VAR2": 1234,
-		"VAR3": 123.4,
+		"VAR2": 0,
+		"VAR3": 123.5,
 		"VAR4": nil,
 	}
 	var dst environment
+	exp := environment{
+		Values: []environmentNameValuePair{
+			{
+				Name: "VAR1",
+				Value: &environmentValue{
+					StringValue: util.NewString("VAL1"),
+				},
+			},
+			{
+				Name: "VAR2",
+				Value: &environmentValue{
+					Int64Value: new(int64),
+				},
+			},
+			{
+				Name: "VAR3",
+				Value: &environmentValue{
+					FloatValue: new(float64),
+				},
+			},
+			{
+				Name: "VAR4",
+				Value: &environmentValue{},
+			},
+		},
+	}
+	*exp.Values[2].Value.FloatValue = 123.5
 	err := mapdecode.Decode(&dst, src)
 	if err != nil {
 		t.Error(err)
-	}
-	flags := 0
-	for _, pair := range dst.Values {
-		value := pair.Value
-		switch pair.Name {
-		case "VAR1":
-			if value.FloatValue != nil || value.Int64Value != nil || value.StringValue == nil || *value.StringValue != "VAL1" {
-				t.Fail()
-			}
-			flags |= 1
-		case "VAR2":
-			if value.FloatValue != nil || value.Int64Value == nil || value.StringValue != nil || *value.Int64Value != 1234 {
-				t.Fail()
-			}
-			flags |= 2
-		case "VAR3":
-			if value.FloatValue == nil || value.Int64Value != nil || value.StringValue != nil || *value.FloatValue != 123.4 {
-				t.Fail()
-			}
-			flags |= 4
-		case "VAR4":
-			if value.FloatValue != nil || value.Int64Value != nil || value.StringValue != nil {
-				t.Fail()
-			}
-			flags |= 8
-		default:
-			t.Fail()
-		}
-	}
-	if flags != 15 {
+	} else if (!areEnvironmentsEqual(dst, exp)) {
+		t.Logf("env1: %+v\n", dst)
+		t.Logf("env2: %+v\n", exp)
 		t.Fail()
 	}
 }
 
-// TODO https://github.com/jbrekelmans/kube-compose/issues/64 ignoring cyclomatic complexity errors
-// nolint
 func TestEnvironmentDecode_SliceSuccess(t *testing.T) {
 	src := []string{
 		"VAR5=VAL5",
@@ -184,28 +189,68 @@ func TestEnvironmentDecode_SliceSuccess(t *testing.T) {
 	err := mapdecode.Decode(&dst, src)
 	if err != nil {
 		t.Error(err)
-	}
-	flags := 0
-	for _, pair := range dst.Values {
-		value := pair.Value
-		switch pair.Name {
-		case "VAR5":
-			if value.FloatValue != nil || value.Int64Value != nil || value.StringValue == nil || *value.StringValue != "VAL5" {
-				t.Fail()
-			}
-			flags |= 1
-		case "VAR6":
-			if value != nil {
-				t.Fail()
-			}
-			flags |= 2
-		default:
-			t.Fail()
-		}
-	}
-	if flags != 3 {
+	} else if !areEnvironmentsEqual(dst, environment{
+		Values: []environmentNameValuePair{
+			{
+				Name: "VAR5",
+				Value: &environmentValue{
+					StringValue: util.NewString("VAL5"),
+				},
+			},
+			{
+				Name: "VAR6",
+			},
+		},
+	}) {
 		t.Fail()
 	}
+}
+
+func areEnvironmentsEqual(env1, env2 environment) bool {
+	n := len(env1.Values)
+	if n != len(env2.Values) {
+		return false
+	}
+	if hasDuplicateNames(env1) || hasDuplicateNames(env2) {
+		panic("env1 or env2 has duplicate namees")
+	}
+	for i := 0 ; i < n ; i++ {
+		pair1 := &env1.Values[i]
+		found := false
+		for j := 0 ; j < n; j++ {
+			pair2 := &env2.Values[j]
+			if pair1.Name == pair2.Name && areEnvironmentValuesEqual(pair1.Value, pair2.Value) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+func hasDuplicateNames(env environment) bool {
+	hasName := map[string]bool{}
+	for _, pair := range env.Values {
+		if _, ok := hasName[pair.Name]; ok {
+			return true
+		}
+		hasName[pair.Name] = true
+	}
+	return false
+}
+
+func areEnvironmentValuesEqual(v1, v2 *environmentValue) bool {
+	if v1 == nil || v2 == nil {
+		return v1 == v2
+	}
+	if !util.FloatPointersPointToSameValue(v1.FloatValue, v2.FloatValue) {
+		return false
+	}
+	return reflect.DeepEqual(v1.Int64Value, v2.Int64Value) &&
+		reflect.DeepEqual(v1.StringValue, v2.StringValue)
 }
 
 func TestEnvironmentDecode_Error(t *testing.T) {

@@ -36,6 +36,91 @@ type PortBinding struct {
 	Host string
 }
 
+type portBindingParser struct {
+	external       []int32
+	externalMinStr string
+	internal       []int32
+	host           string
+	protocol       string
+	done		   bool
+	result		   []PortBinding
+}
+
+func (parser *portBindingParser) parseInternal(matchMap map[string]string) error {
+	internalMin, err := parsePortUint(matchMap["internalMin"])
+	if err != nil {
+		return err
+	}
+	internalMaxStr := matchMap["internalMax"]
+	if internalMaxStr == "" {
+		parser.internal = append(parser.internal, internalMin)
+	} else {
+		internalMax, err := parsePortUint(internalMaxStr)
+		if err != nil {
+			return err
+		}
+		for i := internalMin; i <= internalMax; i++ {
+			parser.internal = append(parser.internal, i)
+		}
+	}
+	return nil
+}
+
+func (parser *portBindingParser) parseExternal(matchMap map[string]string) error {
+	parser.externalMinStr = matchMap["externalMin"]
+	if len(parser.externalMinStr) > 0 {
+		externalMin, err := parsePortUint(parser.externalMinStr)
+		if err != nil {
+			return err
+		}
+		externalMaxStr := matchMap["externalMax"]
+		if externalMaxStr == "" {
+			parser.external = append(parser.external, externalMin)
+		} else {
+			externalMax, err := parsePortUint(externalMaxStr)
+			if err != nil {
+				return err
+			}
+			if len(parser.internal) == 1 {
+				parser.result = append(parser.result, PortBinding{
+					Internal:    parser.internal[0],
+					ExternalMin: externalMin,
+					ExternalMax: externalMax,
+					Protocol:    parser.protocol,
+					Host:        parser.host,
+				})
+				parser.done = true
+				return nil
+			}
+			for i := externalMin; i <= externalMax; i++ {
+				parser.external = append(parser.external, i)
+			}
+		}
+	}
+	return nil
+}
+
+func (parser *portBindingParser) buildResult() error {
+	if len(parser.externalMinStr) > 0 && len(parser.internal) != len(parser.external) {
+		return fmt.Errorf("port ranges don't match in length")
+	}
+	for j, i := range parser.internal {
+		portBinding := PortBinding{
+			Internal:    i,
+			ExternalMin: -1,
+			ExternalMax: -1,
+			Protocol:    parser.protocol,
+			Host:        parser.host,
+		}
+		if len(parser.externalMinStr) > 0 {
+			portBinding.ExternalMin = parser.external[j]
+			portBinding.ExternalMax = parser.external[j]
+		}
+		parser.result = append(parser.result, portBinding)
+	}
+	return nil
+}
+
 // https://docs.docker.com/compose/compose-file/compose-file-v2/
 // ports:
 //  - "3000"
@@ -47,94 +132,35 @@ type PortBinding struct {
 //  - "127.0.0.1:5000-5010:5000-5010"
 //  - "6060:6060/udp"
 //  - "12400-12500:1240"
-// TODO https://github.com/jbrekelmans/kube-compose/issues/64 reduce cyclomatic complexity of this function
-//nolint
 func parsePortBindings(spec string, portBindings []PortBinding) ([]PortBinding, error) {
+	parser := portBindingParser{
+		result: portBindings,
+	}
 	matches := portBindingSpecRegexp.FindStringSubmatch(spec)
 	if matches == nil {
 		return nil, fmt.Errorf("invalid port %q, should be [[remote_ip:]remote_port[-remote_port]:]port[/protocol]", spec)
 	}
 	matchMap := util.BuildRegexpMatchMap(portBindingSpecRegexp, matches)
 
-	host := matchMap["host"]
-	protocol := matchMap["protocol"]
-	if protocol == "" {
-		protocol = "tcp"
+	parser.host = matchMap["host"]
+	parser.protocol = matchMap["protocol"]
+	if parser.protocol == "" {
+		parser.protocol = "tcp"
 	}
 
-	internal, err := parsePortBindingsInternal(matchMap)
+	err := parser.parseInternal(matchMap)
 	if err != nil {
 		return nil, err
 	}
-
-	external := []int32{}
-	externalMinStr := matchMap["externalMin"]
-	if len(externalMinStr) > 0 {
-		externalMin, err := parsePortUint(externalMinStr)
-		if err != nil {
-			return nil, err
-		}
-		externalMaxStr := matchMap["externalMax"]
-		if externalMaxStr == "" {
-			external = append(external, externalMin)
-		} else {
-			externalMax, err := parsePortUint(externalMaxStr)
-			if err != nil {
-				return nil, err
-			}
-			if len(internal) == 1 {
-				return append(portBindings, PortBinding{
-					Internal:    internal[0],
-					ExternalMin: externalMin,
-					ExternalMax: externalMax,
-					Protocol:    protocol,
-					Host:        host,
-				}), nil
-			}
-			for i := externalMin; i <= externalMax; i++ {
-				external = append(external, i)
-			}
-		}
-	}
-	if len(externalMinStr) > 0 && len(internal) != len(external) {
-		return nil, fmt.Errorf("port ranges don't match in length")
-	}
-	for j, i := range internal {
-		portBinding := PortBinding{
-			Internal:    i,
-			ExternalMin: -1,
-			ExternalMax: -1,
-			Protocol:    protocol,
-			Host:        host,
-		}
-		if len(externalMinStr) > 0 {
-			portBinding.ExternalMin = external[j]
-			portBinding.ExternalMax = external[j]
-		}
-		portBindings = append(portBindings, portBinding)
-	}
-	return portBindings, nil
-}
-
-func parsePortBindingsInternal(matchMap map[string]string) ([]int32, error) {
-	internal := []int32{}
-	internalMin, err := parsePortUint(matchMap["internalMin"])
+	err = parser.parseExternal(matchMap)
 	if err != nil {
 		return nil, err
 	}
-	internalMaxStr := matchMap["internalMax"]
-	if internalMaxStr == "" {
-		internal = append(internal, internalMin)
-	} else {
-		internalMax, err := parsePortUint(internalMaxStr)
-		if err != nil {
-			return nil, err
-		}
-		for i := internalMin; i <= internalMax; i++ {
-			internal = append(internal, i)
-		}
+	if parser.done {
+		return parser.result, nil
 	}
-	return internal, nil
+	err = parser.buildResult()
+	return parser.result, err
 }
 
 func parsePortUint(portStr string) (int32, error) {

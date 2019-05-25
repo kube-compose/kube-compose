@@ -35,6 +35,7 @@ type appImageInfo struct {
 	imageHealthcheck *dockerComposeConfig.Healthcheck
 	once             *sync.Once
 	podImage         string
+	sourceImageID    string
 	user             *docker.Userinfo
 }
 
@@ -128,8 +129,6 @@ func (u *upRunner) initApps() {
 	}
 }
 
-// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-// nolint
 func (u *upRunner) getAppImageInfo(app *app) error {
 	sourceImage := app.composeService.DockerComposeService.Image
 	if sourceImage == "" {
@@ -145,87 +144,104 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("error while parsing image %#v", sourceImage))
 	}
-
-	// We need the image locally always, so we can parse its healthcheck
-	sourceImageNamed, sourceImageIsNamed := sourceImageRef.(dockerRef.Named)
-	sourceImageID := resolveLocalImageID(sourceImageRef, localImageIDSet, u.localImagesCache.images)
-
-	var podImage string
-	if sourceImageID == "" {
-		if !sourceImageIsNamed {
-			return fmt.Errorf("could not find image %#v locally, and building images is not supported", sourceImage)
-		}
-		var digest string
-		digest, err = pullImageWithLogging(u.opts.Context, u.dockerClient, app.name(), sourceImageRef.String())
-		if err != nil {
-			return err
-		}
-		sourceImageID, podImage, err = resolveLocalImageAfterPull(u.opts.Context, u.dockerClient, sourceImageNamed, digest)
-		if err != nil {
-			return err
-		}
-		if sourceImageID == "" {
-			return fmt.Errorf("could get ID of image %#v, this is either a bug or images were removed by an external process (please try again)",
-				sourceImage)
-		}
-		// len(podImage) > 0 by definition of resolveLocalImageAfterPull
-	}
-	inspect, inspectRaw, err := u.dockerClient.ImageInspectWithRaw(u.opts.Context, sourceImageID)
+	err = u.getAppImageInfoEnsureSourceImageID(sourceImage, sourceImageRef, app, localImageIDSet)
 	if err != nil {
 		return err
 	}
-	if u.cfg.PushImages != nil {
-		destinationImage := fmt.Sprintf("%s/%s/%s", u.cfg.PushImages.DockerRegistry, u.cfg.Namespace, app.composeService.NameEscaped)
-		destinationImagePush := destinationImage + ":latest"
-		err = u.dockerClient.ImageTag(u.opts.Context, sourceImageID, destinationImagePush)
-		if err != nil {
-			return err
-		}
-		var digest string
-		digest, err = pushImageWithLogging(u.opts.Context, u.dockerClient, app.name(), destinationImagePush, u.cfg.KubeConfig.BearerToken)
-		if err != nil {
-			return err
-		}
-		podImage = destinationImage + "@" + digest
-	} else if podImage == "" {
-		if !sourceImageIsNamed {
-			// TODO https://github.com/jbrekelmans/kube-compose/issues/6
-			return fmt.Errorf("image reference %#v is likely unstable, "+
-				"please enable pushing of images or use named image references to improve consistency across hosts", sourceImage)
-		}
-		podImage = sourceImage
+	inspect, inspectRaw, err := u.dockerClient.ImageInspectWithRaw(u.opts.Context, app.imageInfo.sourceImageID)
+	if err != nil {
+		return err
 	}
-	app.imageInfo.podImage = podImage
+	err = u.getAppImageEnsureCorrectPodImage(app, sourceImageRef, sourceImage)
+	if err != nil {
+		return err
+	}
 	imageHealthcheck, err := inspectImageRawParseHealthcheck(inspectRaw)
 	if err != nil {
 		return err
 	}
 	app.imageInfo.imageHealthcheck = imageHealthcheck
-
 	if u.opts.RunAsUser {
-		var user *docker.Userinfo
-		userRaw := app.composeService.DockerComposeService.User
-		if userRaw == nil {
-			user, err = docker.ParseUserinfo(inspect.Config.User)
-			if err != nil {
-				return errors.Wrap(err, fmt.Sprintf("image %#v has an invalid user %#v", sourceImage, inspect.Config.User))
-			}
-		} else {
-			user, err = docker.ParseUserinfo(*userRaw)
-			if err != nil {
-				return errors.Wrap(err, fmt.Sprintf("docker-compose service %s has an invalid user %#v", app.name(), *userRaw))
-			}
-		}
-		if user.UID == nil || (user.Group != "" && user.GID == nil) {
-			// TODO https://github.com/jbrekelmans/kube-compose/issues/70 confirm whether docker and our pod spec will produce the same default
-			// group if a UID is set but no GID
-			err = getUserinfoFromImage(u.opts.Context, u.dockerClient, sourceImageID, user)
-			if err != nil {
-				return errors.Wrap(err, fmt.Sprintf("error getting uid/gid from image %#v", sourceImage))
-			}
-		}
-		app.imageInfo.user = user
+		err = u.getAppImageInfoUser(app, &inspect, sourceImage)
 	}
+	return err
+}
+
+func (u *upRunner) getAppImageEnsureCorrectPodImage(a *app, sourceImageRef dockerRef.Reference, sourceImage string) error {
+	if u.cfg.PushImages != nil {
+		destinationImage := fmt.Sprintf("%s/%s/%s", u.cfg.PushImages.DockerRegistry, u.cfg.Namespace, a.composeService.NameEscaped)
+		destinationImagePush := destinationImage + ":latest"
+		err := u.dockerClient.ImageTag(u.opts.Context, a.imageInfo.sourceImageID, destinationImagePush)
+		if err != nil {
+			return err
+		}
+		var digest string
+		digest, err = pushImageWithLogging(u.opts.Context, u.dockerClient, a.name(), destinationImagePush, u.cfg.KubeConfig.BearerToken)
+		if err != nil {
+			return err
+		}
+		a.imageInfo.podImage = destinationImage + "@" + digest
+	} else if a.imageInfo.podImage == "" {
+		_, sourceImageIsNamed := sourceImageRef.(dockerRef.Named)
+		if !sourceImageIsNamed {
+			// TODO https://github.com/jbrekelmans/kube-compose/issues/6
+			return fmt.Errorf("image reference %#v is likely unstable, "+
+				"please enable pushing of images or use named image references to improve consistency across hosts", sourceImage)
+		}
+		a.imageInfo.podImage = sourceImage
+	}
+	return nil
+}
+
+func (u *upRunner) getAppImageInfoEnsureSourceImageID(sourceImage string, sourceImageRef dockerRef.Reference, a *app,
+	localImageIDSet *digestset.Set) error {
+	// We need the image locally always, so we can parse its healthcheck
+	sourceImageNamed, sourceImageIsNamed := sourceImageRef.(dockerRef.Named)
+	a.imageInfo.sourceImageID = resolveLocalImageID(sourceImageRef, localImageIDSet, u.localImagesCache.images)
+	if !sourceImageIsNamed {
+		return fmt.Errorf("could not find image %#v locally, and building images is not supported", sourceImage)
+	}
+	digest, err := pullImageWithLogging(u.opts.Context, u.dockerClient, a.name(), sourceImageRef.String())
+	if err != nil {
+		return err
+	}
+	a.imageInfo.sourceImageID, a.imageInfo.podImage, err = resolveLocalImageAfterPull(
+		u.opts.Context, u.dockerClient, sourceImageNamed, digest)
+	if err != nil {
+		return err
+	}
+	if a.imageInfo.sourceImageID == "" {
+		return  fmt.Errorf("could get ID of image %#v, this is either a bug or images were removed by an external process (please try again)",
+			sourceImage)
+	}
+	// len(podImage) > 0 by definition of resolveLocalImageAfterPull
+	return nil
+}
+
+func (u *upRunner) getAppImageInfoUser(a *app, inspect *dockerTypes.ImageInspect, sourceImage string) error {
+	var user *docker.Userinfo
+	var err error
+	userRaw := a.composeService.DockerComposeService.User
+	if userRaw == nil {
+		user, err = docker.ParseUserinfo(inspect.Config.User)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("image %#v has an invalid user %#v", sourceImage, inspect.Config.User))
+		}
+	} else {
+		user, err = docker.ParseUserinfo(*userRaw)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("docker-compose service %s has an invalid user %#v", a.name(), *userRaw))
+		}
+	}
+	if user.UID == nil || (user.Group != "" && user.GID == nil) {
+		// TODO https://github.com/jbrekelmans/kube-compose/issues/70 confirm whether docker and our pod spec will produce the same default
+		// group if a UID is set but no GID
+		err := getUserinfoFromImage(u.opts.Context, u.dockerClient, a.imageInfo.sourceImageID, user)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("error getting uid/gid from image %#v", sourceImage))
+		}
+	}
+	a.imageInfo.user = user
 	return nil
 }
 
@@ -266,8 +282,6 @@ func (u *upRunner) waitForServiceClusterIPCountRemaining() int {
 	return remaining
 }
 
-// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-// nolint
 func (u *upRunner) waitForServiceClusterIP(expected int) error {
 	listOptions := metav1.ListOptions{
 		LabelSelector: u.cfg.EnvironmentLabel + "=" + u.cfg.EnvironmentID,
@@ -334,8 +348,6 @@ func (u *upRunner) waitForServiceClusterIP(expected int) error {
 	return nil
 }
 
-// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-// nolint
 func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) {
 	expectedServiceCount := 0
 	for _, app := range u.apps {
@@ -373,6 +385,10 @@ func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) 
 	if expectedServiceCount == 0 {
 		return nil, nil
 	}
+	return u.getPodHostAliasesCore(expectedServiceCount)
+}
+
+func (u *upRunner) getPodHostAliasesCore(expectedServiceCount int) ([]v1.HostAlias, error) {
 	err := u.waitForServiceClusterIP(expectedServiceCount)
 	if err != nil {
 		return nil, err
@@ -446,35 +462,34 @@ func getRestartPolicyforService(app *app) v1.RestartPolicy {
 	return restartPolicy
 }
 
-// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-// nolint
+// GetReadinessProbe converts the image/docker-compose healthcheck to a readiness probe to implement depends_on condition: service_healthy
+// in docker compose files. Kubernetes does not appear to have disabled the healthcheck of docker images:
+// https://stackoverflow.com/questions/41475088/when-to-use-docker-healthcheck-vs-livenessprobe-readinessprobe
+// ... so we're not doubling up on healthchecks. We accept that this may lead to calls failing due to removal backend pods from load
+// balancers.
+func (a *app) GetReadinessProbe() *v1.Probe {
+	if !a.composeService.DockerComposeService.HealthcheckDisabled {
+		if a.composeService.DockerComposeService.Healthcheck != nil {
+			return createReadinessProbeFromDockerHealthcheck(a.composeService.DockerComposeService.Healthcheck)
+		} else if a.imageInfo.imageHealthcheck != nil {
+			return createReadinessProbeFromDockerHealthcheck(a.imageInfo.imageHealthcheck)
+		}
+	}
+	return nil
+}
+
 func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	err := u.getAppImageInfoOnce(app)
 	if err != nil {
 		return nil, err
 	}
-	// We convert the image/docker-compose healthcheck to a readiness probe to implement
-	// depends_on condition: service_healthy in docker compose files.
-	// Kubernetes does not appear to have disabled the healthcheck of docker images:
-	// https://stackoverflow.com/questions/41475088/when-to-use-docker-healthcheck-vs-livenessprobe-readinessprobe
-	// ... so we're not doubling up on healthchecks.
-	// We accept that this may lead to calls failing due to removal backend pods from load balancers.
-	var readinessProbe *v1.Probe
-	if !app.composeService.DockerComposeService.HealthcheckDisabled {
-		if app.composeService.DockerComposeService.Healthcheck != nil {
-			readinessProbe = createReadinessProbeFromDockerHealthcheck(app.composeService.DockerComposeService.Healthcheck)
-		} else if app.imageInfo.imageHealthcheck != nil {
-			readinessProbe = createReadinessProbeFromDockerHealthcheck(app.imageInfo.imageHealthcheck)
-		}
-	}
-	var containerPorts []v1.ContainerPort
-	if len(app.composeService.Ports) > 0 {
-		containerPorts = make([]v1.ContainerPort, len(app.composeService.Ports))
-		for i, port := range app.composeService.Ports {
-			containerPorts[i] = v1.ContainerPort{
-				ContainerPort: port.Port,
-				Protocol:      v1.Protocol(strings.ToUpper(port.Protocol)),
-			}
+	readinessProbe := app.GetReadinessProbe()
+
+	containerPorts := make([]v1.ContainerPort, len(app.composeService.Ports))
+	for i, port := range app.composeService.Ports {
+		containerPorts[i] = v1.ContainerPort{
+			ContainerPort: port.Port,
+			Protocol:      v1.Protocol(strings.ToUpper(port.Protocol)),
 		}
 	}
 	var envVars []v1.EnvVar
@@ -536,29 +551,24 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	return podServer, nil
 }
 
-// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-// nolint
-func parsePodStatus(pod *v1.Pod) (podStatus, error) {
+func isPodReady(pod *v1.Pod) bool {
 	for _, condition := range pod.Status.Conditions {
 		if condition.Type == v1.PodReady && condition.Status == v1.ConditionTrue {
-			return podStatusReady, nil
+			return true
 		}
+	}
+	return false
+}
+
+func parsePodStatus(pod *v1.Pod) (podStatus, error) {
+	if isPodReady(pod) {
+		return podStatusReady, nil
 	}
 	runningCount := 0
 	for _, containerStatus := range pod.Status.ContainerStatuses {
 		t := containerStatus.State.Terminated
 		if t != nil {
-			if t.Reason != "Completed" {
-				return podStatusOther, fmt.Errorf("aborting because container %s of pod %s terminated (code=%d,signal=%d,reason=%s): %s",
-					containerStatus.Name,
-					pod.ObjectMeta.Name,
-					t.ExitCode,
-					t.Signal,
-					t.Reason,
-					t.Message,
-				)
-			}
-			return podStatusCompleted, nil
+			return parsePodStatusTerminatedContainer(pod.ObjectMeta.Name, containerStatus.Name, t)
 		}
 		if w := containerStatus.State.Waiting; w != nil && w.Reason == "ErrImagePull" {
 			return podStatusOther, fmt.Errorf("aborting because container %s of pod %s could not pull image: %s",
@@ -577,8 +587,20 @@ func parsePodStatus(pod *v1.Pod) (podStatus, error) {
 	return podStatusOther, nil
 }
 
-// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-// nolint
+func parsePodStatusTerminatedContainer(podName, containerName string,t *v1.ContainerStateTerminated) (podStatus, error) {
+	if t.Reason != "Completed" {
+		return podStatusOther, fmt.Errorf("aborting because container %s of pod %s terminated (code=%d,signal=%d,reason=%s): %s",
+			containerName,
+			podName,
+			t.ExitCode,
+			t.Signal,
+			t.Reason,
+			t.Message,
+		)
+	}
+	return podStatusCompleted, nil
+}
+
 func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 
 	app, err := u.findAppFromObjectMeta(&pod.ObjectMeta)
@@ -604,23 +626,7 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 				}
 				completedChannel := make(chan interface{})
 				u.completedChannels = append(u.completedChannels, completedChannel)
-				go func() {
-					getLogsRequest := u.k8sPodClient.GetLogs(pod.ObjectMeta.Name, getPodLogOptions)
-					var bodyReader io.ReadCloser
-					bodyReader, err = getLogsRequest.Stream()
-					if err != nil {
-						panic(err)
-					}
-					defer util.CloseAndLogError(bodyReader)
-					scanner := bufio.NewScanner(bodyReader)
-					for scanner.Scan() {
-						fmt.Printf("%-*s| %s\n", u.maxServiceNameLength+3, cmdColor.Colorize(app.name, app.color), scanner.Text())
-					}
-					if err = scanner.Err(); err != nil {
-						fmt.Println(err)
-					}
-					close(completedChannel)
-				}()
+				go u.streamPodLogs(pod, completedChannel, getPodLogOptions, app)
 			}
 		}
 	}
@@ -637,8 +643,24 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 	return nil
 }
 
-// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-// nolint
+func (u *upRunner) streamPodLogs(pod *v1.Pod, completedChannel chan interface{}, getPodLogOptions *v1.PodLogOptions, app *app) {
+	getLogsRequest := u.k8sPodClient.GetLogs(pod.ObjectMeta.Name, getPodLogOptions)
+	var bodyReader io.ReadCloser
+	bodyReader, err := getLogsRequest.Stream()
+	if err != nil {
+		panic(err)
+	}
+	defer util.CloseAndLogError(bodyReader)
+	scanner := bufio.NewScanner(bodyReader)
+	for scanner.Scan() {
+		fmt.Printf("%-*s| %s\n", u.maxServiceNameLength+3, cmdColor.Colorize(app.name, app.color), scanner.Text())
+	}
+	if err = scanner.Err(); err != nil {
+		fmt.Println(err)
+	}
+	close(completedChannel)
+}
+
 func (u *upRunner) createPodsIfNeeded() error {
 	for app1 := range u.appsToBeStarted {
 		createPod := true
@@ -656,36 +678,39 @@ func (u *upRunner) createPodsIfNeeded() error {
 			}
 		}
 		if createPod {
-			reason := strings.Builder{}
-			reason.WriteString("its dependency conditions are met (")
-			comma := false
-			for dcService, healthiness := range app1.composeService.DockerComposeService.DependsOn {
-				composeService := u.cfg.FindService(dcService)
-				if comma {
-					reason.WriteString(", ")
-				}
-				reason.WriteString(composeService.Name)
-				if healthiness == dockerComposeConfig.ServiceHealthy {
-					reason.WriteString(": ready")
-				} else {
-					reason.WriteString(": running")
-				}
-				comma = true
-			}
-			reason.WriteString(")")
 			pod, err := u.createPod(app1)
 			if err != nil {
 				return err
 			}
-			fmt.Printf("app %s: created pod %s because %s\n", app1.name(), pod.ObjectMeta.Name, reason.String())
+			reason := u.formatCreatePodReason(app1)
+			fmt.Printf("app %s: created pod %s because %s\n", app1.name(), pod.ObjectMeta.Name, reason)
 			delete(u.appsToBeStarted, app1)
 		}
 	}
 	return nil
 }
 
-// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-// nolint
+func (u *upRunner) formatCreatePodReason(app1 *app) string {
+	reason := strings.Builder{}
+	reason.WriteString("its dependency conditions are met (")
+	comma := false
+	for dcService, healthiness := range app1.composeService.DockerComposeService.DependsOn {
+		composeService := u.cfg.FindService(dcService)
+		if comma {
+			reason.WriteString(", ")
+		}
+		reason.WriteString(composeService.Name)
+		if healthiness == dockerComposeConfig.ServiceHealthy {
+			reason.WriteString(": ready")
+		} else {
+			reason.WriteString(": running")
+		}
+		comma = true
+	}
+	reason.WriteString(")")
+	return reason.String()
+}
+
 func (u *upRunner) run() error {
 	u.initApps()
 	u.initAppsToBeStarted()
@@ -703,11 +728,13 @@ func (u *upRunner) run() error {
 
 	for app := range u.appsToBeStarted {
 		// Begin pulling and pushing images immediately...
-		//nolint
+		// The error returned by getAppImageInfoOnce will be handled later, hence the nolint.
+		// nolint
 		go u.getAppImageInfoOnce(app)
 	}
 	// Begin creating services and collecting their cluster IPs (we'll need this to
-	// set the hostAliases of each pod)
+	// set the hostAliases of each pod).
+	// The error returned by getAppImageInfoOnce will be handled later, hence the nolint.
 	// nolint
 	go u.createServicesAndGetPodHostAliasesOnce()
 	for app := range u.appsToBeStarted {
