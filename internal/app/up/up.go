@@ -316,8 +316,10 @@ func (u *upRunner) waitForServiceClusterIPWatchEvent(event *k8swatch.Event) erro
 		if app != nil {
 			return k8smeta.ErrorResourcesModifiedExternally()
 		}
+	default:
+		return fmt.Errorf("got unexpected error event from channel: %+v", event.Object)
 	}
-	return fmt.Errorf("got unexpected error event from channel: %+v", event.Object)
+	return nil
 }
 
 func (u *upRunner) waitForServiceClusterIPWatch(expected, remaining int, eventChannel <-chan k8swatch.Event) error {
@@ -728,6 +730,42 @@ func (u *upRunner) formatCreatePodReason(app1 *app) string {
 	return reason.String()
 }
 
+func (u *upRunner) runStartInitialPods() error {
+	for app := range u.appsToBeStarted {
+		if len(app.composeService.DockerComposeService.DependsOn) != 0 {
+			continue
+		}
+		pod, err := u.createPod(app)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("app %s: created pod %s because all its dependency conditions are met\n", app.name(), pod.ObjectMeta.Name)
+		delete(u.appsToBeStarted, app)
+	}
+	return nil
+}
+
+func (u *upRunner) runListPodsAndCreateThemIfNeeded() (string, error) {
+	listOptions := metav1.ListOptions{
+		LabelSelector: u.cfg.EnvironmentLabel + "=" + u.cfg.EnvironmentID,
+	}
+	podList, err := u.k8sPodClient.List(listOptions)
+	if err != nil {
+		return "", err
+	}
+	for i := 0; i < len(podList.Items); i++ {
+		err = u.updateAppMaxObservedPodStatus(&podList.Items[i])
+		if err != nil {
+			return "", err
+		}
+	}
+	err = u.createPodsIfNeeded()
+	if err != nil {
+		return "", err
+	}
+	return podList.ResourceVersion, nil
+}
+
 func (u *upRunner) run() error {
 	u.initApps()
 	u.initAppsToBeStarted()
@@ -754,43 +792,60 @@ func (u *upRunner) run() error {
 	// The error returned by getAppImageInfoOnce will be handled later, hence the nolint.
 	// nolint
 	go u.createServicesAndGetPodHostAliasesOnce()
-	for app := range u.appsToBeStarted {
-		if len(app.composeService.DockerComposeService.DependsOn) != 0 {
-			continue
-		}
-		var pod *v1.Pod
-		pod, err = u.createPod(app)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("app %s: created pod %s because all its dependency conditions are met\n", app.name(), pod.ObjectMeta.Name)
-		delete(u.appsToBeStarted, app)
-	}
 
-	listOptions := metav1.ListOptions{
-		LabelSelector: u.cfg.EnvironmentLabel + "=" + u.cfg.EnvironmentID,
-	}
-	podList, err := u.k8sPodClient.List(listOptions)
-	if err != nil {
-		return err
-	}
-	for i := 0; i < len(podList.Items); i++ {
-		err = u.updateAppMaxObservedPodStatus(&podList.Items[i])
-		if err != nil {
-			return err
-		}
-	}
-	err = u.createPodsIfNeeded()
+	err = u.runStartInitialPods()
 	if err != nil {
 		return err
 	}
 
+	var resourceVersion string
+	resourceVersion, err = u.runListPodsAndCreateThemIfNeeded()
+	if err != nil {
+		return err
+	}
+	err = u.runWatchPods(resourceVersion)
+	if err != nil {
+		return err
+	}
+	// Wait for completed channels
+	for _, completedChannel := range u.completedChannels {
+		<-completedChannel
+	}
+	return nil
+}
+
+func (u *upRunner) runWatchPodsEvent(event *k8swatch.Event) error {
+	switch event.Type {
+	case k8swatch.Added, k8swatch.Modified:
+		pod := event.Object.(*v1.Pod)
+		err := u.updateAppMaxObservedPodStatus(pod)
+		if err != nil {
+			return err
+		}
+	case k8swatch.Deleted:
+		pod := event.Object.(*v1.Pod)
+		app, err := u.findAppFromObjectMeta(&pod.ObjectMeta)
+		if err != nil {
+			return err
+		}
+		if app != nil {
+			return k8smeta.ErrorResourcesModifiedExternally()
+		}
+	default:
+		return fmt.Errorf("got unexpected error event from channel: %+v", event.Object)
+	}
+	return u.createPodsIfNeeded()
+}
+
+func (u *upRunner) runWatchPods(resourceVersion string) error {
 	if u.checkIfPodsReady() {
 		fmt.Printf("pods ready (%d/%d)\n", len(u.appsThatNeedToBeReady), len(u.appsThatNeedToBeReady))
 		return nil
 	}
-
-	listOptions.ResourceVersion = podList.ResourceVersion
+	listOptions := metav1.ListOptions{
+		LabelSelector: u.cfg.EnvironmentLabel + "=" + u.cfg.EnvironmentID,
+	}
+	listOptions.ResourceVersion = resourceVersion
 	listOptions.Watch = true
 	watch, err := u.k8sPodClient.Watch(listOptions)
 	if err != nil {
@@ -803,27 +858,7 @@ func (u *upRunner) run() error {
 		if !ok {
 			return fmt.Errorf("channel unexpectedly closed")
 		}
-		switch event.Type {
-		case k8swatch.Added, k8swatch.Modified:
-			pod := event.Object.(*v1.Pod)
-			err = u.updateAppMaxObservedPodStatus(pod)
-			if err != nil {
-				return err
-			}
-		case k8swatch.Deleted:
-			pod := event.Object.(*v1.Pod)
-			var app *app
-			app, err = u.findAppFromObjectMeta(&pod.ObjectMeta)
-			if err != nil {
-				return err
-			}
-			if app != nil {
-				return k8smeta.ErrorResourcesModifiedExternally()
-			}
-		default:
-			return fmt.Errorf("got unexpected error event from channel: %+v", event.Object)
-		}
-		err = u.createPodsIfNeeded()
+		err = u.runWatchPodsEvent(&event)
 		if err != nil {
 			return err
 		}
@@ -832,10 +867,6 @@ func (u *upRunner) run() error {
 		}
 	}
 	fmt.Printf("pods ready (%d/%d)\n", len(u.appsThatNeedToBeReady), len(u.appsThatNeedToBeReady))
-	// Wait for completed channels
-	for _, completedChannel := range u.completedChannels {
-		<-completedChannel
-	}
 	return nil
 }
 
