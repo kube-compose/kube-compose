@@ -223,8 +223,10 @@ type composeFileService struct {
 		Context    string `mapdecode:"context"`
 		Dockerfile string `mapdecode:"dockerfile"`
 	} `mapdecode:"build"`
+	// TODO https://github.com/jbrekelmans/kube-compose/issues/153 interpret string command/entrypoint correctly
 	Command     stringOrStringSlice  `mapdecode:"command"`
 	DependsOn   *dependsOn           `mapdecode:"depends_on"`
+	// TODO https://github.com/jbrekelmans/kube-compose/issues/153 interpret string command/entrypoint correctly
 	Entrypoint  *stringOrStringSlice `mapdecode:"entrypoint"`
 	Environment environment          `mapdecode:"environment"`
 	Extends     *extends             `mapdecode:"extends"`
