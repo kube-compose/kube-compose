@@ -9,7 +9,7 @@ func TestParsePortBindings_InternalMinTooLarge(t *testing.T) {
 	_, err := parsePortBindings("65536", nil)
 	if err == nil {
 		t.Fail()
-	} 
+	}
 }
 
 func TestParsePortBindings_InternalMaxTooLarge(t *testing.T) {
@@ -36,10 +36,10 @@ func TestParsePortBindings_ExternalMaxTooLarge(t *testing.T) {
 func TestParsePortBindings_RandomlyAvailable(t *testing.T) {
 	expected := []PortBinding{
 		{
-			Internal: 8000,
+			Internal:    8000,
 			ExternalMin: 8000,
 			ExternalMax: 8001,
-			Protocol: "tcp",
+			Protocol:    "tcp",
 		},
 	}
 	actual, err := parsePortBindings("8000-8001:8000", nil)
@@ -62,18 +62,18 @@ func TestParsePortBindings_RangeLengthMismatch(t *testing.T) {
 func TestParsePortBindings_SuccessWithExternal1(t *testing.T) {
 	expected := []PortBinding{
 		{
-			Internal: 8000,
+			Internal:    8000,
 			ExternalMin: 8000,
 			ExternalMax: 8000,
-			Protocol: "udp",
-			Host: "127.0.0.1",
+			Protocol:    "udp",
+			Host:        "127.0.0.1",
 		},
 		{
-			Internal: 8001,
+			Internal:    8001,
 			ExternalMin: 8001,
 			ExternalMax: 8001,
-			Protocol: "udp",
-			Host: "127.0.0.1",
+			Protocol:    "udp",
+			Host:        "127.0.0.1",
 		},
 	}
 	actual, err := parsePortBindings("127.0.0.1:8000-8001:8000-8001/udp", nil)
@@ -88,11 +88,11 @@ func TestParsePortBindings_SuccessWithExternal1(t *testing.T) {
 func TestParsePortBindings_SuccessWithExternal2(t *testing.T) {
 	expected := []PortBinding{
 		{
-			Internal: 8000,
+			Internal:    8000,
 			ExternalMin: 8000,
 			ExternalMax: 8000,
-			Protocol: "udp",
-			Host: "127.0.0.1",
+			Protocol:    "udp",
+			Host:        "127.0.0.1",
 		},
 	}
 	actual, err := parsePortBindings("127.0.0.1:8000:8000/udp", nil)
@@ -108,16 +108,16 @@ func TestParsePortBindings_SuccessWithExternal2(t *testing.T) {
 func TestParsePortBindings_SuccessWithoutExternal(t *testing.T) {
 	expected := []PortBinding{
 		{
-			Internal: 8000,
+			Internal:    8000,
 			ExternalMin: -1,
 			ExternalMax: -1,
-			Protocol: "tcp",
+			Protocol:    "tcp",
 		},
 		{
-			Internal: 8001,
+			Internal:    8001,
 			ExternalMin: -1,
 			ExternalMax: -1,
-			Protocol: "tcp",
+			Protocol:    "tcp",
 		},
 	}
 	actual, err := parsePortBindings("8000-8001", nil)
