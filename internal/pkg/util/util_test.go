@@ -136,3 +136,10 @@ func TestUnescapeByte_Error3(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestFloatPointersPointToSameValue_OneNil(t *testing.T) {
+	fp1 := new(float64)
+	if FloatPointersPointToSameValue(fp1, nil) {
+		t.Fail()
+	}
+}
