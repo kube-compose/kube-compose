@@ -137,7 +137,7 @@ func TestInterpolate_BracesError2(t *testing.T) {
 }
 
 func TestInterpolate_BracesError3(t *testing.T) {
-	expected := "value"
+	expected := "valueBracesError3"
 	m := map[string]string{
 		"VAR1": expected,
 	}
