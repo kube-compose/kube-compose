@@ -146,6 +146,8 @@ func parsePortBindings(spec string, portBindings []PortBinding) ([]PortBinding, 
 	parser.protocol = matchMap["protocol"]
 	if parser.protocol == "" {
 		parser.protocol = "tcp"
+	} else {
+		parser.protocol = parser.protocol[1:]
 	}
 
 	err := parser.parseInternal(matchMap)
