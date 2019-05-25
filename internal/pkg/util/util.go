@@ -3,6 +3,7 @@ package util
 import (
 	"fmt"
 	"io"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -25,6 +26,26 @@ func BuildRegexpMatchMap(r HasSubexpNames, matches []string) map[string]string {
 		}
 	}
 	return matchMap
+}
+
+// FloatPointersPointToSameValue returns true if and only if:
+// 1. f1 and f2 are the same pointer value.
+// 2. f1 and f2 are both not nil and the floats to which they point are equal (==) or are both NaN.
+func FloatPointersPointToSameValue(f1, f2 *float64) bool {
+	if f1 == f2 {
+		return true
+	}
+	if f1 == nil || f2 == nil {
+		return false
+	}
+	return *f1 == *f2 || (math.IsNaN(*f1) && math.IsNaN(*f2))
+}
+
+// NewString allocates a string and assigns it value v.
+func NewString(v string) *string {
+	vp := new(string)
+	*vp = v
+	return vp
 }
 
 // CloseAndLogError closes the closer and logs any error it returns.

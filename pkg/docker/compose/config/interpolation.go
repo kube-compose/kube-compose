@@ -99,112 +99,146 @@ func InterpolateConfig(config genericMap, valueGetter ValueGetter, v *version.Ve
 	return c.run()
 }
 
+type stringInterpolator struct {
+	sb          strings.Builder
+	str         string
+	v           bool
+	valueGetter ValueGetter
+}
+
+func (k *stringInterpolator) advance(n int) {
+	k.str = k.str[n:]
+}
+
+func (k *stringInterpolator) processAfterDollarSignSimple() {
+	// The grammar of names without braces is [a-zA-Z_][a-zA-Z0-9_]+
+	// Scan until no letter, digit or underscore to find end of placeholder...
+	i := 1
+	for i < len(k.str) && (k.str[i] == '_' || IsASCIILetter(k.str[i]) || IsASCIIDigit(k.str[i])) {
+		i++
+	}
+	value, found := k.valueGetter(k.str[0:i])
+	if !found {
+		value = ""
+	}
+	k.sb.WriteString(value)
+	k.advance(i)
+}
+
+func (k *stringInterpolator) processCurlyBraceExpansionSimple(i int) {
+	value, found := k.valueGetter(k.str[1:i])
+	if !found {
+		value = ""
+	}
+	k.sb.WriteString(value)
+	k.advance(i + 1)
+}
+
+func (k *stringInterpolator) processCurlyBraceExpansionWithError(name, errorMsg string, treatEmptyAsUnset bool, i int) error {
+	value, found := k.valueGetter(name)
+	if !found || (value == "" && treatEmptyAsUnset) {
+		return fmt.Errorf("substitution variable %#v has no value or value is empty: %#v", name, errorMsg)
+	}
+	k.sb.WriteString(value)
+	k.advance(i + 1)
+	return nil
+}
+
+func (k *stringInterpolator) processCurlyBraceExpansionWithDefault(name, defaultVal string, treatEmptyAsUnset bool, i int) {
+	value, found := k.valueGetter(name)
+	if !found || (value == "" && treatEmptyAsUnset) {
+		value = defaultVal
+	}
+	k.sb.WriteString(value)
+	k.advance(i + 1)
+}
+
+func (k *stringInterpolator) processCurlyBraceExpansion(i int) error {
+	// Process what is between the two curly braces
+	if k.v {
+		j := strings.IndexAny(k.str[1:i], ":?-")
+		if j >= 0 {
+			j++
+			switch {
+			case k.str[j] == ':':
+				switch {
+				case k.str[j+1] == '?':
+					return k.processCurlyBraceExpansionWithError(k.str[1:j], k.str[j+2:i], true, i)
+				case k.str[j+1] == '-':
+					k.processCurlyBraceExpansionWithDefault(k.str[1:j], k.str[j+2:i], true, i)
+					return nil
+				}
+			case k.str[j] == '?':
+				return k.processCurlyBraceExpansionWithError(k.str[1:j], k.str[j+1:i], false, i)
+			default:
+				k.processCurlyBraceExpansionWithDefault(k.str[1:j], k.str[j+1:i], false, i)
+				return nil
+			}
+		}
+	}
+	k.processCurlyBraceExpansionSimple(i)
+	return nil
+}
+
+func (k *stringInterpolator) processAfterDollarSign() error {
+	if k.str[0] == '_' || IsASCIILetter(k.str[0]) {
+		k.processAfterDollarSignSimple()
+		return nil
+	}
+	if k.str[0] == '{' {
+		// Scan until '}' to perform substitution...
+		i := strings.IndexRune(k.str[1:], '}')
+		if i < 0 {
+			return fmt.Errorf("expected }")
+		}
+		i++
+		return k.processCurlyBraceExpansion(i)
+	}
+	if k.str[0] == '$' {
+		k.sb.WriteByte('$')
+		k.advance(1)
+		return nil
+	}
+	return fmt.Errorf("unexpected character after $")
+}
+
+func (k *stringInterpolator) getResult() string {
+	if k.sb.Len() == 0 {
+		// Fast path
+		return k.str
+	}
+	// WriteString always returns a nil error
+	k.sb.WriteString(k.str)
+	return k.sb.String()
+}
+
 // Interpolate substitutes docker-compose style variables in the str.
 // The docker-compose 2.1+ syntax is used if and only if version is true.
 // The implementation is not strict on the syntax between two paired curly braces, but
 // is otherwise identical to the Python implementation:
 // https://github.com/docker/compose/blob/master/compose/config/interpolation.py
-// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-// nolint
 func Interpolate(str string, valueGetter ValueGetter, v bool) (string, error) {
-	var sb strings.Builder
+	k := stringInterpolator{
+		str:         str,
+		v:           v,
+		valueGetter: valueGetter,
+	}
 	for {
-		i := strings.IndexRune(str, '$')
+		i := strings.IndexRune(k.str, '$')
 		if i < 0 {
 			break
 		}
-		sb.WriteString(str[:i])
-		str = str[i+1:]
-		if str == "" {
+		k.sb.WriteString(k.str[:i])
+		k.advance(i + 1)
+		if k.str == "" {
 			return "", fmt.Errorf("$ followed by EOF")
 		}
-		if str[0] == byte('_') || IsASCIILetter(str[0]) {
-			// The grammar of names without braces is [a-zA-Z_][a-zA-Z0-9_]+
-			// Scan until no letter, digit or underscore to find end of placeholder...
-			i = 1
-			for i < len(str) && (str[i] == byte('_') || IsASCIILetter(str[i]) || IsASCIIDigit(str[i])) {
-				i++
-			}
-			value, found := valueGetter(str[0:i])
-			if !found {
-				value = ""
-			}
-			sb.WriteString(value)
-			str = str[i:]
-			continue
+		err := k.processAfterDollarSign()
+		if err != nil {
+			return "", err
 		}
-		if str[0] == byte('{') {
-			// Scan until '}' to perform substitution...
-			i = strings.IndexRune(str[1:], '}')
-			if i < 0 {
-				return "", fmt.Errorf("expected }")
-			}
-			i++
-
-			// Process what is between the two curly braces
-			j := -1
-			treatEmptyAsUnset := false
-			hasErrorMsg := false
-			var errorMsgOrDefaultVal string
-			if v {
-				j = strings.IndexAny(str[1:i], ":?-")
-				if j >= 0 {
-					j++
-					switch {
-					case str[j] == byte(':'):
-						treatEmptyAsUnset = true
-						switch {
-						case str[j+1] == byte('?'):
-							hasErrorMsg = true
-							errorMsgOrDefaultVal = str[j+2 : i]
-						case str[j+1] == byte('-'):
-							errorMsgOrDefaultVal = str[j+2 : i]
-						default:
-							j = -1
-						}
-					case str[j] == byte('?'):
-						hasErrorMsg = true
-						errorMsgOrDefaultVal = str[j+1 : i]
-					default:
-						errorMsgOrDefaultVal = str[j+1 : i]
-					}
-				}
-			}
-			if j < 0 {
-				value, found := valueGetter(str[1:i])
-				if !found {
-					value = ""
-				}
-				sb.WriteString(value)
-				str = str[i+1:]
-				continue
-			}
-			name := str[1:j]
-			value, found := valueGetter(name)
-			if !found || (value == "" && treatEmptyAsUnset) {
-				if hasErrorMsg {
-					return "", fmt.Errorf("substitution variable %#v has no value or value is empty: %#v", name, errorMsgOrDefaultVal)
-				}
-				value = errorMsgOrDefaultVal
-			}
-			sb.WriteString(value)
-			str = str[i+1:]
-			continue
-		}
-		if str[0] == byte('$') {
-			sb.WriteByte('$')
-			str = str[1:]
-			continue
-		}
-		return "", fmt.Errorf("unexpected character after $")
 	}
-	if sb.Len() == 0 {
-		// Fast path
-		return str, nil
-	}
-	// WriteString always returns a nil error
-	sb.WriteString(str)
-	return sb.String(), nil
+	return k.getResult(), nil
 }
 
 // IsASCIILetter returns true if and only if b is the ASCII code for a letter.

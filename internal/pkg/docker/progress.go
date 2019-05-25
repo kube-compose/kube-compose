@@ -80,7 +80,7 @@ var (
 	staticPushStatusInfoFromLabel map[string]*staticStatusInfo
 )
 
-// Special init function for this package
+// This init function is fine, ignoring linting warning.
 // nolint
 func init() {
 	n := len(staticPullStatusInfoSlice)
@@ -163,12 +163,54 @@ func (d *PullOrPush) Progress() float64 {
 	return sum / float64(count)
 }
 
-// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-// nolint
+type pullOrPushWaiter struct {
+	digest    string
+	lastError string
+	onUpdate  func(*PullOrPush)
+}
+
+func (waiter *pullOrPushWaiter) handleMessage(d *PullOrPush, msg *jsonmessage.JSONMessage) {
+	statusEnum := d.staticStatusInfoFromLabel[msg.Status]
+	if statusEnum != nil {
+		s := d.statusFromLayer[msg.ID]
+		if s == nil {
+			s = &status{}
+			d.statusFromLayer[msg.ID] = s
+		}
+		s.statusEnum = statusEnum
+		s.progress = msg.Progress
+		waiter.onUpdate(d)
+		// TODO https://github.com/jbrekelmans/kube-compose/issues/5 support non-sha256 digests
+	} else if loc := digestRegExp.FindStringIndex(msg.Status); loc != nil {
+		y := sha256BitLength/4 + len(sha256Prefix)
+		waiter.digest = msg.Status[loc[0] : loc[0]+y]
+	} else if msg.Error != nil && len(msg.Error.Message) > 0 {
+		waiter.lastError = msg.Error.Message
+	}
+}
+
+func (waiter *pullOrPushWaiter) end(d *PullOrPush) (string, error) {
+	if waiter.digest == "" {
+		verb := "pushing"
+		if d.isPull {
+			verb = "pulling"
+		}
+		if waiter.lastError != "" {
+			return "", fmt.Errorf("error while %s image: %s", verb, waiter.lastError)
+		}
+		return "", fmt.Errorf("unknown error while %s image", verb)
+	}
+	return waiter.digest, nil
+}
+
+// Wait processes a JSON stream (the body of an image pull docker HTTP response) and returns an error as soon as an error is encountered in
+// the stream, or the digest could not be parsd aftere processing the entire stream. Otherwise, it returns the digest string and a no error.
+// onUpdate is called whenever d.Progress() may return a different value from the previous call.
 func (d *PullOrPush) Wait(onUpdate func(*PullOrPush)) (string, error) {
+	waiter := pullOrPushWaiter{
+		onUpdate: onUpdate,
+	}
 	decoder := json.NewDecoder(d.reader)
-	digest := ""
-	var lastError string
 	for {
 		var msg jsonmessage.JSONMessage
 		err := decoder.Decode(&msg)
@@ -178,33 +220,7 @@ func (d *PullOrPush) Wait(onUpdate func(*PullOrPush)) (string, error) {
 			}
 			return "", err
 		}
-		statusEnum := d.staticStatusInfoFromLabel[msg.Status]
-		if statusEnum != nil {
-			s := d.statusFromLayer[msg.ID]
-			if s == nil {
-				s = &status{}
-				d.statusFromLayer[msg.ID] = s
-			}
-			s.statusEnum = statusEnum
-			s.progress = msg.Progress
-			onUpdate(d)
-			// TODO https://github.com/jbrekelmans/kube-compose/issues/5 support non-sha256 digests
-		} else if loc := digestRegExp.FindStringIndex(msg.Status); loc != nil {
-			y := sha256BitLength/4 + len(sha256Prefix)
-			digest = msg.Status[loc[0] : loc[0]+y]
-		} else if msg.Error != nil && len(msg.Error.Message) > 0 {
-			lastError = msg.Error.Message
-		}
+		waiter.handleMessage(d, &msg)
 	}
-	if digest == "" {
-		verb := "pushing"
-		if d.isPull {
-			verb = "pulling"
-		}
-		if len(lastError) > 0 {
-			return "", fmt.Errorf("error while %s image: %s", verb, lastError)
-		}
-		return "", fmt.Errorf("unknown error while %s image", verb)
-	}
-	return digest, nil
+	return waiter.end(d)
 }

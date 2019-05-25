@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 	"github.com/uber-go/mapdecode"
 )
 
@@ -128,8 +129,7 @@ func (v *environmentValue) Decode(into mapdecode.Into) error {
 	var s string
 	err = into(&s)
 	if err == nil {
-		v.StringValue = new(string)
-		*v.StringValue = s
+		v.StringValue = util.NewString(s)
 	}
 	return err
 }

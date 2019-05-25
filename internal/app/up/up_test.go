@@ -5,6 +5,7 @@ import (
 
 	"github.com/jbrekelmans/kube-compose/internal/app/config"
 	dockerComposeConfig "github.com/jbrekelmans/kube-compose/pkg/docker/compose/config"
+	"k8s.io/client-go/rest"
 )
 
 const (
@@ -15,16 +16,19 @@ const (
 
 func newTestConfig() *config.Config {
 	cfg := &config.Config{}
-	cfg.AddService("a", &dockerComposeConfig.Service{
+	serviceA := cfg.AddService("a", &dockerComposeConfig.Service{
 		Restart: "no",
 	})
 	cfg.AddService("b", &dockerComposeConfig.Service{
 		Restart: "always",
 	})
-	cfg.AddService("c", &dockerComposeConfig.Service{
+	serviceC := cfg.AddService("c", &dockerComposeConfig.Service{
 		Restart: "on-failure",
 	})
-	cfg.AddService("d", &dockerComposeConfig.Service{})
+	serviceD := cfg.AddService("d", &dockerComposeConfig.Service{})
+	serviceA.DockerComposeService.DependsOn = map[*dockerComposeConfig.Service]dockerComposeConfig.ServiceHealthiness{}
+	serviceA.DockerComposeService.DependsOn[serviceC.DockerComposeService] = dockerComposeConfig.ServiceHealthy
+	serviceA.DockerComposeService.DependsOn[serviceD.DockerComposeService] = dockerComposeConfig.ServiceStarted
 	return cfg
 }
 
@@ -89,5 +93,35 @@ func TestAppHasService_True(t *testing.T) {
 	}
 	if !app.hasService() {
 		t.Fail()
+	}
+}
+
+func TestUpRunnerInitKubernetesClientset(t *testing.T) {
+	kubeConfig := &rest.Config{
+		Host: "http://localhost:8443/",
+	}
+	cfg := &config.Config{
+		KubeConfig: kubeConfig,
+	}
+	u := &upRunner{
+		cfg: cfg,
+	}
+	err := u.initKubernetesClientset()
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestFormatCreatePodReason(t *testing.T) {
+	cfg := newTestConfig()
+	u := &upRunner{
+		cfg: cfg,
+	}
+	u.initApps()
+	appA := u.apps["a"]
+	s := u.formatCreatePodReason(appA)
+	if s != "its dependency conditions are met (c: ready, d: running)" &&
+		s != "its dependency conditions are met (d: running, c: ready)" {
+		t.Error(s)
 	}
 }

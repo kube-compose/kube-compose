@@ -52,8 +52,6 @@ func (cfg *Config) FindService(dockerComposeService *dockerComposeConfig.Service
 	return cfg.Services[dockerComposeService]
 }
 
-// TODO: https://github.com/jbrekelmans/kube-compose/issues/64
-// nolint
 func New(file *string) (*Config, error) {
 	var files []string
 	if file != nil {

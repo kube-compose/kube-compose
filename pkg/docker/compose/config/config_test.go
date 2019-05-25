@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	fsPackage "github.com/jbrekelmans/kube-compose/internal/pkg/fs"
+	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 	"github.com/pkg/errors"
 )
 
@@ -285,10 +286,10 @@ func assertComposeFileServicesEqual(t *testing.T, services1, services2 map[strin
 			t.Fail()
 		} else {
 			if len(service1.dependsOn) > 0 || len(service2.dependsOn) > 0 {
-				t.Fail()
+				panic("services must not have depends on")
 			}
 			if service1.extends != nil || service2.extends != nil {
-				t.Fail()
+				panic("services must not have extends")
 			}
 			assertServicesEqual(t, service1.service, service2.service, true)
 		}
@@ -405,9 +406,7 @@ func assertServicesEqualContinued(t *testing.T, service1, service2 *Service, ign
 		t.Fail()
 	}
 	if !ignoreDependsOn && (len(service1.DependsOn) > 0 || len(service2.DependsOn) > 0) {
-		t.Logf("dependsOn1: %+v\n", service1.DependsOn)
-		t.Logf("dependsOn2: %+v\n", service2.DependsOn)
-		t.Fail()
+		panic("services must not have depends on")
 	}
 }
 
@@ -758,10 +757,9 @@ func TestParseComposeFileService_InvalidHealthcheckError(t *testing.T) {
 	c := newTestConfigLoader(nil)
 	cfService := &composeFileService{
 		Healthcheck: &ServiceHealthcheck{
-			Timeout: new(string),
+			Timeout: util.NewString("henkie"),
 		},
 	}
-	*cfService.Healthcheck.Timeout = "henkie"
 	_, err := c.parseComposeFileService(cfService)
 	if err == nil {
 		t.Fail()
