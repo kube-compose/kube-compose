@@ -68,7 +68,10 @@ func New(file *string) (*Config, error) {
 	cfg.Services = map[*dockerComposeConfig.Service]*Service{}
 	for name, dcService := range dcCfg.Services {
 		if e := validation.IsDNS1123Subdomain(name); len(e) > 0 {
-			return nil, fmt.Errorf("sorry, we do not support the potentially valid docker-compose service named %s: %s", name, e[0])
+			return nil, fmt.Errorf("sorry, we do not support the potentially valid docker compose service named %s: %s", name, e[0])
+		}
+		if dcService.EntrypointPresent && len(dcService.Entrypoint) == 0 {
+			return nil, fmt.Errorf("error at docker compose service %s: entrypoint cannot be set to an empty array", name)
 		}
 		service := &Service{
 			DockerComposeService: dcService,

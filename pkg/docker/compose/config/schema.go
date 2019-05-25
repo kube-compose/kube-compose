@@ -223,17 +223,20 @@ type composeFileService struct {
 		Context    string `mapdecode:"context"`
 		Dockerfile string `mapdecode:"dockerfile"`
 	} `mapdecode:"build"`
-	DependsOn   *dependsOn          `mapdecode:"depends_on"`
-	Entrypoint  stringOrStringSlice `mapdecode:"entrypoint"`
-	Environment environment         `mapdecode:"environment"`
-	Extends     *extends            `mapdecode:"extends"`
-	Healthcheck *ServiceHealthcheck `mapdecode:"healthcheck"`
-	Image       string              `mapdecode:"image"`
-	Ports       []port              `mapdecode:"ports"`
-	User        *string             `mapdecode:"user"`
-	Volumes     []string            `mapdecode:"volumes"`
-	WorkingDir  string              `mapdecode:"working_dir"`
-	Restart     string              `mapdecode:"restart"`
+	// TODO https://github.com/jbrekelmans/kube-compose/issues/153 interpret string command/entrypoint correctly
+	Command   stringOrStringSlice `mapdecode:"command"`
+	DependsOn *dependsOn          `mapdecode:"depends_on"`
+	// TODO https://github.com/jbrekelmans/kube-compose/issues/153 interpret string command/entrypoint correctly
+	Entrypoint  *stringOrStringSlice `mapdecode:"entrypoint"`
+	Environment environment          `mapdecode:"environment"`
+	Extends     *extends             `mapdecode:"extends"`
+	Healthcheck *ServiceHealthcheck  `mapdecode:"healthcheck"`
+	Image       string               `mapdecode:"image"`
+	Ports       []port               `mapdecode:"ports"`
+	User        *string              `mapdecode:"user"`
+	Volumes     []string             `mapdecode:"volumes"`
+	WorkingDir  string               `mapdecode:"working_dir"`
+	Restart     string               `mapdecode:"restart"`
 }
 
 type composeFile struct {
