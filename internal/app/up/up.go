@@ -282,59 +282,53 @@ func (u *upRunner) waitForServiceClusterIPCountRemaining() int {
 	return remaining
 }
 
-func (u *upRunner) waitForServiceClusterIP(expected int) error {
-	listOptions := metav1.ListOptions{
-		LabelSelector: u.cfg.EnvironmentLabel + "=" + u.cfg.EnvironmentID,
-	}
-	serviceList, err := u.k8sServiceClient.List(listOptions)
+func (u *upRunner) waitForServiceClusterIPList(expected int, listOptions *metav1.ListOptions) (string, error) {
+	serviceList, err := u.k8sServiceClient.List(*listOptions)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if len(serviceList.Items) < expected {
-		return k8smeta.ErrorResourcesModifiedExternally()
+		return "", k8smeta.ErrorResourcesModifiedExternally()
 	}
 	for i := 0; i < len(serviceList.Items); i++ {
 		_, err = u.waitForServiceClusterIPUpdate(&serviceList.Items[i])
 		if err != nil {
-			return err
+			return "", err
 		}
 	}
-	remaining := u.waitForServiceClusterIPCountRemaining()
-	fmt.Printf("waiting for cluster IP assignment (%d/%d)\n", expected-remaining, expected)
-	if remaining == 0 {
-		return nil
+	return serviceList.ResourceVersion, nil
+}
+
+func (u *upRunner) waitForServiceClusterIPWatchEvent(event *k8swatch.Event) error {
+	switch event.Type {
+	case k8swatch.Added, k8swatch.Modified:
+		service := event.Object.(*v1.Service)
+		_, err := u.waitForServiceClusterIPUpdate(service)
+		if err != nil {
+			return err
+		}
+	case k8swatch.Deleted:
+		service := event.Object.(*v1.Service)
+		app, err := u.findAppFromObjectMeta(&service.ObjectMeta)
+		if err != nil {
+			return err
+		}
+		if app != nil {
+			return k8smeta.ErrorResourcesModifiedExternally()
+		}
 	}
-	listOptions.ResourceVersion = serviceList.ResourceVersion
-	listOptions.Watch = true
-	watch, err := u.k8sServiceClient.Watch(listOptions)
-	if err != nil {
-		return err
-	}
-	defer watch.Stop()
-	eventChannel := watch.ResultChan()
+	return fmt.Errorf("got unexpected error event from channel: %+v", event.Object)
+}
+
+func (u *upRunner) waitForServiceClusterIPWatch(expected, remaining int, eventChannel <-chan k8swatch.Event) error {
 	for {
 		event, ok := <-eventChannel
 		if !ok {
 			return fmt.Errorf("channel unexpectedly closed")
 		}
-		switch event.Type {
-		case k8swatch.Added, k8swatch.Modified:
-			service := event.Object.(*v1.Service)
-			_, err := u.waitForServiceClusterIPUpdate(service)
-			if err != nil {
-				return err
-			}
-		case k8swatch.Deleted:
-			service := event.Object.(*v1.Service)
-			app, err := u.findAppFromObjectMeta(&service.ObjectMeta)
-			if err != nil {
-				return err
-			}
-			if app != nil {
-				return k8smeta.ErrorResourcesModifiedExternally()
-			}
-		default:
-			return fmt.Errorf("got unexpected error event from channel: %+v", event.Object)
+		err := u.waitForServiceClusterIPWatchEvent(&event)
+		if err != nil {
+			return err
 		}
 		remainingNew := u.waitForServiceClusterIPCountRemaining()
 		if remainingNew != remaining {
@@ -346,6 +340,29 @@ func (u *upRunner) waitForServiceClusterIP(expected int) error {
 		}
 	}
 	return nil
+}
+
+func (u *upRunner) waitForServiceClusterIP(expected int) error {
+	listOptions := metav1.ListOptions{
+		LabelSelector: u.cfg.EnvironmentLabel + "=" + u.cfg.EnvironmentID,
+	}
+	remaining := u.waitForServiceClusterIPCountRemaining()
+	resourceVersion, err := u.waitForServiceClusterIPList(expected, &listOptions)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("waiting for cluster IP assignment (%d/%d)\n", expected-remaining, expected)
+	if remaining == 0 {
+		return nil
+	}
+	listOptions.ResourceVersion = resourceVersion
+	listOptions.Watch = true
+	watch, err := u.k8sServiceClient.Watch(listOptions)
+	if err != nil {
+		return err
+	}
+	defer watch.Stop()
+	return u.waitForServiceClusterIPWatch(expected, remaining, watch.ResultChan())
 }
 
 func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) {
@@ -630,13 +647,13 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 			}
 		}
 	}
-	podStatus, err := parsePodStatus(pod)
+	s, err := parsePodStatus(pod)
 	if err != nil {
 		return err
 	}
 
-	if podStatus > app.maxObservedPodStatus {
-		app.maxObservedPodStatus = podStatus
+	if s > app.maxObservedPodStatus {
+		app.maxObservedPodStatus = s
 		fmt.Printf("app %s: pod status %s\n", app.name(), &app.maxObservedPodStatus)
 	}
 

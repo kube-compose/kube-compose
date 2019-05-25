@@ -164,7 +164,6 @@ func (d *PullOrPush) Progress() float64 {
 }
 
 type pullOrPushWaiter struct {
-	d		  *PullOrPush
 	digest    string
 	lastError string
 	onUpdate  func(*PullOrPush)

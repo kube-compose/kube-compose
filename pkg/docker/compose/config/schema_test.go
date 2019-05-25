@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/uber-go/mapdecode"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
+	"github.com/uber-go/mapdecode"
 )
 
 func TestPortDecode_SuccessInt(t *testing.T) {
@@ -164,7 +164,7 @@ func TestEnvironmentDecode_MapSuccess(t *testing.T) {
 				},
 			},
 			{
-				Name: "VAR4",
+				Name:  "VAR4",
 				Value: &environmentValue{},
 			},
 		},
@@ -173,7 +173,7 @@ func TestEnvironmentDecode_MapSuccess(t *testing.T) {
 	err := mapdecode.Decode(&dst, src)
 	if err != nil {
 		t.Error(err)
-	} else if (!areEnvironmentsEqual(dst, exp)) {
+	} else if !areEnvironmentsEqual(dst, exp) {
 		t.Logf("env1: %+v\n", dst)
 		t.Logf("env2: %+v\n", exp)
 		t.Fail()
@@ -214,10 +214,10 @@ func areEnvironmentsEqual(env1, env2 environment) bool {
 	if hasDuplicateNames(env1) || hasDuplicateNames(env2) {
 		panic("env1 or env2 has duplicate namees")
 	}
-	for i := 0 ; i < n ; i++ {
+	for i := 0; i < n; i++ {
 		pair1 := &env1.Values[i]
 		found := false
-		for j := 0 ; j < n; j++ {
+		for j := 0; j < n; j++ {
 			pair2 := &env2.Values[j]
 			if pair1.Name == pair2.Name && areEnvironmentValuesEqual(pair1.Value, pair2.Value) {
 				found = true
