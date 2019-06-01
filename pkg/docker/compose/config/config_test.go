@@ -754,7 +754,7 @@ func TestParseComposeFileService_InvalidPortsError(t *testing.T) {
 			},
 		},
 	}
-	_, err := c.parseComposeFileService(cfService)
+	_, err := c.parseComposeFileService("", cfService)
 	if err == nil {
 		t.Fail()
 	}
@@ -767,7 +767,7 @@ func TestParseComposeFileService_InvalidHealthcheckError(t *testing.T) {
 			Timeout: util.NewString("henkie"),
 		},
 	}
-	_, err := c.parseComposeFileService(cfService)
+	_, err := c.parseComposeFileService("", cfService)
 	if err == nil {
 		t.Fail()
 	}

@@ -218,6 +218,24 @@ func (p *port) Decode(into mapdecode.Into) error {
 	return err
 }
 
+// ServiceVolume represents the volume of a service.
+type ServiceVolume struct {
+	Short *PathMapping
+}
+
+// Decode parses either the long or short syntax of a docker-compose service volume into the ServiceVolume type.
+func (sv *ServiceVolume) Decode(into mapdecode.Into) error {
+	var shortSyntax string
+	err := into(&shortSyntax)
+	if err == nil {
+		sv.Short = &PathMapping{}
+		*sv.Short = parsePathMapping(shortSyntax)
+		return nil
+	}
+	// TODO https://github.com/jbrekelmans/kube-compose/issues/161 support long volume syntax
+	return err
+}
+
 type composeFileService struct {
 	Build *struct {
 		Context    string `mapdecode:"context"`
@@ -236,7 +254,7 @@ type composeFileService struct {
 	Image       string               `mapdecode:"image"`
 	Ports       []port               `mapdecode:"ports"`
 	User        *string              `mapdecode:"user"`
-	Volumes     []string             `mapdecode:"volumes"`
+	Volumes     []ServiceVolume      `mapdecode:"volumes"`
 	WorkingDir  string               `mapdecode:"working_dir"`
 	Restart     string               `mapdecode:"restart"`
 }
