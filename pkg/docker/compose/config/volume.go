@@ -100,7 +100,7 @@ func ntpathVolumeNameLengthCore(s string) int {
 		if index >= n {
 			return 0
 		}
-		if !isSlash(s[index]) {
+		if isSlash(s[index]) {
 			break
 		}
 		index++
@@ -114,7 +114,7 @@ func ntpathVolumeNameLengthCore(s string) int {
 			return n
 		}
 		if isSlash(s[index2]) {
-			return index2 - 1
+			return index2
 		}
 		index2++
 	}
