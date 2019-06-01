@@ -86,6 +86,9 @@ func ntpathVolumeNameLength(s string) int {
 		if isSlash(s[0]) && isSlash(s[1]) && (n < 3 || !isSlash(s[2])) {
 			return ntpathVolumeNameLengthCore(s)
 		}
+		if s[1] == ':' {
+			return 2
+		}
 	}
 	return 0
 }
