@@ -5,6 +5,7 @@ func merge(into, from *composeFileParsedService) {
 	mergeStringMaps(into.service.Environment, from.service.Environment)
 	into.service.Ports = mergePortBindings(into.service.Ports, from.service.Ports)
 	// TODO https://github.com/jbrekelmans/kube-compose/issues/48 add missing rules here
+	// TODO https://github.com/jbrekelmans/kube-compose/issues/164 support merging of volumes
 }
 
 func mergeStringMaps(intoStringMap, fromStringMap map[string]string) {

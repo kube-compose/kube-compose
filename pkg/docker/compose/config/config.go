@@ -55,6 +55,7 @@ type Service struct {
 	Image               string
 	Ports               []PortBinding
 	User                *string
+	Volumes             []ServiceVolume
 	WorkingDir          string
 	Restart             string
 }
@@ -335,10 +336,13 @@ func New(files []string) (*CanonicalDockerComposeConfig, error) {
 			return nil, err
 		}
 	}
-	err := c.resolveDependsOn(cfParsed)
+	err := resolveDependsOn(cfParsed)
 	if err != nil {
 		return nil, err
 	}
+
+	// TODO https://github.com/jbrekelmans/kube-compose/issues/165 resolve named volumes
+	// TODO https://github.com/jbrekelmans/kube-compose/issues/166 error on duplicate mount points
 
 	configCanonical := &CanonicalDockerComposeConfig{}
 	configCanonical.Services = map[string]*Service{}
@@ -368,7 +372,7 @@ func getXProperties(gm interface{}) XProperties {
 	return result
 }
 
-func (c *configLoader) resolveDependsOn(cfParsed *composeFileParsed) error {
+func resolveDependsOn(cfParsed *composeFileParsed) error {
 	for name1, cfServiceParsed := range cfParsed.services {
 		service := cfServiceParsed.service
 		service.DependsOn = map[*Service]ServiceHealthiness{}
@@ -419,7 +423,7 @@ func ensureNoDependsOnCycle(name1 string, cfServiceParsed *composeFileParsedServ
 func (c *configLoader) parseComposeFile(cf *composeFile, cfParsed *composeFileParsed) error {
 	cfParsed.services = make(map[string]*composeFileParsedService, len(cf.Services))
 	for name, cfService := range cf.Services {
-		composeFileParsedService, err := c.parseComposeFileService(cfService)
+		composeFileParsedService, err := c.parseComposeFileService(cfParsed.resolvedFile, cfService)
 		if err != nil {
 			return err
 		}
@@ -428,11 +432,12 @@ func (c *configLoader) parseComposeFile(cf *composeFile, cfParsed *composeFilePa
 	return nil
 }
 
-func (c *configLoader) parseComposeFileService(cfService *composeFileService) (*composeFileParsedService, error) {
+func (c *configLoader) parseComposeFileService(resolvedFile string, cfService *composeFileService) (*composeFileParsedService, error) {
 	service := &Service{
 		Command:    cfService.Command.Values,
 		Image:      cfService.Image,
 		User:       cfService.User,
+		Volumes:    cfService.Volumes,
 		WorkingDir: cfService.WorkingDir,
 		Restart:    cfService.Restart,
 	}
@@ -465,6 +470,11 @@ func (c *configLoader) parseComposeFileService(cfService *composeFileService) (*
 		return nil, err
 	}
 	service.Environment = environment
+
+	// TODO https://github.com/jbrekelmans/kube-compose/issues/163 only resolve volume paths if volume_driver is not set.
+	for i := 0; i < len(service.Volumes); i++ {
+		resolveVolumePath(resolvedFile, &service.Volumes[i])
+	}
 
 	return composeFileParsedService, nil
 }

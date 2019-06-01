@@ -400,3 +400,31 @@ func TestStringOrStringSliceDecode_Error(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestServiceVolumeDecode_Success(t *testing.T) {
+	src := "aa:bb:cc"
+	var dst ServiceVolume
+	err := mapdecode.Decode(&dst, src)
+	if err != nil {
+		t.Error(err)
+	} else if !reflect.DeepEqual(dst, ServiceVolume{
+		Short: &PathMapping{
+			ContainerPath: "bb",
+			HasHostPath:   true,
+			HasMode:       true,
+			HostPath:      "aa",
+			Mode:          "cc",
+		},
+	}) {
+		t.Fail()
+	}
+}
+
+func TestServiceVolumeDecode_Error(t *testing.T) {
+	src := 0
+	var dst ServiceVolume
+	err := mapdecode.Decode(&dst, src)
+	if err == nil {
+		t.Fail()
+	}
+}
