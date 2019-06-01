@@ -218,7 +218,7 @@ func (p *port) Decode(into mapdecode.Into) error {
 	return err
 }
 
-// ServiceVolume represents the volume of a service.
+// ServiceVolume is the type used to encode each volume of a docker compose service.
 type ServiceVolume struct {
 	Short *PathMapping
 }

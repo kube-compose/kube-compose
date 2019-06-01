@@ -6,7 +6,7 @@ import (
 )
 
 // PathMapping is a representation of a short docker-compose volume.
-// Instead of a string pointer we use a pair of boolean and string for host path and mode, respectively. This is because
+// Instead of a string pointer we use a pair of boolean and string for host path and mode. This is because
 // merging (and detection of duplicates) is to be implemented with struct equality. Defining the struct this way would align
 // the merging behavior with docker compose.
 type PathMapping struct {
