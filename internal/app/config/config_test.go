@@ -84,20 +84,12 @@ func TestAddService_ErrorServiceHasDependsOn(t *testing.T) {
 }
 
 var dockerComposeYmlInvalidServiceName = "docker-compose.invalid-service-name.yml"
-var dockerComposeYmlEmptyEntrypoint = "docker-compose.empty-entrypoint.yml"
 var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
 	dockerComposeYmlInvalidServiceName: {
 		Content: []byte(`version: '2'
 services:
   '!!':
     image: ubuntu:latest
-`),
-	},
-	dockerComposeYmlEmptyEntrypoint: {
-		Content: []byte(`version: '2'
-services:
-  testservice:
-    entrypoint: []
 `),
 	},
 })
@@ -114,16 +106,6 @@ func withMockFS(cb func()) {
 func TestNew_InvalidServiceName(t *testing.T) {
 	withMockFS(func() {
 		_, err := New(util.NewString(dockerComposeYmlInvalidServiceName))
-		if err == nil {
-			t.Fail()
-		} else {
-			t.Log(err)
-		}
-	})
-}
-func TestNew_EmptyEntrypointError(t *testing.T) {
-	withMockFS(func() {
-		_, err := New(util.NewString(dockerComposeYmlEmptyEntrypoint))
 		if err == nil {
 			t.Fail()
 		} else {
