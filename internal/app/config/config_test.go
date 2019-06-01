@@ -1,6 +1,7 @@
 package config
 
 import (
+	"reflect"
 	"testing"
 
 	fsPackage "github.com/jbrekelmans/kube-compose/internal/pkg/fs"
@@ -83,9 +84,14 @@ func TestAddService_ErrorServiceHasDependsOn(t *testing.T) {
 	})
 }
 
+var dockerComposeYmlInvalid = "docker-compose.invalid.yml"
 var dockerComposeYmlInvalidServiceName = "docker-compose.invalid-service-name.yml"
 var dockerComposeYmlInvalidXKubeCompose = "docker-compose.invalid-x-kube-compose.yml"
+var dockerComposeYmlValidPushImages = "docker-compose.valid-push-images.yml"
 var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
+	dockerComposeYmlInvalid: {
+		Content: []byte(`version: 'asdf'`),
+	},
 	dockerComposeYmlInvalidServiceName: {
 		Content: []byte(`version: '2'
 services:
@@ -103,6 +109,13 @@ x-kube-compose:
   push_images: ""
 `),
 	},
+	dockerComposeYmlValidPushImages: {
+		Content: []byte(`version: '2'
+x-kube-compose:
+  push_images:
+    docker_registry: 'my-docker-registry.example.com'
+`),
+	},
 })
 
 func withMockFS(cb func()) {
@@ -112,6 +125,17 @@ func withMockFS(cb func()) {
 	}()
 	dockerComposeConfig.FS = mockFileSystem
 	cb()
+}
+
+func TestNew_Invalid(t *testing.T) {
+	withMockFS(func() {
+		_, err := New(util.NewString(dockerComposeYmlInvalid))
+		if err == nil {
+			t.Fail()
+		} else {
+			t.Log(err)
+		}
+	})
 }
 
 func TestNew_InvalidServiceName(t *testing.T) {
@@ -132,6 +156,24 @@ func TestNew_InvalidXKubeCompose(t *testing.T) {
 			t.Fail()
 		} else {
 			t.Log(err)
+		}
+	})
+}
+
+func TestNew_ValidPushImages(t *testing.T) {
+	withMockFS(func() {
+		c, err := New(util.NewString(dockerComposeYmlValidPushImages))
+		if err != nil {
+			t.Error(err)
+		} else {
+			expected := &PushImagesConfig{
+				DockerRegistry: "my-docker-registry.example.com",
+			}
+			if !reflect.DeepEqual(c.PushImages, expected) {
+				t.Logf("pushImages1: %+v\n", c.PushImages)
+				t.Logf("pushImages2: %+v\n", expected)
+				t.Fail()
+			}
 		}
 	})
 }
