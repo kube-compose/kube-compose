@@ -227,6 +227,8 @@ type composeFileService struct {
 	Command   stringOrStringSlice `mapdecode:"command"`
 	DependsOn *dependsOn          `mapdecode:"depends_on"`
 	// TODO https://github.com/jbrekelmans/kube-compose/issues/153 interpret string command/entrypoint correctly
+	// TODO https://github.com/jbrekelmans/kube-compose/issues/157 just use []string instead of *[]string to distinguish between empty slice
+	// and absent slice.
 	Entrypoint  *stringOrStringSlice `mapdecode:"entrypoint"`
 	Environment environment          `mapdecode:"environment"`
 	Extends     *extends             `mapdecode:"extends"`
