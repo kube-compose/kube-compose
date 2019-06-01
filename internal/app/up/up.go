@@ -36,6 +36,7 @@ type appImageInfo struct {
 	once             *sync.Once
 	podImage         string
 	sourceImageID    string
+	cmd              []string
 	user             *docker.Userinfo
 }
 
@@ -152,6 +153,7 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 	if err != nil {
 		return err
 	}
+	app.imageInfo.cmd = inspect.Config.Cmd
 	err = u.getAppImageEnsureCorrectPodImage(app, sourceImageRef, sourceImage)
 	if err != nil {
 		return err
@@ -538,14 +540,31 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 			securityContext.RunAsGroup = app.imageInfo.user.GID
 		}
 	}
+	var args []string
+	var command []string
+	// docker-compose does not ignore the entrypoint if it is an empty array. For example: if the entrypoint is empty but the command is not
+	// empty then the entrypoint becomes the command. But the Kubernetes client treats an empty entrypoint array as an unset entrypoint,
+	// consequently the image's entrypoint will be used. This if-else statement bridges the gap in behaviour.
+	if app.composeService.DockerComposeService.EntrypointPresent && len(app.composeService.DockerComposeService.Entrypoint) == 0 {
+		command = app.composeService.DockerComposeService.Command
+		if len(command) == 0 {
+			command = app.imageInfo.cmd
+			if len(command) == 0 {
+				return nil, fmt.Errorf("cannot create container for app %s because it would have no command", app.name())
+			}
+		}
+	} else {
+		command = app.composeService.DockerComposeService.Entrypoint
+		args = app.composeService.DockerComposeService.Command
+	}
 	pod := &v1.Pod{
 		Spec: v1.PodSpec{
 			// new(bool) allocates a bool, sets it to false, and returns a pointer to it.
 			AutomountServiceAccountToken: new(bool),
 			Containers: []v1.Container{
 				{
-					Args:            app.composeService.DockerComposeService.Command,
-					Command:         app.composeService.DockerComposeService.Entrypoint,
+					Args:            args,
+					Command:         command,
 					Env:             envVars,
 					Image:           app.imageInfo.podImage,
 					ImagePullPolicy: v1.PullAlways,
