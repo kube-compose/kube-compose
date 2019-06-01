@@ -31,6 +31,8 @@ var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
   entrypoint: []
   command: ["bash", "-c", "echo 'Hello World!'"]
   image: ubuntu:latest
+  volumes:
+  - "aa:bb:cc"
 `),
 	},
 	testDockerComposeYmlIOError: {
@@ -268,6 +270,17 @@ func TestConfigLoaderLoadFile_Success(t *testing.T) {
 						Command:           []string{"bash", "-c", "echo 'Hello World!'"},
 						EntrypointPresent: true,
 						Image:             "ubuntu:latest",
+						Volumes: []ServiceVolume{
+							{
+								Short: &PathMapping{
+									ContainerPath: "bb",
+									HasHostPath:   true,
+									HasMode:       true,
+									HostPath:      "aa",
+									Mode:          "cc",
+								},
+							},
+						},
 					},
 				},
 			}
@@ -412,9 +425,34 @@ func assertServicesEqualContinued(t *testing.T, service1, service2 *Service, ign
 		t.Logf("command2: %+v\n", service2.Command)
 		t.Fail()
 	}
+	if !areServiceVolumesEqual(service1.Volumes, service2.Volumes) {
+		t.Logf("volumes1: %+v\n", service1.Volumes)
+		t.Logf("volumes2: %+v\n", service2.Volumes)
+		t.Fail()
+	}
 	if !ignoreDependsOn && (len(service1.DependsOn) > 0 || len(service2.DependsOn) > 0) {
 		panic("services must not have depends on")
 	}
+}
+
+func areServiceVolumesEqual(volumes1, volumes2 []ServiceVolume) bool {
+	n := len(volumes1)
+	if n != len(volumes2) {
+		return false
+	}
+	for i := 0; i < n; i++ {
+		if !arePathMappingsEqual(volumes1[i].Short, volumes2[i].Short) {
+			return false
+		}
+	}
+	return true
+}
+
+func arePathMappingsEqual(pm1, pm2 *PathMapping) bool {
+	if pm1 == nil {
+		return pm2 == nil
+	}
+	return pm2 != nil && *pm1 == *pm2
 }
 
 func areStringMapsEqual(m1, m2 map[string]string) bool {
