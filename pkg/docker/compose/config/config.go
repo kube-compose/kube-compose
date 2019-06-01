@@ -45,7 +45,9 @@ type Service struct {
 	Command    []string
 	DependsOn  map[*Service]ServiceHealthiness
 	Entrypoint []string
+
 	// docker-compose distinguishes between an empty Entrypoint and an absent Entrypoint.
+	// TODO https://github.com/jbrekelmans/kube-compose/issues/157 remove this field
 	EntrypointPresent   bool
 	Environment         map[string]string
 	Healthcheck         *Healthcheck

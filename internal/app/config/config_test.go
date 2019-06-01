@@ -84,7 +84,7 @@ func TestAddService_ErrorServiceHasDependsOn(t *testing.T) {
 }
 
 var dockerComposeYmlInvalidServiceName = "docker-compose.invalid-service-name.yml"
-var dockerComposeYmlEmptyEntrypoint = "docker-compose.empty-entrypoint.yml"
+var dockerComposeYmlInvalidXKubeCompose = "docker-compose.invalid-x-kube-compose.yml"
 var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
 	dockerComposeYmlInvalidServiceName: {
 		Content: []byte(`version: '2'
@@ -93,11 +93,14 @@ services:
     image: ubuntu:latest
 `),
 	},
-	dockerComposeYmlEmptyEntrypoint: {
+	dockerComposeYmlInvalidXKubeCompose: {
 		Content: []byte(`version: '2'
 services:
-  testservice:
-    entrypoint: []
+  asdf:
+    image: ubuntu:latest
+    ports: [8080]
+x-kube-compose:
+  push_images: ""
 `),
 	},
 })
@@ -121,9 +124,10 @@ func TestNew_InvalidServiceName(t *testing.T) {
 		}
 	})
 }
-func TestNew_EmptyEntrypointError(t *testing.T) {
+
+func TestNew_InvalidXKubeCompose(t *testing.T) {
 	withMockFS(func() {
-		_, err := New(util.NewString(dockerComposeYmlEmptyEntrypoint))
+		_, err := New(util.NewString(dockerComposeYmlInvalidXKubeCompose))
 		if err == nil {
 			t.Fail()
 		} else {

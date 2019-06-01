@@ -36,6 +36,7 @@ type appImageInfo struct {
 	once             *sync.Once
 	podImage         string
 	sourceImageID    string
+	cmd              []string
 	user             *docker.Userinfo
 }
 
@@ -152,6 +153,7 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 	if err != nil {
 		return err
 	}
+	app.imageInfo.cmd = inspect.Config.Cmd
 	err = u.getAppImageEnsureCorrectPodImage(app, sourceImageRef, sourceImage)
 	if err != nil {
 		return err
@@ -497,6 +499,38 @@ func (a *app) GetReadinessProbe() *v1.Probe {
 	return nil
 }
 
+func (a *app) GetArgsAndCommand(c *v1.Container) error {
+	// docker-compose does not ignore the entrypoint if it is an empty array. For example: if the entrypoint is empty but the command is not
+	// empty then the entrypoint becomes the command. But the Kubernetes client treats an empty entrypoint array as an unset entrypoint,
+	// consequently the image's entrypoint will be used. This if-else statement bridges the gap in behavior.
+	if a.composeService.DockerComposeService.EntrypointPresent && len(a.composeService.DockerComposeService.Entrypoint) == 0 {
+		c.Command = a.composeService.DockerComposeService.Command
+		if len(c.Command) == 0 {
+			c.Command = a.imageInfo.cmd
+			if len(c.Command) == 0 {
+				return fmt.Errorf("cannot create container for app %s because it would have no command", a.name())
+			}
+		}
+	} else {
+		c.Command = a.composeService.DockerComposeService.Entrypoint
+		c.Args = a.composeService.DockerComposeService.Command
+	}
+	return nil
+}
+
+func (u *upRunner) createPodSecurityContext(a *app) *v1.PodSecurityContext {
+	if u.opts.RunAsUser {
+		securityContext := &v1.PodSecurityContext{
+			RunAsUser: a.imageInfo.user.UID,
+		}
+		if a.imageInfo.user.GID != nil {
+			securityContext.RunAsGroup = a.imageInfo.user.GID
+		}
+		return securityContext
+	}
+	return nil
+}
+
 func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	err := u.getAppImageInfoOnce(app)
 	if err != nil {
@@ -529,23 +563,12 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 		return nil, err
 	}
 
-	var securityContext *v1.PodSecurityContext
-	if u.opts.RunAsUser {
-		securityContext = &v1.PodSecurityContext{
-			RunAsUser: app.imageInfo.user.UID,
-		}
-		if app.imageInfo.user.GID != nil {
-			securityContext.RunAsGroup = app.imageInfo.user.GID
-		}
-	}
 	pod := &v1.Pod{
 		Spec: v1.PodSpec{
 			// new(bool) allocates a bool, sets it to false, and returns a pointer to it.
 			AutomountServiceAccountToken: new(bool),
 			Containers: []v1.Container{
 				{
-					Args:            app.composeService.DockerComposeService.Command,
-					Command:         app.composeService.DockerComposeService.Entrypoint,
 					Env:             envVars,
 					Image:           app.imageInfo.podImage,
 					ImagePullPolicy: v1.PullAlways,
@@ -557,8 +580,12 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 			},
 			HostAliases:     hostAliases,
 			RestartPolicy:   getRestartPolicyforService(app),
-			SecurityContext: securityContext,
+			SecurityContext: u.createPodSecurityContext(app),
 		},
+	}
+	err = app.GetArgsAndCommand(&pod.Spec.Containers[0])
+	if err != nil {
+		return nil, err
 	}
 	k8smeta.InitObjectMeta(u.cfg, &pod.ObjectMeta, app.composeService)
 	podServer, err := u.k8sPodClient.Create(pod)
