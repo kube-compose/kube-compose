@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -40,6 +41,18 @@ type appImageInfo struct {
 	user             *docker.Userinfo
 }
 
+type appVolume struct {
+	resolvedHostPath string
+	readOnly         bool
+	containerPath    string
+}
+
+type appVolumesImage struct {
+	err     error
+	imageID string
+	once    *sync.Once
+}
+
 type app struct {
 	composeService                       *config.Service
 	serviceClusterIP                     string
@@ -47,6 +60,8 @@ type app struct {
 	maxObservedPodStatus                 podStatus
 	containersForWhichWeAreStreamingLogs map[string]bool
 	color                                cmdColor.Color
+	volumes                              []appVolume
+	volumesImage                         appVolumesImage
 }
 
 func (a *app) name() string {
@@ -117,15 +132,95 @@ func (u *upRunner) initAppsToBeStarted() {
 	}
 }
 
+func (u *upRunner) initVolumeInfo() {
+	totalVolumeCount := 0
+	for app := range u.appsToBeStarted {
+		for _, serviceVolume := range app.composeService.DockerComposeService.Volumes {
+			readOnly := false
+			var resolvedHostPath string
+			if serviceVolume.Short != nil {
+				if serviceVolume.Short.HasMode {
+					switch serviceVolume.Short.Mode {
+					case "ro":
+						readOnly = true
+					case "rw":
+					default:
+						fmt.Errorf(
+							"app %s: docker compose service has a volume with an invalid mode %#v, ignoring this volume",
+							app.name(),
+							serviceVolume.Short.Mode,
+						)
+						continue
+					}
+				}
+				if serviceVolume.Short.HasHostPath {
+					var err error
+					resolvedHostPath, err = resolveBindVolumeHostPath(serviceVolume.Short.HostPath)
+					if err != nil {
+						fmt.Printf(
+							"app %s: docker compose service has a volume with host path %#v, ignoring this volume because resolving the "+
+								"host path resulted in an error: %v",
+							app.name(),
+							serviceVolume.Short.HostPath,
+							err,
+						)
+						continue
+					}
+				} else {
+					// If the volume does not have a host path then docker will create a volume.
+					// The volume is initialized with data of the image's file system.
+					// If docker compose is smart enough to reuse these implicit volumes across restarts of the service's containers, then
+					// this would need to be a persistent volume.
+					// TODO https://github.com/jbrekelmans/kube-compose/issues/169
+					continue
+				}
+			} else {
+				// TODO https://github.com/jbrekelmans/kube-compose/issues/161 support long volume syntax
+				continue
+			}
+			// TODO https://github.com/jbrekelmans/kube-compose/issues/171 overlapping bind mounted volumes do not work..
+			// For now we assume that there is no overlap...
+			app.volumes = append(app.volumes, appVolume{
+				resolvedHostPath: resolvedHostPath,
+				readOnly:         readOnly,
+				containerPath:    serviceVolume.Short.ContainerPath,
+			})
+			totalVolumeCount++
+			if totalVolumeCount > 1 {
+				fmt.Printf("WARNING: the docker compose configuration potentially has a volume that is projected into a container's file " +
+					"system twice, but currently changes to the volume in one container projection will not be reflected in the other")
+			}
+		}
+		if len(app.volumes) > 0 {
+			go u.getAppVolumesImageOnce(app)
+		}
+	}
+}
+
+func (u *upRunner) getAppVolumesImageOnce(a *app) error {
+	a.volumesImage.once.Do(func() {
+		var hostDataPaths []string
+		for _, volume := range a.volumes {
+			hostDataPaths = append(hostDataPaths, volume.resolvedHostPath)
+		}
+		a.volumesImage.err = buildVolumeInitImage(u.opts.Context, u.dockerClient, hostDataPaths)
+	})
+	return a.volumesImage.err
+}
+
+func resolveBindVolumeHostPath(hostPath string) (string, error) {
+	// TODO https://github.com/jbrekelmans/kube-compose/issues/170 the interpretation is slightly different from docker..
+	return filepath.EvalSymlinks(hostPath)
+}
+
 func (u *upRunner) initApps() {
-	u.apps = make(map[string]*app, len(u.cfg.Services))
-	u.appsThatNeedToBeReady = map[*app]bool{}
 	for _, composeService := range u.cfg.Services {
 		app := &app{
 			composeService:                       composeService,
 			containersForWhichWeAreStreamingLogs: make(map[string]bool),
 		}
 		app.imageInfo.once = &sync.Once{}
+		app.volumesImage.once = &sync.Once{}
 		u.apps[app.name()] = app
 	}
 }
@@ -808,6 +903,8 @@ func (u *upRunner) run() error {
 		return err
 	}
 	u.dockerClient = dc
+
+	u.initVolumeInfo()
 
 	for app := range u.appsToBeStarted {
 		// Begin pulling and pushing images immediately...

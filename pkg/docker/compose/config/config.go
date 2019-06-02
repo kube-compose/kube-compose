@@ -473,7 +473,10 @@ func (c *configLoader) parseComposeFileService(resolvedFile string, cfService *c
 
 	// TODO https://github.com/jbrekelmans/kube-compose/issues/163 only resolve volume paths if volume_driver is not set.
 	for i := 0; i < len(service.Volumes); i++ {
-		resolveVolumePath(resolvedFile, &service.Volumes[i])
+		err = resolveHostPath(resolvedFile, &service.Volumes[i])
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return composeFileParsedService, nil
