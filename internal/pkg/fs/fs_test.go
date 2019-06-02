@@ -302,4 +302,3 @@ func Test_MockFileSystem_Stat_ENOTDIR(t *testing.T) {
 		t.Fail()
 	}
 }
-
