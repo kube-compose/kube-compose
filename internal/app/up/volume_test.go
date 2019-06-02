@@ -85,7 +85,7 @@ func directory(name string) mockTarWriterEntry {
 	}
 }
 
-func TestBbindMountHostFileToTar_SuccessRegularFile(t *testing.T) {
+func TestBindMountHostFileToTar_SuccessRegularFile(t *testing.T) {
 	withMockFS(func() {
 		tw := &mockTarWriter{}
 		isDir, err := bindMountHostFileToTar(tw, "orig", "renamed")
@@ -107,7 +107,7 @@ func TestBbindMountHostFileToTar_SuccessRegularFile(t *testing.T) {
 	})
 }
 
-func TestBbindMountHostFileToTar_RecoverFromRegularFileError(t *testing.T) {
+func TestBindMountHostFileToTar_RecoverFromRegularFileError(t *testing.T) {
 	withMockFS(func() {
 		tw := &mockTarWriter{}
 		isDir, err := bindMountHostFileToTar(tw, "origerr", "renamed")
@@ -129,7 +129,7 @@ func TestBbindMountHostFileToTar_RecoverFromRegularFileError(t *testing.T) {
 	})
 }
 
-func TestBbindMountHostFileToTar_SuccessDir(t *testing.T) {
+func TestBindMountHostFileToTar_SuccessDir(t *testing.T) {
 	withMockFS(func() {
 		tw := &mockTarWriter{}
 		isDir, err := bindMountHostFileToTar(tw, "dir", "renamed")

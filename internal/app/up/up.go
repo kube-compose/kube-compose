@@ -446,7 +446,6 @@ func (u *upRunner) waitForServiceClusterIPWatchEvent(event *k8swatch.Event) erro
 func (u *upRunner) waitForServiceClusterIPWatch(expected, remaining int, eventChannel <-chan k8swatch.Event) error {
 	for {
 		event, ok := <-eventChannel
-		fmt.Println(event)
 		if !ok {
 			return fmt.Errorf("channel unexpectedly closed")
 		}
