@@ -78,7 +78,7 @@ func Test_MockFileSystem_InvalidMode1(t *testing.T) {
 		}
 	}()
 	MockFileSystem(map[string]MockFile{
-		"/invalidmode1": MockFile{
+		"/invalidmode1": {
 			Mode: os.ModeDir | os.ModeSymlink,
 		},
 	})
@@ -92,7 +92,7 @@ func Test_MockFileSystem_InvalidMode2(t *testing.T) {
 		}
 	}()
 	MockFileSystem(map[string]MockFile{
-		"/invalidmode2": MockFile{
+		"/invalidmode2": {
 			Mode: os.ModeDevice | os.ModeSymlink,
 		},
 	})
@@ -107,10 +107,10 @@ func Test_MockFileSystem_DirectoryInconsistency(t *testing.T) {
 		}
 	}()
 	MockFileSystem(map[string]MockFile{
-		"/dir/fileforreal": MockFile{
+		"/dir/fileforreal": {
 			Content: []byte("regularfile"),
 		},
-		"/dir": MockFile{
+		"/dir": {
 			Content: []byte("notafile"),
 		},
 	})
