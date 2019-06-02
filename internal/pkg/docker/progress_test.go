@@ -133,9 +133,15 @@ func TestPushProgress_Partial(t *testing.T) {
 	}
 }
 
-func TestNewDigestRegexp_Success(t *testing.T) {
-	r := NewDigestRegexp()
-	if r == nil {
+func TestFindDigest_Success(t *testing.T) {
+	r := FindDigest(testDigest)
+	if r != testDigest {
+		t.Fail()
+	}
+}
+func TestFindDigest_Error(t *testing.T) {
+	r := FindDigest("zz")
+	if r != "" {
 		t.Fail()
 	}
 }

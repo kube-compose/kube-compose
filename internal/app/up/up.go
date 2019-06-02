@@ -60,7 +60,7 @@ type app struct {
 	maxObservedPodStatus                 podStatus
 	containersForWhichWeAreStreamingLogs map[string]bool
 	color                                cmdColor.Color
-	volumes                              []appVolume
+	volumes                              []*appVolume
 	volumeInitImage                      appVolumesInitImage
 }
 
@@ -134,48 +134,10 @@ func (u *upRunner) initAppsToBeStarted() {
 
 func (u *upRunner) initVolumeInfo() {
 	totalVolumeCount := 0
-	for app := range u.appsToBeStarted {
-		for _, serviceVolume := range app.composeService.DockerComposeService.Volumes {
-			readOnly := false
-			var resolvedHostPath string
-			if serviceVolume.Short != nil {
-				if serviceVolume.Short.HasMode {
-					switch serviceVolume.Short.Mode {
-					case "ro":
-						readOnly = true
-					case "rw":
-					default:
-						fmt.Errorf(
-							"app %s: docker compose service has a volume with an invalid mode %#v, ignoring this volume",
-							app.name(),
-							serviceVolume.Short.Mode,
-						)
-						continue
-					}
-				}
-				if serviceVolume.Short.HasHostPath {
-					var err error
-					resolvedHostPath, err = resolveBindVolumeHostPath(serviceVolume.Short.HostPath)
-					if err != nil {
-						fmt.Printf(
-							"app %s: docker compose service has a volume with host path %#v, ignoring this volume because resolving the "+
-								"host path resulted in an error: %v\n",
-							app.name(),
-							serviceVolume.Short.HostPath,
-							err,
-						)
-						continue
-					}
-				} else {
-					// If the volume does not have a host path then docker will create a volume.
-					// The volume is initialized with data of the image's file system.
-					// If docker compose is smart enough to reuse these implicit volumes across restarts of the service's containers, then
-					// this would need to be a persistent volume.
-					// TODO https://github.com/jbrekelmans/kube-compose/issues/169
-					continue
-				}
-			} else {
-				// TODO https://github.com/jbrekelmans/kube-compose/issues/161 support long volume syntax
+	for a := range u.appsToBeStarted {
+		for _, serviceVolume := range a.composeService.DockerComposeService.Volumes {
+			appVolume := initVolumeInfoGetAppVolume(a, serviceVolume)
+			if appVolume == nil {
 				continue
 			}
 			totalVolumeCount++
@@ -194,13 +156,55 @@ func (u *upRunner) initVolumeInfo() {
 			}
 			// TODO https://github.com/jbrekelmans/kube-compose/issues/171 overlapping bind mounted volumes do not work..
 			// For now we assume that there is no overlap...
-			app.volumes = append(app.volumes, appVolume{
-				resolvedHostPath: resolvedHostPath,
-				readOnly:         readOnly,
-				containerPath:    serviceVolume.Short.ContainerPath,
-			})
+			a.volumes = append(a.volumes, appVolume)
 		}
 	}
+}
+
+func initVolumeInfoGetAppVolume(a *app, serviceVolume dockerComposeConfig.ServiceVolume) *appVolume {
+	r := &appVolume{}
+	if serviceVolume.Short != nil {
+		r.containerPath = serviceVolume.Short.ContainerPath
+		if serviceVolume.Short.HasMode {
+			switch serviceVolume.Short.Mode {
+			case "ro":
+				r.readOnly = true
+			case "rw":
+			default:
+				fmt.Printf(
+					"app %s: docker compose service has a volume with an invalid mode %#v, ignoring this volume\n",
+					a.name(),
+					serviceVolume.Short.Mode,
+				)
+				return nil
+			}
+		}
+		if serviceVolume.Short.HasHostPath {
+			var err error
+			r.resolvedHostPath, err = resolveBindVolumeHostPath(serviceVolume.Short.HostPath)
+			if err != nil {
+				fmt.Printf(
+					"app %s: docker compose service has a volume with host path %#v, ignoring this volume because resolving the "+
+						"host path resulted in an error: %v\n",
+					a.name(),
+					serviceVolume.Short.HostPath,
+					err,
+				)
+				return nil
+			}
+		} else {
+			// If the volume does not have a host path then docker will create a volume.
+			// The volume is initialized with data of the image's file system.
+			// If docker compose is smart enough to reuse these implicit volumes across restarts of the service's containers, then
+			// this would need to be a persistent volume.
+			// TODO https://github.com/jbrekelmans/kube-compose/issues/169
+			return nil
+		}
+	} else {
+		// TODO https://github.com/jbrekelmans/kube-compose/issues/161 support long volume syntax
+		return nil
+	}
+	return r
 }
 
 func (u *upRunner) getAppVolumeInitImage(a *app) error {

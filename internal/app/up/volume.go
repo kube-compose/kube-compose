@@ -19,8 +19,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-var digestRegexp = docker.NewDigestRegexp()
-
 func buildVolumeInitImageGetDockerfile(isDirSlice []bool) []byte {
 	var b bytes.Buffer
 	b.WriteString(`ARG BASE_IMAGE
@@ -199,7 +197,7 @@ func (h *bindMountHostFileToTarHelper) endHeaderCommon(header *tar.Header) error
 	return err
 }
 
-func (h *bindMountHostFileToTarHelper) run(hostFile string, fileNameInTar string) (isDir bool, err error) {
+func (h *bindMountHostFileToTarHelper) run(hostFile, fileNameInTar string) (isDir bool, err error) {
 	fileInfo, err := os.Lstat(hostFile)
 	if err != nil {
 		return
@@ -254,7 +252,7 @@ func bindMouseHostFileToTar(tw *tar.Writer, hostFile, renameTo string) (isDir bo
 	return
 }
 
-func buildVolumeInitImageGetBuildContext(r *buildVolumeInitImageResult, bindVolumeHostPaths []string) ([]byte, error) {
+func buildVolumeInitImageGetBuildContext(bindVolumeHostPaths []string) ([]byte, error) {
 	var tarBuffer bytes.Buffer
 	tw := tar.NewWriter(&tarBuffer)
 	defer tw.Close()
@@ -293,8 +291,7 @@ type buildVolumeInitImageResult struct {
 }
 
 func buildVolumeInitImage(ctx context.Context, dc *dockerClient.Client, bindVolumeHostPaths []string) (*buildVolumeInitImageResult, error) {
-	r := &buildVolumeInitImageResult{}
-	buildContextBytes, err := buildVolumeInitImageGetBuildContext(r, bindVolumeHostPaths)
+	buildContextBytes, err := buildVolumeInitImageGetBuildContext(bindVolumeHostPaths)
 	if err != nil {
 		return nil, err
 	}
@@ -310,6 +307,7 @@ func buildVolumeInitImage(ctx context.Context, dc *dockerClient.Client, bindVolu
 	if err != nil {
 		return nil, err
 	}
+	r := &buildVolumeInitImageResult{}
 	decoder := json.NewDecoder(response.Body)
 	for {
 		var msg jsonmessage.JSONMessage
@@ -320,9 +318,9 @@ func buildVolumeInitImage(ctx context.Context, dc *dockerClient.Client, bindVolu
 			}
 			return nil, err
 		}
-		if loc := digestRegexp.FindStringIndex(msg.Stream); loc != nil {
-			i := docker.Sha256BitLength/4 + len(docker.Sha256Prefix)
-			r.imageID = msg.Stream[loc[0] : loc[0]+i]
+
+		if imageID := docker.FindDigest(msg.Stream); imageID != "" {
+			r.imageID = imageID
 		}
 	}
 	if r.imageID == "" {
