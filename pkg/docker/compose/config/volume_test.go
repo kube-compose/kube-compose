@@ -147,3 +147,15 @@ func TestResolveVolumePath_Success(t *testing.T) {
 		}
 	}
 }
+func TestResolveVolumePath_TildeNotSupported(t *testing.T) {
+	sv := ServiceVolume{
+		Short: &PathMapping{
+			HasHostPath: true,
+			HostPath:    "~/Documents",
+		},
+	}
+	err := resolveHostPath("/Users/henk/.bash_profile", &sv)
+	if err == nil {
+		t.Fail()
+	}
+}
