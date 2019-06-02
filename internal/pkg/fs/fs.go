@@ -52,7 +52,7 @@ func OSFileSystem() FileSystem {
 
 type MockFileSystem interface {
 	FileSystem
-	Add(name string, mockFile MockFile)
+	Set(name string, mockFile MockFile)
 }
 
 type mockFileSystem struct {
@@ -134,10 +134,10 @@ func (fs *mockFileSystem) find(name string) (node *mockINode, start int) {
 			return node, start
 		}
 		node = childNode
-		start = end + 1
 		if end < 0 {
-			return node, start
+			return node, len(name)
 		}
+		start = end + 1
 	}
 }
 
@@ -239,12 +239,12 @@ func NewMockFileSystem(data map[string]MockFile) MockFileSystem {
 		},
 	}
 	for name, mockFile := range data {
-		fs.Add(name, mockFile)
+		fs.Set(name, mockFile)
 	}
 	return fs
 }
 
-func (fs *mockFileSystem) Add(name string, mockFile MockFile) {
+func (fs *mockFileSystem) Set(name string, mockFile MockFile) {
 	var flag os.FileMode
 	switch {
 	case mockFile.Mode.IsDir():

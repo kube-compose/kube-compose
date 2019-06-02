@@ -15,7 +15,7 @@ var testFileContent = "content"
 
 var mockFileSystem fsPackage.MockFileSystem
 
-// init here is justified because a common mock file system is used, and we require calling Add to make tests deterministic.
+// init here is justified because a common mock file system is used, and we require calling Set to make tests deterministic.
 // nolint
 func init() {
 	mockFileSystem = fsPackage.NewMockFileSystem(map[string]fsPackage.MockFile{
@@ -26,10 +26,10 @@ func init() {
 			Error: errTest,
 		},
 	})
-	mockFileSystem.Add("/dir/file1", fsPackage.MockFile{
+	mockFileSystem.Set("/dir/file1", fsPackage.MockFile{
 		Content: []byte(testFileContent),
 	})
-	mockFileSystem.Add("/dir/file2", fsPackage.MockFile{
+	mockFileSystem.Set("/dir/file2", fsPackage.MockFile{
 		Content: []byte(testFileContent),
 	})
 }
