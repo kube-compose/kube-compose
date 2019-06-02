@@ -7,7 +7,7 @@ import (
 	fsPackage "github.com/jbrekelmans/kube-compose/internal/pkg/fs"
 )
 
-var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
+var mockFileSystem fsPackage.FileSystem = fsPackage.NewMockFileSystem(map[string]fsPackage.MockFile{
 	"/passwd": {
 		Content: []byte("root:x:0:"),
 	},

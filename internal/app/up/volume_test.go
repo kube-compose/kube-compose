@@ -13,20 +13,24 @@ import (
 var errTest = fmt.Errorf("test error")
 var testFileContent = "content"
 
-var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
-	"/orig": {
+var mockFileSystem fsPackage.MockFileSystem
+
+func init() {
+	mockFileSystem = fsPackage.NewMockFileSystem(map[string]fsPackage.MockFile{
+		"/orig": {
+			Content: []byte(testFileContent),
+		},
+		"/origerr": {
+			Error: errTest,
+		},
+	})
+	mockFileSystem.Add("/dir/file1", fsPackage.MockFile{
 		Content: []byte(testFileContent),
-	},
-	"/origerr": {
-		Error: errTest,
-	},
-	"/dir/file1": {
+	})
+	mockFileSystem.Add("/dir/file2", fsPackage.MockFile{
 		Content: []byte(testFileContent),
-	},
-	"/dir/file2": {
-		Content: []byte(testFileContent),
-	},
-})
+	})
+}
 
 func withMockFS(cb func()) {
 	fsOld := fs
