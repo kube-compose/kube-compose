@@ -67,11 +67,11 @@ services:
     environment:
       KEY2: VALUE2
     extends:
-      file: '` + testDockerComposeYml + `'
+      file: '` + testDockerComposeYml[1:] + `'
       service: testservice
   service3:
     extends:
-      file: '` + testDockerComposeYml + `'
+      file: '` + testDockerComposeYml[1:] + `'
       service: testservice
 `),
 	},
