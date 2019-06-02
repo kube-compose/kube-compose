@@ -29,7 +29,7 @@ func TestFindUserInPasswd_Success(t *testing.T) {
 }
 func TestFindUserInPasswd_ENOENT(t *testing.T) {
 	withMockFS(func() {
-		_, err := FindUserInPasswd("", "")
+		_, err := FindUserInPasswd("/asdf", "")
 		if err == nil {
 			t.Fail()
 		}

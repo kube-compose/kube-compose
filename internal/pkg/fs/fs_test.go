@@ -268,6 +268,20 @@ func Test_MockFileSystem_Stat_DirError2(t *testing.T) {
 	}
 }
 
+func Test_MockFileSystem_Stat_DirError3(t *testing.T) {
+	errExpected := errors.New("unknown error 15")
+	fs := NewMockFileSystem(map[string]MockFile{
+		"/": {
+			Error: errExpected,
+			Mode:  os.ModeDir,
+		},
+	})
+	_, errActual := fs.Stat("/asdf")
+	if errActual != errExpected {
+		t.Fail()
+	}
+}
+
 func Test_MockFileSystem_Stat_FileError(t *testing.T) {
 	errExpected := errors.New("unknown error 12")
 	fs := NewMockFileSystem(map[string]MockFile{
@@ -288,3 +302,4 @@ func Test_MockFileSystem_Stat_ENOTDIR(t *testing.T) {
 		t.Fail()
 	}
 }
+
