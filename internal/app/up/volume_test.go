@@ -18,7 +18,7 @@ var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
 func withMockFS(cb func()) {
 	fsOld := fs
 	defer func() {
-		fsOld = fsOld
+		fs = fsOld
 	}()
 	fs = mockFileSystem
 	cb()
@@ -46,7 +46,7 @@ func (m *mockTarWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func regularFile(name string, data string) mockTarWriterEntry {
+func regularFile(name, data string) mockTarWriterEntry {
 	return mockTarWriterEntry{
 		h: &tar.Header{
 			Name:     name,
