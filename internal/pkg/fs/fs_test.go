@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"os"
+	"syscall"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -69,6 +70,102 @@ func Test_MockFileSystem(t *testing.T) {
 	}
 }
 
+func Test_MockFileSystem_InvalidMode1(t *testing.T) {
+	defer func() {
+		err := recover()
+		if err == nil {
+			t.Fail()
+		}
+	}()
+	MockFileSystem(map[string]MockFile{
+		"/invalidmode1": MockFile{
+			Mode: os.ModeDir | os.ModeSymlink,
+		},
+	})
+}
+
+func Test_MockFileSystem_InvalidMode2(t *testing.T) {
+	defer func() {
+		err := recover()
+		if err == nil {
+			t.Fail()
+		}
+	}()
+	MockFileSystem(map[string]MockFile{
+		"/invalidmode2": MockFile{
+			Mode: os.ModeDevice | os.ModeSymlink,
+		},
+	})
+}
+
+// This test is flaky due to hashing...
+func Test_MockFileSystem_DirectoryInconsistency(t *testing.T) {
+	defer func() {
+		err := recover()
+		if err == nil {
+			t.Fail()
+		}
+	}()
+	MockFileSystem(map[string]MockFile{
+		"/dir/fileforreal": MockFile{
+			Content: []byte("regularfile"),
+		},
+		"/dir": MockFile{
+			Content: []byte("notafile"),
+		},
+	})
+}
+
+func Test_MockFileDescriptor_Read_EmptyBuffer(t *testing.T) {
+	fs := MockFileSystem(map[string]MockFile{
+		"/emptybuffer": {Content: []byte("nope")},
+	})
+	fd, err := fs.Open("/emptybuffer")
+	if err != nil {
+		t.Error(err)
+	} else {
+		n, err := fd.Read(nil)
+		if err != nil {
+			t.Error(err)
+		}
+		if n != 0 {
+			t.Fail()
+		}
+	}
+}
+func Test_MockFileDescriptor_Readdir_ENOTDIR(t *testing.T) {
+	fs := MockFileSystem(map[string]MockFile{
+		"/enotdir": {Content: []byte("ENOTDIR")},
+	})
+	fd, err := fs.Open("/asdf")
+	if err != nil {
+		t.Error(err)
+	} else {
+		_, err = fd.Readdir(0)
+		if err != syscall.ENOTDIR {
+			t.Fail()
+		}
+	}
+}
+func Test_MockFileDescriptor_Readdir_NNotSupported(t *testing.T) {
+	fs := MockFileSystem(map[string]MockFile{})
+	fd, err := fs.Open("")
+	if err != nil {
+		t.Error(err)
+	} else {
+		defer func() {
+			err := recover()
+			if err == nil {
+				t.Fail()
+			}
+		}()
+		_, err = fd.Readdir(3)
+		if err != nil {
+			t.Error(err)
+		}
+	}
+}
+
 func Test_MockFileSystem_Lstat_Success(t *testing.T) {
 	fs := MockFileSystem(map[string]MockFile{
 		"/passwd": {Content: []byte("root:x:0:")},
@@ -91,6 +188,17 @@ func Test_MockFileSystem_Lstat_Success(t *testing.T) {
 	fileInfo.Mode()
 }
 
+func Test_MockFileSystem_Lstat_InvalidPath(t *testing.T) {
+	defer func() {
+		err := recover()
+		if err == nil {
+			t.Fail()
+		}
+	}()
+	fs := MockFileSystem(map[string]MockFile{})
+	_, _ = fs.Lstat("/.")
+}
+
 func Test_MockFileSystem_Stat_ENOENT(t *testing.T) {
 	fs := MockFileSystem(map[string]MockFile{})
 	_, err := fs.Stat("/passwd")
@@ -99,12 +207,25 @@ func Test_MockFileSystem_Stat_ENOENT(t *testing.T) {
 	}
 }
 
-func Test_MockFileSystem_Stat_Error(t *testing.T) {
+func Test_MockFileSystem_Stat_FileError(t *testing.T) {
 	errExpected := errors.New("unknown error 12")
 	fs := MockFileSystem(map[string]MockFile{
 		"/passwd": {Error: errExpected},
 	})
 	_, errActual := fs.Stat("/passwd")
+	if errActual != errExpected {
+		t.Fail()
+	}
+}
+func Test_MockFileSystem_Stat_DirError(t *testing.T) {
+	errExpected := errors.New("unknown error 13")
+	fs := MockFileSystem(map[string]MockFile{
+		"/": {
+			Error: errExpected,
+			Mode:  os.ModeDir,
+		},
+	})
+	_, errActual := fs.Stat("")
 	if errActual != errExpected {
 		t.Fail()
 	}

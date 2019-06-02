@@ -79,7 +79,11 @@ func (fs *mockFileSystem) find(name string) (node *mockINode, start int) {
 	node = fs.root
 	// All relative files are relative to the root.
 	if name == "" {
-		return node, start
+		return
+	}
+	if name == "/" {
+		start = 1
+		return
 	}
 	if name[0] == '/' {
 		start = 1
@@ -118,7 +122,7 @@ func (fs *mockFileSystem) findOrError(name string) (*mockINode, error) {
 	if name[0] == '/' {
 		start = 1
 	}
-	for {
+	for start < len(name) {
 		if node.err != nil {
 			return node, node.err
 		}
@@ -138,11 +142,9 @@ func (fs *mockFileSystem) findOrError(name string) (*mockINode, error) {
 			return node, os.ErrNotExist
 		}
 		node = childNode
-		if end < 0 {
-			return node, node.err
-		}
 		start = end + 1
 	}
+	return node, node.err
 }
 
 func validateNameComp(nameComp string) {
