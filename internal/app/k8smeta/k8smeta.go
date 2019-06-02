@@ -37,14 +37,14 @@ func InitObjectMeta(cfg *config.Config, objectMeta *metav1.ObjectMeta, composeSe
 }
 
 // FindFromObjectMeta finds a docker compose service from resource metadata.
-func FindFromObjectMeta(cfg *config.Config, objectMeta *metav1.ObjectMeta) (*config.Service, error) {
+func FindFromObjectMeta(cfg *config.Config, objectMeta *metav1.ObjectMeta) *config.Service {
 	if composeServiceName, ok := objectMeta.Annotations[AnnotationName]; ok {
 		composeService := cfg.FindServiceByName(composeServiceName)
 		if composeService != nil {
-			return composeService, nil
+			return composeService
 		}
 	}
-	return nil, nil
+	return nil
 }
 
 func GetK8sName(service *config.Service, cfg *config.Config) string {

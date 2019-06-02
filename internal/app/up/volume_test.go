@@ -85,10 +85,10 @@ func directory(name string) mockTarWriterEntry {
 	}
 }
 
-func TestBindMouseHostFileToTar_SuccessRegularFile(t *testing.T) {
+func TestBbindMountHostFileToTar_SuccessRegularFile(t *testing.T) {
 	withMockFS(func() {
 		tw := &mockTarWriter{}
-		isDir, err := bindMouseHostFileToTar(tw, "orig", "renamed")
+		isDir, err := bindMountHostFileToTar(tw, "orig", "renamed")
 		if err != nil {
 			t.Error(err)
 		} else {
@@ -107,10 +107,10 @@ func TestBindMouseHostFileToTar_SuccessRegularFile(t *testing.T) {
 	})
 }
 
-func TestBindMouseHostFileToTar_RecoverFromRegularFileError(t *testing.T) {
+func TestBbindMountHostFileToTar_RecoverFromRegularFileError(t *testing.T) {
 	withMockFS(func() {
 		tw := &mockTarWriter{}
-		isDir, err := bindMouseHostFileToTar(tw, "origerr", "renamed")
+		isDir, err := bindMountHostFileToTar(tw, "origerr", "renamed")
 		if err != nil {
 			t.Error(err)
 		} else {
@@ -129,10 +129,10 @@ func TestBindMouseHostFileToTar_RecoverFromRegularFileError(t *testing.T) {
 	})
 }
 
-func TestBindMouseHostFileToTar_SuccessDir(t *testing.T) {
+func TestBbindMountHostFileToTar_SuccessDir(t *testing.T) {
 	withMockFS(func() {
 		tw := &mockTarWriter{}
-		isDir, err := bindMouseHostFileToTar(tw, "dir", "renamed")
+		isDir, err := bindMountHostFileToTar(tw, "dir", "renamed")
 		if err != nil {
 			t.Error(err)
 		} else {
