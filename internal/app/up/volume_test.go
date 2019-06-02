@@ -4,7 +4,6 @@ import (
 	"archive/tar"
 	"bytes"
 	"fmt"
-	"os"
 	"reflect"
 	"testing"
 
@@ -14,10 +13,10 @@ import (
 var testError = fmt.Errorf("test error")
 
 var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
-	"orig": {
+	"/orig": {
 		Content: []byte("content"),
 	},
-	"origerr": {
+	"/origerr": {
 		Error: testError,
 	},
 })
@@ -58,7 +57,6 @@ func regularFile(name, data string) mockTarWriterEntry {
 		h: &tar.Header{
 			Name:     name,
 			Typeflag: tar.TypeReg,
-			Mode:     int64(os.ModePerm),
 			Size:     int64(len(data)),
 		},
 		data: []byte(data),

@@ -37,7 +37,7 @@ func Test_OSFileSystem_Stat(t *testing.T) {
 
 func Test_MockFileSystem_Open_ENOENT(t *testing.T) {
 	fs := MockFileSystem(map[string]MockFile{})
-	file, err := fs.Open("")
+	file, err := fs.Open("/data")
 	if file != nil {
 		defer file.Close()
 	}

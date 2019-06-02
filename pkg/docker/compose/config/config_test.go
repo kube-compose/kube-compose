@@ -10,20 +10,20 @@ import (
 	"github.com/pkg/errors"
 )
 
-const testDockerComposeYml = "docker-compose.yaml"
-const testDockerComposeYmlIOError = "docker-compose.io-error.yaml"
-const testDockerComposeYmlInvalidVersion = "docker-compose.invalid-version.yml"
-const testDockerComposeYmlInterpolationIssue = "docker-compose.interpolation-issue.yml"
-const testDockerComposeYmlDecodeIssue = "docker-compose.decode-issue.yml"
-const testDockerComposeYmlExtends = "docker-compose.extends.yml"
-const testDockerComposeYmlExtendsCycle = "docker-compose.extends-cycle.yml"
-const testDockerComposeYmlExtendsIOError = "docker-compose.extends-io-error.yml"
-const testDockerComposeYmlExtendsDoesNotExist = "docker-compose.extends-does-not-exist.yml"
-const testDockerComposeYmlExtendsDoesNotExistFile = "docker-compose.extends-does-not-exist-file.yml"
-const testDockerComposeYmlExtendsInvalidDependsOn = "docker-compose.extends-invalid-depends-on.yml"
-const testDockerComposeYmlDependsOnDoesNotExist = "docker-compose.depends-on-does-not-exist.yml"
-const testDockerComposeYmlDependsOnCycle = "docker-compose.depends-on-cycle.yml"
-const testDockerComposeYmlDependsOn = "docker-compose.depends-on.yml"
+const testDockerComposeYml = "/docker-compose.yaml"
+const testDockerComposeYmlIOError = "/docker-compose.io-error.yaml"
+const testDockerComposeYmlInvalidVersion = "/docker-compose.invalid-version.yml"
+const testDockerComposeYmlInterpolationIssue = "/docker-compose.interpolation-issue.yml"
+const testDockerComposeYmlDecodeIssue = "/docker-compose.decode-issue.yml"
+const testDockerComposeYmlExtends = "/docker-compose.extends.yml"
+const testDockerComposeYmlExtendsCycle = "/docker-compose.extends-cycle.yml"
+const testDockerComposeYmlExtendsIOError = "/docker-compose.extends-io-error.yml"
+const testDockerComposeYmlExtendsDoesNotExist = "/docker-compose.extends-does-not-exist.yml"
+const testDockerComposeYmlExtendsDoesNotExistFile = "/docker-compose.extends-does-not-exist-file.yml"
+const testDockerComposeYmlExtendsInvalidDependsOn = "/docker-compose.extends-invalid-depends-on.yml"
+const testDockerComposeYmlDependsOnDoesNotExist = "/docker-compose.depends-on-does-not-exist.yml"
+const testDockerComposeYmlDependsOnCycle = "/docker-compose.depends-on-cycle.yml"
+const testDockerComposeYmlDependsOn = "/docker-compose.depends-on.yml"
 
 var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
 	testDockerComposeYml: {
@@ -163,7 +163,7 @@ services:
 })
 
 var mockFileSystemStandardFileError = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
-	"docker-compose.yml": {
+	"/docker-compose.yml": {
 		Error: errors.New("unknown error 2"),
 	},
 })
