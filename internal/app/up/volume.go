@@ -111,6 +111,8 @@ func (h *bindMountHostFileToTarHelper) runDirectory(fileInfo os.FileInfo, hostFi
 func (h *bindMountHostFileToTarHelper) isFileWithinBindHostRoot(target string) bool {
 	// Can assume target and h.rootHostFile are cleaned.
 	// TODO https://github.com/jbrekelmans/kube-compose/issues/173 support case sensitive file systems
+	// We do not have to split off the prefix here, but we do so in case drive letters are case-insensitive
+	// independent of the file system.
 	vol := filepath.VolumeName(target)
 	if vol != h.rootHostFileVol {
 		return false
@@ -137,8 +139,8 @@ func (h *bindMountHostFileToTarHelper) runSymlink(fileInfo os.FileInfo, hostFile
 	linkIsAbsLike := link != "" && (link[0] == '\\' || link[0] == '/')
 	if linkIsAbsLike || filepath.VolumeName(link) != "" {
 		// Windows:
-		// Handle situations where the link is absolute, or relative to current working directory of a particular drive:
-		// https://docs.microsoft.com/en-us/windows/desktop/api/winbase/nf-winbase-createsymboliclinka
+		// Handle situations where the link is absolute (but does not have a drive), or relative to the cwd of a drive:
+		// https://docs.microsoft.com/en-us/windows/desktop/api/winbase/nf-winbase-createsymboliclinka#remarks
 		// This should be a noop on non-Windows because there will never be a non-empty volume and therefore the path must
 		// be absolute.
 		linkResolved, err = filepath.Abs(link)
@@ -147,7 +149,7 @@ func (h *bindMountHostFileToTarHelper) runSymlink(fileInfo os.FileInfo, hostFile
 		}
 	} else {
 		// Windows: no drive.
-		// link is relative to parent directory.
+		// Therefore the link is relative to the parent directory.
 		linkResolved = filepath.Join(filepath.Dir(hostFile), link)
 	}
 	// linkResolved will always be cleaned here, which is required for isFileWithinBindHostRoot.
