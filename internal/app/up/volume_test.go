@@ -2,6 +2,8 @@ package up
 
 import (
 	"archive/tar"
+	"bytes"
+	"fmt"
 	"os"
 	"reflect"
 	"testing"
@@ -9,9 +11,14 @@ import (
 	fsPackage "github.com/jbrekelmans/kube-compose/internal/pkg/fs"
 )
 
+var testError = fmt.Errorf("test error")
+
 var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
 	"orig": {
 		Content: []byte("content"),
+	},
+	"origerr": {
+		Error: testError,
 	},
 })
 
@@ -58,6 +65,15 @@ func regularFile(name, data string) mockTarWriterEntry {
 	}
 }
 
+func emptyDirectory(name string) mockTarWriterEntry {
+	return mockTarWriterEntry{
+		h: &tar.Header{
+			Name:     name,
+			Typeflag: tar.TypeDir,
+		},
+	}
+}
+
 func TestBindMouseHostFileToTar_Success(t *testing.T) {
 	withMockFS(func() {
 		tw := &mockTarWriter{}
@@ -78,4 +94,41 @@ func TestBindMouseHostFileToTar_Success(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestBindMouseHostFileToTar_RecoverFromRegularFileError(t *testing.T) {
+	withMockFS(func() {
+		tw := &mockTarWriter{}
+		isDir, err := bindMouseHostFileToTar(tw, "origerr", "renamed")
+		if err != nil {
+			t.Error(err)
+		} else {
+			if !isDir {
+				t.Fail()
+			}
+			expected := []mockTarWriterEntry{
+				emptyDirectory("renamed/"),
+			}
+			if !reflect.DeepEqual(tw.entries, expected) {
+				t.Logf("entries1: %+v\n", tw.entries)
+				t.Logf("entries2: %+v\n", expected)
+				t.Fail()
+			}
+		}
+	})
+}
+
+func TestBuildVolumeInitImageGetDockerfile_Success(t *testing.T) {
+	actual := buildVolumeInitImageGetDockerfile([]bool{true, false})
+	expected := []byte(`ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+COPY data1/ /app/data/vol1/
+COPY data2 /app/data/vol2
+ENTRYPOINT ["bash", "-c", "cp -ar /app/data/vol1 /mnt/vol1/root && cp -ar /app/data/vol2 /mnt/vol2/root"]
+`)
+	if !bytes.Equal(actual, expected) {
+		t.Logf("actual:\n%s", string(actual))
+		t.Logf("expected:\n%s", string(expected))
+		t.Fail()
+	}
 }

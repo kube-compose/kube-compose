@@ -218,7 +218,7 @@ func (h *bindMountHostFileToTarHelper) run(hostFile, fileNameInTar string) (isDi
 	if h.twMayBeCorrupt {
 		return
 	}
-	fmt.Printf("cannot simulate bind volume with host file %#v, interpreting as empty directory:", hostFile)
+	fmt.Printf("cannot simulate bind volume with host file %#v, interpreting as empty directory: ", hostFile)
 	fmt.Println(err)
 	// Change type to an empty directory
 	header, err := tar.FileInfoHeader(fileInfo, "")
@@ -248,7 +248,7 @@ func bindMouseHostFileToTar(tw TarWriter, hostFile, renameTo string) (isDir bool
 			isDir = false
 			return
 		}
-		fmt.Printf("cannot simulate bind volume with host file %#v, interpreting as empty directory:", hostFile)
+		fmt.Printf("cannot simulate bind volume with host file %#v, interpreting as empty directory: ", hostFile)
 		fmt.Println(err)
 		header := &tar.Header{
 			Name:     renameTo + "/",
