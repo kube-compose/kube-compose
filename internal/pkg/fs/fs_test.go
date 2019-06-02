@@ -157,7 +157,6 @@ func Test_MockFileDescriptor_Read_EmptyBuffer(t *testing.T) {
 	}
 }
 
-
 func Test_MockFileDescriptor_Read_EISDIR(t *testing.T) {
 	fs := NewMockFileSystem(map[string]MockFile{})
 	fd, err := fs.Open("/")
