@@ -84,11 +84,11 @@ func TestAddService_ErrorServiceHasDependsOn(t *testing.T) {
 	})
 }
 
-var dockerComposeYmlInvalid = "docker-compose.invalid.yml"
-var dockerComposeYmlInvalidServiceName = "docker-compose.invalid-service-name.yml"
-var dockerComposeYmlInvalidXKubeCompose = "docker-compose.invalid-x-kube-compose.yml"
-var dockerComposeYmlValidPushImages = "docker-compose.valid-push-images.yml"
-var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
+var dockerComposeYmlInvalid = "/docker-compose.invalid.yml"
+var dockerComposeYmlInvalidServiceName = "/docker-compose.invalid-service-name.yml"
+var dockerComposeYmlInvalidXKubeCompose = "/docker-compose.invalid-x-kube-compose.yml"
+var dockerComposeYmlValidPushImages = "/docker-compose.valid-push-images.yml"
+var mockFileSystem fsPackage.FileSystem = fsPackage.NewMockFileSystem(map[string]fsPackage.MockFile{
 	dockerComposeYmlInvalid: {
 		Content: []byte(`version: 'asdf'`),
 	},

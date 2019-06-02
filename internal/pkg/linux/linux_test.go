@@ -7,7 +7,7 @@ import (
 	fsPackage "github.com/jbrekelmans/kube-compose/internal/pkg/fs"
 )
 
-var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
+var mockFileSystem fsPackage.FileSystem = fsPackage.NewMockFileSystem(map[string]fsPackage.MockFile{
 	"/passwd": {
 		Content: []byte("root:x:0:"),
 	},
@@ -29,7 +29,7 @@ func TestFindUserInPasswd_Success(t *testing.T) {
 }
 func TestFindUserInPasswd_ENOENT(t *testing.T) {
 	withMockFS(func() {
-		_, err := FindUserInPasswd("", "")
+		_, err := FindUserInPasswd("/asdf", "")
 		if err == nil {
 			t.Fail()
 		}

@@ -130,16 +130,32 @@ func TestResolveVolumePath_Success(t *testing.T) {
 			HostPath:    "./Documents",
 		},
 	}
-	resolveVolumePath("/Users/henk/.bash_profile", &sv)
-	expected := ServiceVolume{
+	err := resolveHostPath("/Users/henk/.bash_profile", &sv)
+	if err != nil {
+		t.Error(err)
+	} else {
+		expected := ServiceVolume{
+			Short: &PathMapping{
+				HasHostPath: true,
+				HostPath:    "/Users/henk/Documents",
+			},
+		}
+		if !reflect.DeepEqual(sv, expected) {
+			t.Logf("serviceVolume1: %+v\n", sv)
+			t.Logf("serviceVolume2: %+v\n", expected)
+			t.Fail()
+		}
+	}
+}
+func TestResolveVolumePath_TildeNotSupported(t *testing.T) {
+	sv := ServiceVolume{
 		Short: &PathMapping{
 			HasHostPath: true,
-			HostPath:    "/Users/henk/Documents",
+			HostPath:    "~/Documents",
 		},
 	}
-	if !reflect.DeepEqual(sv, expected) {
-		t.Logf("serviceVolume1: %+v\n", sv)
-		t.Logf("serviceVolume2: %+v\n", expected)
+	err := resolveHostPath("/Users/henk/.bash_profile", &sv)
+	if err == nil {
 		t.Fail()
 	}
 }

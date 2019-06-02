@@ -313,7 +313,7 @@ func pullImageWithLogging(ctx context.Context, puller docker.ImagePuller, appNam
 	return digest, nil
 }
 
-func pushImageWithLogging(ctx context.Context, pusher docker.ImagePusher, appName, image, bearerToken string) (string, error) {
+func pushImageWithLogging(ctx context.Context, pusher docker.ImagePusher, appName, image, bearerToken, imageDescr string) (string, error) {
 	lastLogTime := time.Now().Add(-2 * time.Second)
 	registryAuth := docker.EncodeRegistryAuth("unused", bearerToken)
 	digest, err := docker.PushImage(ctx, pusher, image, registryAuth, func(push *docker.PullOrPush) {
@@ -322,12 +322,12 @@ func pushImageWithLogging(ctx context.Context, pusher docker.ImagePusher, appNam
 		if elapsed >= 2*time.Second {
 			lastLogTime = t
 			progress := push.Progress()
-			fmt.Printf("app %s: pushing image %s (%.1f%%)\n", appName, image, progress*100.0)
+			fmt.Printf("app %s: pushing %s %s (%.1f%%)\n", appName, imageDescr, image, progress*100.0)
 		}
 	})
 	if err != nil {
 		return "", err
 	}
-	fmt.Printf("app %s: pushing image %s (%.1f%%) @%s\n", appName, image, 100.0, digest)
+	fmt.Printf("app %s: pushing %s %s (%.1f%%) @%s\n", appName, imageDescr, image, 100.0, digest)
 	return digest, err
 }

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 )
@@ -127,10 +128,16 @@ func isSlash(b byte) bool {
 
 // Copy of the resolve_volume_path function:
 // https://github.com/docker/compose/blob/99e67d0c061fa3d9b9793391f3b7c8bdf8e841fc/compose/config/config.py#L1354
-func resolveVolumePath(resolvedFile string, sv *ServiceVolume) {
-	if sv.Short != nil && sv.Short.HasHostPath && len(sv.Short.HostPath) > 0 && sv.Short.HostPath[0] == '.' {
-		sv.Short.HostPath = filepath.Join(filepath.Dir(resolvedFile), sv.Short.HostPath)
-		// TODO https://github.com/jbrekelmans/kube-compose/issues/162 support expanding tilde
+func resolveHostPath(resolvedFile string, sv *ServiceVolume) error {
+	if sv.Short != nil && sv.Short.HasHostPath && len(sv.Short.HostPath) > 0 {
+		if sv.Short.HostPath[0] == '.' {
+			sv.Short.HostPath = filepath.Join(filepath.Dir(resolvedFile), sv.Short.HostPath)
+		}
+		if sv.Short.HostPath[0] == '~' {
+			// TODO https://github.com/jbrekelmans/kube-compose/issues/162 support expanding tilde
+			return fmt.Errorf("a docker compose service has a volume that includes a ~, but expanding users is not supported")
+		}
 	}
 	// TODO https://github.com/jbrekelmans/kube-compose/issues/161 expanding source of long volume syntax
+	return nil
 }
