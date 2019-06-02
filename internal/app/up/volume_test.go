@@ -10,14 +10,21 @@ import (
 	fsPackage "github.com/jbrekelmans/kube-compose/internal/pkg/fs"
 )
 
-var testError = fmt.Errorf("test error")
+var errTest = fmt.Errorf("test error")
+var testFileContent = "content"
 
 var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
 	"/orig": {
-		Content: []byte("content"),
+		Content: []byte(testFileContent),
 	},
 	"/origerr": {
-		Error: testError,
+		Error: errTest,
+	},
+	"/dir/file1": {
+		Content: []byte(testFileContent),
+	},
+	"/dir/file2": {
+		Content: []byte(testFileContent),
 	},
 })
 
@@ -63,7 +70,7 @@ func regularFile(name, data string) mockTarWriterEntry {
 	}
 }
 
-func emptyDirectory(name string) mockTarWriterEntry {
+func directory(name string) mockTarWriterEntry {
 	return mockTarWriterEntry{
 		h: &tar.Header{
 			Name:     name,
@@ -72,7 +79,7 @@ func emptyDirectory(name string) mockTarWriterEntry {
 	}
 }
 
-func TestBindMouseHostFileToTar_Success(t *testing.T) {
+func TestBindMouseHostFileToTar_SuccessRegularFile(t *testing.T) {
 	withMockFS(func() {
 		tw := &mockTarWriter{}
 		isDir, err := bindMouseHostFileToTar(tw, "orig", "renamed")
@@ -83,7 +90,7 @@ func TestBindMouseHostFileToTar_Success(t *testing.T) {
 				t.Fail()
 			}
 			expected := []mockTarWriterEntry{
-				regularFile("renamed", "content"),
+				regularFile("renamed", testFileContent),
 			}
 			if !reflect.DeepEqual(tw.entries, expected) {
 				t.Logf("entries1: %+v\n", tw.entries)
@@ -105,7 +112,31 @@ func TestBindMouseHostFileToTar_RecoverFromRegularFileError(t *testing.T) {
 				t.Fail()
 			}
 			expected := []mockTarWriterEntry{
-				emptyDirectory("renamed/"),
+				directory("renamed/"),
+			}
+			if !reflect.DeepEqual(tw.entries, expected) {
+				t.Logf("entries1: %+v\n", tw.entries)
+				t.Logf("entries2: %+v\n", expected)
+				t.Fail()
+			}
+		}
+	})
+}
+
+func TestBindMouseHostFileToTar_SuccessDir(t *testing.T) {
+	withMockFS(func() {
+		tw := &mockTarWriter{}
+		isDir, err := bindMouseHostFileToTar(tw, "dir", "renamed")
+		if err != nil {
+			t.Error(err)
+		} else {
+			if !isDir {
+				t.Fail()
+			}
+			expected := []mockTarWriterEntry{
+				directory("renamed/"),
+				regularFile("renamed/file1", testFileContent),
+				regularFile("renamed/file2", testFileContent),
 			}
 			if !reflect.DeepEqual(tw.entries, expected) {
 				t.Logf("entries1: %+v\n", tw.entries)

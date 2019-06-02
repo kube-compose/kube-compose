@@ -83,7 +83,7 @@ func (h *bindMountHostFileToTarHelper) runRegular(fileInfo os.FileInfo, hostFile
 }
 
 func (h *bindMountHostFileToTarHelper) runDirectory(fileInfo os.FileInfo, hostFile, fileNameInTar string) error {
-	fd, err := os.Open(hostFile)
+	fd, err := fs.Open(hostFile)
 	if err != nil {
 		return err
 	}

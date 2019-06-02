@@ -13,6 +13,7 @@ import (
 // FileDescriptor is an abstraction of os.File to improve testability of code.
 type FileDescriptor interface {
 	io.ReadCloser
+	Readdir(n int) ([]os.FileInfo, error)
 }
 
 // FileSystem is an abstraction of the file system to improve testability of code.
@@ -65,8 +66,8 @@ type mockINodeExtraDir = map[string]*mockINode
 type mockINodeExtraBytes = []byte
 
 var (
-	errMockBadMockFileMode                = fmt.Errorf("mock file has a bad mode")
-	errMockInconsistentMockFileSystemData = fmt.Errorf("data contains a name X that is not a directory, but another name Y indicates " +
+	errMockBadMode                = fmt.Errorf("mock file has a bad mode")
+	errMockDirectoryInconsistency = fmt.Errorf("data contains a name X that is not a directory, but another name Y indicates " +
 		"that X must be a directory")
 	errMockReadNonRegularFile = fmt.Errorf("cannot read non regular file")
 )
@@ -74,13 +75,12 @@ var (
 // returns -1 if an item along the path is not a directory
 // panics if the supplied name is not normalized (we do not want to complicate things by requiring normalization)
 // otherwise, returns the index of the deepest path component and the parent inode of that component
-func (fs *mockFileSystem) find(name string) (*mockINode, int) {
-	node := fs.root
+func (fs *mockFileSystem) find(name string) (node *mockINode, start int) {
+	node = fs.root
 	// All relative files are relative to the root.
 	if name == "" {
-		return node, 0
+		return node, start
 	}
-	start := 0
 	if name[0] == '/' {
 		start = 1
 	}
@@ -151,7 +151,7 @@ func validateNameComp(nameComp string) {
 	}
 }
 
-func (fs *mockFileSystem) createChildren(node *mockINode, name string, mockFile *MockFile) {
+func (fs *mockFileSystem) createChildren(node *mockINode, name string, mockFile MockFile) {
 	start := 0
 	for {
 		nameComp := name[start:]
@@ -169,6 +169,7 @@ func (fs *mockFileSystem) createChildren(node *mockINode, name string, mockFile 
 				extra: mockINodeExtraDir{},
 			}
 			node.extra.(mockINodeExtraDir)[nameComp] = childNode
+			node = childNode
 		} else {
 			// initialize file or directory as per MockFile
 			childNode = &mockINode{
@@ -178,7 +179,7 @@ func (fs *mockFileSystem) createChildren(node *mockINode, name string, mockFile 
 			if (mockFile.Mode & os.ModeDir) != 0 {
 				childNode.extra = mockINodeExtraDir{}
 			} else {
-				childNode.extra = mockINodeExtraBytes(mockFile.Content)
+				childNode.extra = mockFile.Content
 			}
 			node.extra.(mockINodeExtraDir)[nameComp] = childNode
 			return
@@ -215,24 +216,24 @@ func MockFileSystem(data map[string]MockFile) FileSystem {
 			flag = 0
 		}
 		if (mockFile.Mode & (os.ModeType &^ flag)) != 0 {
-			panic(errMockBadMockFileMode)
+			panic(errMockBadMode)
 		}
 		node, start := fs.find(name)
 		if start == -1 {
-			panic(errMockInconsistentMockFileSystemData)
+			panic(errMockDirectoryInconsistency)
 		}
 		if start < len(name) {
-			fs.createChildren(node, name[start:], &mockFile)
+			fs.createChildren(node, name[start:], mockFile)
 		} else {
 			nodeIsDir := (node.mode & os.ModeDir) != 0
 			mockFileIsDir := (mockFile.Mode & os.ModeDir) != 0
 			if nodeIsDir != mockFileIsDir {
-				panic(errMockInconsistentMockFileSystemData)
+				panic(errMockDirectoryInconsistency)
 			}
 			node.mode = mockFile.Mode
 			node.err = mockFile.Error
 			if !mockFileIsDir {
-				node.extra = mockINodeExtraBytes(mockFile.Content)
+				node.extra = mockFile.Content
 			}
 		}
 	}
@@ -242,6 +243,10 @@ func MockFileSystem(data map[string]MockFile) FileSystem {
 type mockFileDescriptor struct {
 	node    *mockINode
 	readPos int
+}
+
+func (r *mockFileDescriptor) Close() error {
+	return nil
 }
 
 func (r *mockFileDescriptor) Read(p []byte) (n int, err error) {
@@ -261,8 +266,18 @@ func (r *mockFileDescriptor) Read(p []byte) (n int, err error) {
 	return
 }
 
-func (r *mockFileDescriptor) Close() error {
-	return nil
+func (r *mockFileDescriptor) Readdir(n int) ([]os.FileInfo, error) {
+	if !r.node.mode.IsDir() {
+		return nil, syscall.ENOTDIR
+	}
+	if n > 0 {
+		panic(fmt.Errorf("not supported"))
+	}
+	var ret []os.FileInfo
+	for nameComp, childNode := range r.node.extra.(mockINodeExtraDir) {
+		ret = append(ret, newMockFileInfo(childNode, nameComp))
+	}
+	return ret, nil
 }
 
 func (fs *mockFileSystem) EvalSymlinks(path string) (string, error) {
@@ -319,18 +334,22 @@ func (fileInfo *mockFileInfo) Sys() interface{} {
 	return nil
 }
 
+func newMockFileInfo(node *mockINode, nameComp string) *mockFileInfo {
+	fileInfo := &mockFileInfo{
+		mode: node.mode,
+		name: nameComp,
+	}
+	if node.mode.IsRegular() {
+		fileInfo.size = int64(len(node.extra.(mockINodeExtraBytes)))
+	}
+	return fileInfo
+}
+
 func (fs *mockFileSystem) Stat(name string) (os.FileInfo, error) {
 	node, err := fs.findOrError(name)
 	if err != nil {
 		return nil, err
 	}
 	i := strings.LastIndexByte(name, '/')
-	fileInfo := &mockFileInfo{
-		mode: node.mode,
-		name: name[i+1:],
-	}
-	if node.mode.IsRegular() {
-		fileInfo.size = int64(len(node.extra.(mockINodeExtraBytes)))
-	}
-	return fileInfo, nil
+	return newMockFileInfo(node, name[i+1:]), nil
 }
