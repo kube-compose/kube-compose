@@ -156,6 +156,21 @@ func Test_MockFileDescriptor_Read_EmptyBuffer(t *testing.T) {
 		}
 	}
 }
+
+
+func Test_MockFileDescriptor_Read_EISDIR(t *testing.T) {
+	fs := NewMockFileSystem(map[string]MockFile{})
+	fd, err := fs.Open("/")
+	if err != nil {
+		t.Error(err)
+	} else {
+		_, err = fd.Read(nil)
+		if err != errMockReadNonRegularFile {
+			t.Error(err)
+		}
+	}
+}
+
 func Test_MockFileDescriptor_Readdir_ENOTDIR(t *testing.T) {
 	fs := NewMockFileSystem(map[string]MockFile{
 		"/enotdir": {Content: []byte("ENOTDIR")},
