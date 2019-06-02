@@ -15,9 +15,12 @@ import (
 	dockerClient "github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/docker"
+	fsPackage "github.com/jbrekelmans/kube-compose/internal/pkg/fs"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 	"github.com/pkg/errors"
 )
+
+var fs = fsPackage.OSFileSystem()
 
 func buildVolumeInitImageGetDockerfile(isDirSlice []bool) []byte {
 	var b bytes.Buffer
@@ -43,8 +46,13 @@ FROM ${BASE_IMAGE}
 	return b.Bytes()
 }
 
+type TarWriter interface {
+	io.Writer
+	WriteHeader(header *tar.Header) error
+}
+
 type bindMountHostFileToTarHelper struct {
-	tw                     *tar.Writer
+	tw                     TarWriter
 	twMayBeCorrupt         bool
 	renameTo               string
 	rootHostFile           string
@@ -57,7 +65,7 @@ func (h *bindMountHostFileToTarHelper) runRegular(fileInfo os.FileInfo, hostFile
 	if err != nil {
 		return err
 	}
-	fd, err := os.Open(hostFile)
+	fd, err := fs.Open(hostFile)
 	if err != nil {
 		return err
 	}
@@ -198,7 +206,7 @@ func (h *bindMountHostFileToTarHelper) endHeaderCommon(header *tar.Header) error
 }
 
 func (h *bindMountHostFileToTarHelper) run(hostFile, fileNameInTar string) (isDir bool, err error) {
-	fileInfo, err := os.Lstat(hostFile)
+	fileInfo, err := fs.Lstat(hostFile)
 	if err != nil {
 		return
 	}
@@ -224,7 +232,7 @@ func (h *bindMountHostFileToTarHelper) run(hostFile, fileNameInTar string) (isDi
 	return
 }
 
-func bindMouseHostFileToTar(tw *tar.Writer, hostFile, renameTo string) (isDir bool, err error) {
+func bindMouseHostFileToTar(tw TarWriter, hostFile, renameTo string) (isDir bool, err error) {
 	h := &bindMountHostFileToTarHelper{
 		tw:           tw,
 		rootHostFile: hostFile,

@@ -15,6 +15,10 @@ func Test_OSFileSystem_EvalSymlinks(t *testing.T) {
 	_, _ = OSFileSystem().EvalSymlinks("")
 }
 
+func Test_OSFileSystem_Lstat(t *testing.T) {
+	_, _ = OSFileSystem().Lstat("")
+}
+
 func Test_OSFileSystem_Open(t *testing.T) {
 	file, err := OSFileSystem().Open("")
 	defer func() {
@@ -65,11 +69,11 @@ func Test_MockFileSystem(t *testing.T) {
 	}
 }
 
-func Test_MockFileSystem_Stat_Success(t *testing.T) {
+func Test_MockFileSystem_Lstat_Success(t *testing.T) {
 	fs := MockFileSystem(map[string]MockFile{
 		"/passwd": {Content: []byte("root:x:0:")},
 	})
-	fileInfo, err := fs.Stat("/passwd")
+	fileInfo, err := fs.Lstat("/passwd")
 	if err != nil {
 		t.Error(err)
 	}

@@ -16,6 +16,7 @@ type FileDescriptor interface {
 // FileSystem is an abstraction of the file system to improve testability of code.
 type FileSystem interface {
 	EvalSymlinks(path string) (string, error)
+	Lstat(name string) (os.FileInfo, error)
 	Open(name string) (FileDescriptor, error)
 	Stat(name string) (os.FileInfo, error)
 }
@@ -25,6 +26,10 @@ type osFileSystem struct {
 
 func (fs *osFileSystem) EvalSymlinks(path string) (string, error) {
 	return filepath.EvalSymlinks(path)
+}
+
+func (fs *osFileSystem) Lstat(name string) (os.FileInfo, error) {
+	return os.Lstat(name)
 }
 
 func (fs *osFileSystem) Open(name string) (FileDescriptor, error) {
@@ -84,6 +89,10 @@ func (fs *mockFileSystem) EvalSymlinks(path string) (string, error) {
 	return path, nil
 }
 
+func (fs *mockFileSystem) Lstat(name string) (os.FileInfo, error) {
+	return fs.Stat(name)
+}
+
 func (fs *mockFileSystem) Open(name string) (FileDescriptor, error) {
 	mockFile, ok := fs.data[name]
 	if !ok {
@@ -103,7 +112,7 @@ type mockFileInfo struct {
 }
 
 func (fileInfo *mockFileInfo) IsDir() bool {
-	return false
+	return fileInfo.Mode().IsDir()
 }
 
 func (fileInfo *mockFileInfo) Mode() os.FileMode {
@@ -111,7 +120,7 @@ func (fileInfo *mockFileInfo) Mode() os.FileMode {
 }
 
 func (fileInfo *mockFileInfo) ModTime() time.Time {
-	return time.Now()
+	return time.Time{}
 }
 
 func (fileInfo *mockFileInfo) Name() string {
