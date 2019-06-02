@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"path/filepath"
 	"strings"
 	"sync"
 
@@ -44,13 +43,15 @@ type appImageInfo struct {
 type appVolume struct {
 	resolvedHostPath string
 	readOnly         bool
+	isDir            bool // Only populated once getAppVolumeInitImageOnce has completed.
 	containerPath    string
 }
 
-type appVolumesImage struct {
-	err     error
-	imageID string
-	once    *sync.Once
+type appVolumesInitImage struct {
+	err           error
+	podImage      string
+	sourceImageID string
+	once          *sync.Once
 }
 
 type app struct {
@@ -61,7 +62,7 @@ type app struct {
 	containersForWhichWeAreStreamingLogs map[string]bool
 	color                                cmdColor.Color
 	volumes                              []appVolume
-	volumesImage                         appVolumesImage
+	volumeInitImage                      appVolumesInitImage
 }
 
 func (a *app) name() string {
@@ -159,7 +160,7 @@ func (u *upRunner) initVolumeInfo() {
 					if err != nil {
 						fmt.Printf(
 							"app %s: docker compose service has a volume with host path %#v, ignoring this volume because resolving the "+
-								"host path resulted in an error: %v",
+								"host path resulted in an error: %v\n",
 							app.name(),
 							serviceVolume.Short.HostPath,
 							err,
@@ -178,6 +179,20 @@ func (u *upRunner) initVolumeInfo() {
 				// TODO https://github.com/jbrekelmans/kube-compose/issues/161 support long volume syntax
 				continue
 			}
+			totalVolumeCount++
+			if totalVolumeCount > 1 {
+				fmt.Printf("WARNING: the docker compose configuration potentially has a volume that is projected into the file system f1" +
+					" and f2 of containers c1 and c2, respectively, but currently changes in f1 will not be reflected in f2\n")
+			}
+			if totalVolumeCount == 1 {
+				fmt.Printf("WARNING: the docker compose configuration has one or more bind volumes, but the current implementation " +
+					"cannot reflect changes on the host file system in containers (and vice versa)\n")
+			}
+			if u.cfg.PushImages == nil {
+				fmt.Printf("WARNING: the docker compose configuration has one or more bind volumes, but they have been disabled because " +
+					"the configuration to push images is missing\n")
+				return
+			}
 			// TODO https://github.com/jbrekelmans/kube-compose/issues/171 overlapping bind mounted volumes do not work..
 			// For now we assume that there is no overlap...
 			app.volumes = append(app.volumes, appVolume{
@@ -185,42 +200,59 @@ func (u *upRunner) initVolumeInfo() {
 				readOnly:         readOnly,
 				containerPath:    serviceVolume.Short.ContainerPath,
 			})
-			totalVolumeCount++
-			if totalVolumeCount > 1 {
-				fmt.Printf("WARNING: the docker compose configuration potentially has a volume that is projected into a container's file " +
-					"system twice, but currently changes to the volume in one container projection will not be reflected in the other")
-			}
-		}
-		if len(app.volumes) > 0 {
-			go u.getAppVolumesImageOnce(app)
 		}
 	}
 }
 
-func (u *upRunner) getAppVolumesImageOnce(a *app) error {
-	a.volumesImage.once.Do(func() {
-		var hostDataPaths []string
-		for _, volume := range a.volumes {
-			hostDataPaths = append(hostDataPaths, volume.resolvedHostPath)
-		}
-		a.volumesImage.err = buildVolumeInitImage(u.opts.Context, u.dockerClient, hostDataPaths)
-	})
-	return a.volumesImage.err
+func (u *upRunner) getAppVolumeInitImage(a *app) error {
+	var bindMountHostFiles []string
+	for _, volume := range a.volumes {
+		bindMountHostFiles = append(bindMountHostFiles, volume.resolvedHostPath)
+	}
+	r, err := buildVolumeInitImage(u.opts.Context, u.dockerClient, bindMountHostFiles)
+	if err != nil {
+		return err
+	}
+	a.volumeInitImage.sourceImageID = r.imageID
+	for i, volume := range a.volumes {
+		volume.isDir = r.isDirSlice[i]
+	}
+	a.volumeInitImage.podImage, err = u.pushImage(a.volumeInitImage.sourceImageID, a.composeService.NameEscaped, "volume init image", a)
+	return err
 }
 
-func resolveBindVolumeHostPath(hostPath string) (string, error) {
-	// TODO https://github.com/jbrekelmans/kube-compose/issues/170 the interpretation is slightly different from docker..
-	return filepath.EvalSymlinks(hostPath)
+func (u *upRunner) pushImage(sourceImageID, name, imageDescr string, a *app) (podImage string, err error) {
+	destinationImage := fmt.Sprintf("%s/%s/%s", u.cfg.PushImages.DockerRegistry, u.cfg.Namespace, name)
+	destinationImagePush := destinationImage + ":latest"
+	err = u.dockerClient.ImageTag(u.opts.Context, sourceImageID, destinationImagePush)
+	if err != nil {
+		return "", err
+	}
+	var digest string
+	digest, err = pushImageWithLogging(u.opts.Context, u.dockerClient, a.name(), destinationImagePush, u.cfg.KubeConfig.BearerToken,
+		imageDescr)
+	if err != nil {
+		return "", err
+	}
+	return destinationImage + "@" + digest, nil
+}
+
+func (u *upRunner) getAppVolumeInitImageOnce(a *app) error {
+	a.volumeInitImage.once.Do(func() {
+		a.volumeInitImage.err = u.getAppVolumeInitImage(a)
+	})
+	return a.volumeInitImage.err
 }
 
 func (u *upRunner) initApps() {
+	u.apps = map[string]*app{}
 	for _, composeService := range u.cfg.Services {
 		app := &app{
 			composeService:                       composeService,
 			containersForWhichWeAreStreamingLogs: make(map[string]bool),
 		}
 		app.imageInfo.once = &sync.Once{}
-		app.volumesImage.once = &sync.Once{}
+		app.volumeInitImage.once = &sync.Once{}
 		u.apps[app.name()] = app
 	}
 }
@@ -266,18 +298,11 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 
 func (u *upRunner) getAppImageEnsureCorrectPodImage(a *app, sourceImageRef dockerRef.Reference, sourceImage string) error {
 	if u.cfg.PushImages != nil {
-		destinationImage := fmt.Sprintf("%s/%s/%s", u.cfg.PushImages.DockerRegistry, u.cfg.Namespace, a.composeService.NameEscaped)
-		destinationImagePush := destinationImage + ":latest"
-		err := u.dockerClient.ImageTag(u.opts.Context, a.imageInfo.sourceImageID, destinationImagePush)
+		var err error
+		a.imageInfo.podImage, err = u.pushImage(a.imageInfo.sourceImageID, a.composeService.NameEscaped, "image", a)
 		if err != nil {
 			return err
 		}
-		var digest string
-		digest, err = pushImageWithLogging(u.opts.Context, u.dockerClient, a.name(), destinationImagePush, u.cfg.KubeConfig.BearerToken)
-		if err != nil {
-			return err
-		}
-		a.imageInfo.podImage = destinationImage + "@" + digest
 	} else if a.imageInfo.podImage == "" {
 		_, sourceImageIsNamed := sourceImageRef.(dockerRef.Named)
 		if !sourceImageIsNamed {
@@ -626,6 +651,47 @@ func (u *upRunner) createPodSecurityContext(a *app) *v1.PodSecurityContext {
 	return nil
 }
 
+func (u *upRunner) createPodVolumes(a *app, pod *v1.Pod) error {
+	if len(a.volumes) == 0 {
+		return nil
+	}
+	err := u.getAppVolumeInitImageOnce(a)
+	if err != nil {
+		return err
+	}
+	var volumes []v1.Volume
+	var volumeMounts []v1.VolumeMount
+	var initVolumeMounts []v1.VolumeMount
+	for i, volume := range a.volumes {
+		volumeName := fmt.Sprintf("vol%d", i+1)
+		volumes = append(volumes, v1.Volume{
+			Name: volumeName,
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{},
+			},
+		})
+		initVolumeMounts = append(initVolumeMounts, v1.VolumeMount{
+			Name:      volumeName,
+			MountPath: fmt.Sprintf("/mnt/vol%d", i+1),
+		})
+		volumeMounts = append(volumeMounts, v1.VolumeMount{
+			ReadOnly:  volume.readOnly,
+			Name:      volumeName,
+			MountPath: volume.containerPath,
+			SubPath:   "root",
+		})
+	}
+	initContainer := v1.Container{
+		Name:         a.composeService.NameEscaped + "-init",
+		Image:        a.volumeInitImage.podImage,
+		VolumeMounts: initVolumeMounts,
+	}
+	pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
+	pod.Spec.Containers[0].VolumeMounts = volumeMounts
+	pod.Spec.Volumes = volumes
+	return nil
+}
+
 func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	err := u.getAppImageInfoOnce(app)
 	if err != nil {
@@ -683,6 +749,12 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 		return nil, err
 	}
 	k8smeta.InitObjectMeta(u.cfg, &pod.ObjectMeta, app.composeService)
+
+	err = u.createPodVolumes(app, pod)
+	if err != nil {
+		return nil, err
+	}
+
 	podServer, err := u.k8sPodClient.Create(pod)
 	if k8sError.IsAlreadyExists(err) {
 		fmt.Printf("app %s: pod %s already exists\n", app.name(), pod.ObjectMeta.Name)
@@ -892,6 +964,7 @@ func (u *upRunner) runListPodsAndCreateThemIfNeeded() (string, error) {
 func (u *upRunner) run() error {
 	u.initApps()
 	u.initAppsToBeStarted()
+	u.initVolumeInfo()
 	err := u.initKubernetesClientset()
 	if err != nil {
 		return err
@@ -904,13 +977,18 @@ func (u *upRunner) run() error {
 	}
 	u.dockerClient = dc
 
-	u.initVolumeInfo()
-
 	for app := range u.appsToBeStarted {
 		// Begin pulling and pushing images immediately...
 		// The error returned by getAppImageInfoOnce will be handled later, hence the nolint.
 		// nolint
 		go u.getAppImageInfoOnce(app)
+
+		// Start building the volume init image, if needed.
+		if len(app.volumes) > 0 {
+			// The error returned by getAppVolumeInitImageOnce will be handled later, hence the nolint.
+			// nolint
+			go u.getAppVolumeInitImageOnce(app)
+		}
 	}
 	// Begin creating services and collecting their cluster IPs (we'll need this to
 	// set the hostAliases of each pod).

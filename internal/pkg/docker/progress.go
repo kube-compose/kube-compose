@@ -15,15 +15,17 @@ type staticStatusInfo struct {
 	weightBefore float64
 }
 
-const sha256Prefix = "sha256:"
-const sha256BitLength = 256
+const (
+	Sha256Prefix    = "sha256:"
+	Sha256BitLength = 256
+)
 
 var (
-	digestRegExp = regexp.MustCompile(
+	digestRegexp = regexp.MustCompile(
 		fmt.Sprintf(
 			"%s[a-fA-F0-9]{%d}(?:[^a-fA-F0-9]|$)",
-			regexp.QuoteMeta(sha256Prefix),
-			sha256BitLength/4,
+			regexp.QuoteMeta(Sha256Prefix),
+			Sha256BitLength/4,
 		),
 	)
 	maxPullWeight             float64
@@ -124,6 +126,10 @@ type status struct {
 	progress   *jsonmessage.JSONProgress
 }
 
+func NewDigestRegexp() *regexp.Regexp {
+	return digestRegexp.Copy()
+}
+
 func NewPull(r io.Reader) *PullOrPush {
 	return &PullOrPush{
 		isPull:                    true,
@@ -181,8 +187,8 @@ func (waiter *pullOrPushWaiter) handleMessage(d *PullOrPush, msg *jsonmessage.JS
 		s.progress = msg.Progress
 		waiter.onUpdate(d)
 		// TODO https://github.com/jbrekelmans/kube-compose/issues/5 support non-sha256 digests
-	} else if loc := digestRegExp.FindStringIndex(msg.Status); loc != nil {
-		y := sha256BitLength/4 + len(sha256Prefix)
+	} else if loc := digestRegexp.FindStringIndex(msg.Status); loc != nil {
+		y := Sha256BitLength/4 + len(Sha256Prefix)
 		waiter.digest = msg.Status[loc[0] : loc[0]+y]
 	} else if msg.Error != nil && len(msg.Error.Message) > 0 {
 		waiter.lastError = msg.Error.Message

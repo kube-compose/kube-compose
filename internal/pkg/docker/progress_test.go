@@ -132,3 +132,10 @@ func TestPushProgress_Partial(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestNewDigestRegexp_Success(t *testing.T) {
+	r := NewDigestRegexp()
+	if r == nil {
+		t.Fail()
+	}
+}

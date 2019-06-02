@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -12,9 +13,13 @@ import (
 
 	dockerTypes "github.com/docker/docker/api/types"
 	dockerClient "github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/jsonmessage"
+	"github.com/jbrekelmans/kube-compose/internal/pkg/docker"
 	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
 	"github.com/pkg/errors"
 )
+
+var digestRegexp = docker.NewDigestRegexp()
 
 func buildVolumeInitImageGetDockerfile(isDirSlice []bool) []byte {
 	var b bytes.Buffer
@@ -247,22 +252,21 @@ func bindMouseHostFileToTar(tw *tar.Writer, hostFile, renameTo string) (isDir bo
 	return
 }
 
-func buildVolumeInitImageGetBuildContext(hostFiles []string) ([]byte, error) {
+func buildVolumeInitImageGetBuildContext(r *buildVolumeInitImageResult, bindVolumeHostPaths []string) ([]byte, error) {
 	var tarBuffer bytes.Buffer
 	tw := tar.NewWriter(&tarBuffer)
 	defer tw.Close()
 
-	var isDirSlice []bool
-	for i, hostFiles := range hostFiles {
-		isDir, err := bindMouseHostFileToTar(tw, hostFiles, fmt.Sprintf("vol%d", i+1))
+	for i, bindVolumeHostFile := range bindVolumeHostPaths {
+		isDir, err := bindMouseHostFileToTar(tw, bindVolumeHostFile, fmt.Sprintf("data%d", i+1))
 		if err != nil {
 			return nil, err
 		}
-		isDirSlice = append(isDirSlice, isDir)
+		r.isDirSlice = append(r.isDirSlice, isDir)
 	}
 
 	// Write Dockerfile to build context.
-	dockerFile := buildVolumeInitImageGetDockerfile(isDirSlice)
+	dockerFile := buildVolumeInitImageGetDockerfile(r.isDirSlice)
 	err := tw.WriteHeader(&tar.Header{
 		Name: "Dockerfile",
 		Size: int64(len(dockerFile)),
@@ -281,21 +285,75 @@ func buildVolumeInitImageGetBuildContext(hostFiles []string) ([]byte, error) {
 	return tarBuffer.Bytes(), nil
 }
 
-func buildVolumeInitImage(ctx context.Context, dc *dockerClient.Client, hostFiles []string) error {
-	buildContextBytes, err := buildVolumeInitImageGetBuildContext(hostFiles)
+type buildVolumeInitImageResult struct {
+	// Feedback whether or not each file is a directory, so that we can use subPath when creating Kubernetes volume mounts as appropriate.
+	isDirSlice []bool
+	imageID    string
+}
+
+func buildVolumeInitImage(ctx context.Context, dc *dockerClient.Client, bindVolumeHostPaths []string) (*buildVolumeInitImageResult, error) {
+	r := &buildVolumeInitImageResult{}
+	buildContextBytes, err := buildVolumeInitImageGetBuildContext(r, bindVolumeHostPaths)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	buildContext := bytes.NewReader(buildContextBytes)
 	response, err := dc.ImageBuild(ctx, buildContext, dockerTypes.ImageBuildOptions{
 		BuildArgs: map[string]*string{
 			"BASE_IMAGE": util.NewString("ubuntu:latest"),
 		},
+		// Only the image ID is output when SupressOutput is true.
+		SuppressOutput: true,
+		Remove:         true,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
-	_, err = io.Copy(os.Stdout, response.Body)
-	// Not sure what happens here...
-	return err
+	decoder := json.NewDecoder(response.Body)
+	for {
+		var msg jsonmessage.JSONMessage
+		err = decoder.Decode(&msg)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+		if loc := digestRegexp.FindStringIndex(msg.Stream); loc != nil {
+			i := docker.Sha256BitLength/4 + len(docker.Sha256Prefix)
+			r.imageID = msg.Stream[loc[0] : loc[0]+i]
+		}
+	}
+	if r.imageID == "" {
+		return nil, fmt.Errorf("could not parse image ID from docker build output stream")
+	}
+	return r, nil
+}
+
+func resolveBindVolumeHostPath(name string) (string, error) {
+	name, err := filepath.Abs(name)
+	if err != nil {
+		return "", err
+	}
+	// Walk sections of path, evaluating symlinks in the process.
+	vol := filepath.VolumeName(name)
+	sep := string(filepath.Separator)
+	parts := strings.Split(filepath.Clean(name[len(vol):]), sep)
+	result := vol
+	for i := 1; i < len(parts); i++ {
+		result = result + sep + parts[i]
+		resultResolved, err := filepath.EvalSymlinks(result)
+		if os.IsNotExist(err) {
+			if i+1 < len(parts) {
+				result = result + sep + strings.Join(parts[i+1:], sep)
+			}
+			err = os.MkdirAll(result, 0777)
+			return result, err
+		}
+		if err != nil {
+			return "", err
+		}
+		result = resultResolved
+	}
+	return result, nil
 }
