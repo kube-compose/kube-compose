@@ -85,13 +85,14 @@ func (node *mockINode) dirLookup(nameComp string) *mockINode {
 
 func (node *mockINode) dirAppend(nameComp string, childNode *mockINode) {
 	dir := node.extra.(mockINodeExtraDir)
-	node.extra = append(dir, struct {
+	dir = append(dir, struct {
 		name string
 		node *mockINode
 	}{
 		name: nameComp,
 		node: childNode,
 	})
+	node.extra = dir
 }
 
 var (

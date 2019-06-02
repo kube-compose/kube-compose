@@ -15,6 +15,8 @@ var testFileContent = "content"
 
 var mockFileSystem fsPackage.MockFileSystem
 
+// Init here is justified because a common mock file system is used, and we require calling Add to make tests deterministic.
+// nolint
 func init() {
 	mockFileSystem = fsPackage.NewMockFileSystem(map[string]fsPackage.MockFile{
 		"/orig": {
