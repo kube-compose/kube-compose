@@ -43,7 +43,6 @@ type appImageInfo struct {
 type appVolume struct {
 	resolvedHostPath string
 	readOnly         bool
-	isDir            bool // Only populated once getAppVolumeInitImageOnce has completed.
 	containerPath    string
 }
 
@@ -214,9 +213,6 @@ func (u *upRunner) getAppVolumeInitImage(a *app) error {
 		return err
 	}
 	a.volumeInitImage.sourceImageID = r.imageID
-	for i, volume := range a.volumes {
-		volume.isDir = r.isDirSlice[i]
-	}
 	a.volumeInitImage.podImage, err = u.pushImage(a.volumeInitImage.sourceImageID, a.composeService.NameEscaped, "volume init image", a)
 	return err
 }
@@ -245,7 +241,8 @@ func (u *upRunner) getAppVolumeInitImageOnce(a *app) error {
 }
 
 func (u *upRunner) initApps() {
-	u.apps = map[string]*app{}
+	u.apps = make(map[string]*app, len(u.cfg.Services))
+	u.appsThatNeedToBeReady = map[*app]bool{}
 	for _, composeService := range u.cfg.Services {
 		app := &app{
 			composeService:                       composeService,

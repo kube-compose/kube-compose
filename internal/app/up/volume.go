@@ -38,7 +38,7 @@ FROM ${BASE_IMAGE}
 		if i > 1 {
 			b.WriteString(" && ")
 		}
-		fmt.Fprintf(&b, "cp -r /app/data/vol%d /mnt/vol%d/root", i, i)
+		fmt.Fprintf(&b, "cp -ar /app/data/vol%d /mnt/vol%d/root", i, i)
 	}
 	b.WriteString(`"]
 `)
@@ -257,16 +257,17 @@ func buildVolumeInitImageGetBuildContext(r *buildVolumeInitImageResult, bindVolu
 	tw := tar.NewWriter(&tarBuffer)
 	defer tw.Close()
 
+	var isDirSlice []bool
 	for i, bindVolumeHostFile := range bindVolumeHostPaths {
 		isDir, err := bindMouseHostFileToTar(tw, bindVolumeHostFile, fmt.Sprintf("data%d", i+1))
 		if err != nil {
 			return nil, err
 		}
-		r.isDirSlice = append(r.isDirSlice, isDir)
+		isDirSlice = append(isDirSlice, isDir)
 	}
 
 	// Write Dockerfile to build context.
-	dockerFile := buildVolumeInitImageGetDockerfile(r.isDirSlice)
+	dockerFile := buildVolumeInitImageGetDockerfile(isDirSlice)
 	err := tw.WriteHeader(&tar.Header{
 		Name: "Dockerfile",
 		Size: int64(len(dockerFile)),
@@ -286,9 +287,7 @@ func buildVolumeInitImageGetBuildContext(r *buildVolumeInitImageResult, bindVolu
 }
 
 type buildVolumeInitImageResult struct {
-	// Feedback whether or not each file is a directory, so that we can use subPath when creating Kubernetes volume mounts as appropriate.
-	isDirSlice []bool
-	imageID    string
+	imageID string
 }
 
 func buildVolumeInitImage(ctx context.Context, dc *dockerClient.Client, bindVolumeHostPaths []string) (*buildVolumeInitImageResult, error) {
