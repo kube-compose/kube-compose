@@ -42,18 +42,18 @@ Download the binary from https://github.com/jbrekelmans/kube-compose/releases, e
 
 `kube-compose` loads Kubernetes configuration the same way `kubectl` does, and it is recommended you use `kubectl` to manage Kubernetes configuration.
 
-To run `kube-compose` with the test [docker-compose.yml](test/docker-compose.yml):
+To run `kube-compose` with [the test docker-compose.yml](test/docker-compose.yml):
 ```bash
 kube-compose -f 'test/docker-compose.yml' -e 'myuniquelabel' up
 ```
-The `-e` flag sets a unique identifier that is used to isolate [labels and selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) and ensure names are unique when deploying to shared namespaces. This is ideal for CI, because there may be many jobs and test environments running at the same time. This will attach to any pods created, so ctrl+c can be used to interrupt the command.
+The `-e` flag sets a unique identifier that is used to isolate [labels and selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) and ensure names are unique when deploying to shared namespaces. This is ideal for CI, because there may be many jobs and test environments running at the same time. The above command will also attach to any pods created, so ctrl+c can be used to interrupt the process and return control the the terminal.
 
 Similar to `docker-compose`, an environment can be stopped and destroyed using the `down` command: 
 ```bash
 kube-compose -f 'test/docker-compose.yml' -e 'myuniquelabel' down
 ```
 
-The CLI of `kube-compose` mirrors `docker-compose` as much as possible, but has some differences. To avoid repeating the `-e` flag you can use the envirnoment variable `KUBECOMPOSE_ENVID`. The above example can be simplified to:
+The CLI of `kube-compose` mirrors `docker-compose` as much as possible, but has some differences. To avoid repeating the `-e` flag you can use the envirnoment variable `KUBECOMPOSE_ENVID`. The above example can also be written as:
 ```bash
 cd test
 export KUBECOMPOSE_ENVID='myuniquelabel'
@@ -63,22 +63,20 @@ and
 ```bash
 kube-compose down
 ```
-For a full list of options and commands:
+For a full list of options and commands run:
 ```bash
 kube-compose --help
 ```
 
 # Examples
-A CI pipeline that does system testing typically includes the following steps:
+We will see several examples that support common CI use cases, in particular the following common system testing steps:
 1. Start environment
 2. Wait until the environment has fully started
 3. Run tests
 4. Stop environmnent
 
-We will see how these examples support this use case.
-
 ## Waiting for and ordering startup
-`kube-compose` supports ordered startup and can wait for the environment to be ready through [depends_on](https://docs.docker.com/compose/compose-file/compose-file-v2/#depends_on) with `condition: service_healthy` and healthchecks. This approach is powerful, because it requires minimal code changes. NOTE: version 3 docker compose files do not support `depends_on` conditions anymore, and docker instead recommends [using startup scripts](https://docs.docker.com/compose/startup-order/).
+When performing system testing in CI, often one has to wait until the application and stubs are ready. `kube-compose` supports ordered startup and can wait for the environment to be ready through [depends_on](https://docs.docker.com/compose/compose-file/compose-file-v2/#depends_on) with `condition: service_healthy` and healthchecks. This approach is powerful, because it does not require writing complicated startup scripts. NOTE: version 3 docker compose files do not support `depends_on` conditions anymore (see https://docs.docker.com/compose/startup-order/).
 
 For example, if `docker-compose.yml` is...
 ```yaml
@@ -101,11 +99,13 @@ services:
 ```bash
 kube-compose up -d 'helper'
 ```
-...will create the environment and wait for it to have fully started. NOTE: the service `helper` is used to to make sure that `web` is healthy as soon as `kube-compose` returns, so that we can immediately use the environment (e.g. for running system testing). NOTE: in the background `kube-compose` converts [Docker healthchecks](https://docs.docker.com/engine/reference/builder/#healthcheck) to [readiness probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/) and will only start service `web` when the pod of `db` is ready, and will only start `helper` when the pod of `web` is ready. The pod of `helper` exits immediately, but this pattern is very powerful. 
+...will create the environment and wait for it to have fully started. The service `helper` is used to to make sure that `web` is healthy as soon as `kube-compose` returns, so that we can immediately use the environment (e.g. to running system testing).
+
+NOTE: in the background `kube-compose` converts [Docker healthchecks](https://docs.docker.com/engine/reference/builder/#healthcheck) to [readiness probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/) and will only start service `web` when the pod of `db` is ready, and will only start `helper` when the pod of `web` is ready. The pod of `helper` exits immediately, but this pattern is very powerful. 
 
 
 ## Volumes
-`kube-compose` currently only supports a basic simulation of `docker-compose`'s bind mounted volumes. This supports the use case of mounting configuration files into containers. 
+`kube-compose` currently supports a basic simulation of `docker-compose`'s bind mounted volumes. This supports the use case of mounting configuration files into containers, which is a very common way of parameterising containers (in CI).
 
 `kube-compose` implements this by:
 1. Building a helper image with the relevant host files;
@@ -148,11 +148,11 @@ The third limitation implies that sharing volumes between two docker compose ser
 
 
 ## Running containers as specific users
-If the Kubernetes namespace has a pod security policy such that some images run with `kube-compose` will not run with the correct user, you can use the `--run-as-user` flag as follows:
+Often the images and stubs run in CI cannot be easily modified, and a pod security policy makes it that some images will not run as the correct user. `kube-compose` allows you to use the `--run-as-user`:
 ```bash
 kube-compose up --run-as-user
 ```
-This will set each pod's `runAsUser` (and `runAsGroup`) based on the [`user` property](https://docs.docker.com/compose/compose-file/#domainname-hostname-ipc-mac_address-privileged-read_only-shm_size-stdin_open-tty-user-working_dir) of the docker-compose service and the [`USER` configuration](https://docs.docker.com/engine/reference/builder/#user) of the docker image.
+This will set each pod's `runAsUser` (and `runAsGroup`) based on the [`user` property](https://docs.docker.com/compose/compose-file/#domainname-hostname-ipc-mac_address-privileged-read_only-shm_size-stdin_open-tty-user-working_dir) of the docker-compose service and the [`USER` configuration](https://docs.docker.com/engine/reference/builder/#user) of the docker image. This will require additional privileges, but is an easy way of making CI just work.
 
 NOTE: if a Dockerfile does not have a `USER` instruction, then the user is inherited from the base image. This makes it very easy to run images as root.
 
@@ -196,15 +196,3 @@ To clean up after the test:
 ```bash
 kube-compose down
 ```
-
-# Why another tool
-
-Although [kompose](https://github.com/kubernetes/kompose) can already convert docker compose files into Kubernetes resources, the main differences between kube-compose and Kompose are:
-
-1. kube-compose generates Kubernetes resource names and selectors that are unique for each build to support shared namespaces and scaling to many concurrent CI environments.
-
-1. kube-compose creates pods with `restartPolicy: Never` instead of deployments, so that failed pods can be inspected, no logs are lost due to pod restarts, and Kubernetes cluster resources are used more efficiently.
-
-1. kube-compose allows startup dependencies to be specified by respecting [docker compose](https://docs.docker.com/compose/compose-file/compose-file-v2#depends_on)'s `depends_on` field.
-
-1. kube-compose currently depends on the docker daemon to pull Docker images and extract their healthcheck.
