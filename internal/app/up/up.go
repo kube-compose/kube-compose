@@ -143,15 +143,27 @@ func (u *upRunner) initVolumeInfo() {
 			totalVolumeCount++
 			if totalVolumeCount > 1 {
 				fmt.Printf("WARNING: the docker compose configuration potentially has a volume that is projected into the file system f1" +
-					" and f2 of containers c1 and c2, respectively, but currently changes in f1 will not be reflected in f2\n")
+					" and f2 of containers c1 and c2, respectively, but currently changes in f1 will not be reflected in f2 (see " +
+					"https://github.com/jbrekelmans/kube-compose#limitations)\n")
 			}
 			if totalVolumeCount == 1 {
 				fmt.Printf("WARNING: the docker compose configuration has one or more bind volumes, but the current implementation " +
-					"cannot reflect changes on the host file system in containers (and vice versa)\n")
+					"cannot reflect changes on the host file system in containers (and vice versa, see " +
+					"https://github.com/jbrekelmans/kube-compose#limitations)\n")
 			}
+			flag := false
 			if u.cfg.PushImages == nil {
 				fmt.Printf("WARNING: the docker compose configuration has one or more bind volumes, but they have been disabled because " +
-					"the configuration to push images is missing\n")
+					"the configuration to push images is missing (see https://github.com/jbrekelmans/kube-compose#volumes)\n")
+				flag = true
+			}
+			if u.cfg.VolumeInitBaseImage == nil {
+				fmt.Printf("WARNING: the docker compose configuration has one or more bind volumes, but they have been disabled because " +
+					"the base image of volume init containers is not configured (see https://github.com/jbrekelmans/kube-compose#volumes)" +
+					"\n")
+				flag = true
+			}
+			if flag {
 				return
 			}
 			// TODO https://github.com/jbrekelmans/kube-compose/issues/171 overlapping bind mounted volumes do not work..
@@ -212,29 +224,30 @@ func (u *upRunner) getAppVolumeInitImage(a *app) error {
 	for _, volume := range a.volumes {
 		bindMountHostFiles = append(bindMountHostFiles, volume.resolvedHostPath)
 	}
-	r, err := buildVolumeInitImage(u.opts.Context, u.dockerClient, bindMountHostFiles)
+	r, err := buildVolumeInitImage(u.opts.Context, u.dockerClient, bindMountHostFiles, *u.cfg.VolumeInitBaseImage)
 	if err != nil {
 		return err
 	}
 	a.volumeInitImage.sourceImageID = r.imageID
-	a.volumeInitImage.podImage, err = u.pushImage(a.volumeInitImage.sourceImageID, a.composeService.NameEscaped, "volume init image", a)
+	a.volumeInitImage.podImage, err = u.pushImage(a.volumeInitImage.sourceImageID, a.composeService.NameEscaped+"-init",
+		"volume init image", a)
 	return err
 }
 
 func (u *upRunner) pushImage(sourceImageID, name, imageDescr string, a *app) (podImage string, err error) {
-	destinationImage := fmt.Sprintf("%s/%s/%s", u.cfg.PushImages.DockerRegistry, u.cfg.Namespace, name)
-	destinationImagePush := destinationImage + ":latest"
-	err = u.dockerClient.ImageTag(u.opts.Context, sourceImageID, destinationImagePush)
+	imagePush := fmt.Sprintf("%s/%s/%s:latest", u.cfg.PushImages.DockerRegistry, u.cfg.Namespace, name)
+	err = u.dockerClient.ImageTag(u.opts.Context, sourceImageID, imagePush)
 	if err != nil {
-		return "", err
+		return
 	}
 	var digest string
-	digest, err = pushImageWithLogging(u.opts.Context, u.dockerClient, a.name(), destinationImagePush, u.cfg.KubeConfig.BearerToken,
+	digest, err = pushImageWithLogging(u.opts.Context, u.dockerClient, a.name(), imagePush, u.cfg.KubeConfig.BearerToken,
 		imageDescr)
 	if err != nil {
-		return "", err
+		return
 	}
-	return destinationImage + "@" + digest, nil
+	podImage = fmt.Sprintf("docker-registry.default.svc:5000/%s/%s@%s", u.cfg.Namespace, name, digest)
+	return
 }
 
 func (u *upRunner) getAppVolumeInitImageOnce(a *app) error {
@@ -375,18 +388,18 @@ func (u *upRunner) getAppImageInfoOnce(app *app) error {
 	return app.imageInfo.err
 }
 
-func (u *upRunner) findAppFromObjectMeta(objectMeta *metav1.ObjectMeta) (*app, error) {
-	composeService, err := k8smeta.FindFromObjectMeta(u.cfg, objectMeta)
-	if err != nil {
-		return nil, err
+func (u *upRunner) findAppFromObjectMeta(objectMeta *metav1.ObjectMeta) *app {
+	composeService := k8smeta.FindFromObjectMeta(u.cfg, objectMeta)
+	if composeService == nil {
+		return nil
 	}
-	return u.apps[composeService.Name], err
+	return u.apps[composeService.Name]
 }
 
 func (u *upRunner) waitForServiceClusterIPUpdate(service *v1.Service) (*app, error) {
-	app, err := u.findAppFromObjectMeta(&service.ObjectMeta)
-	if err != nil || app == nil {
-		return app, err
+	app := u.findAppFromObjectMeta(&service.ObjectMeta)
+	if app == nil {
+		return nil, nil
 	}
 	if service.Spec.Type != "ClusterIP" {
 		return app, k8smeta.ErrorResourcesModifiedExternally()
@@ -432,10 +445,7 @@ func (u *upRunner) waitForServiceClusterIPWatchEvent(event *k8swatch.Event) erro
 		}
 	case k8swatch.Deleted:
 		service := event.Object.(*v1.Service)
-		app, err := u.findAppFromObjectMeta(&service.ObjectMeta)
-		if err != nil {
-			return err
-		}
+		app := u.findAppFromObjectMeta(&service.ObjectMeta)
 		if app != nil {
 			return k8smeta.ErrorResourcesModifiedExternally()
 		}
@@ -471,11 +481,11 @@ func (u *upRunner) waitForServiceClusterIP(expected int) error {
 	listOptions := metav1.ListOptions{
 		LabelSelector: u.cfg.EnvironmentLabel + "=" + u.cfg.EnvironmentID,
 	}
-	remaining := u.waitForServiceClusterIPCountRemaining()
 	resourceVersion, err := u.waitForServiceClusterIPList(expected, &listOptions)
 	if err != nil {
 		return err
 	}
+	remaining := u.waitForServiceClusterIPCountRemaining()
 	fmt.Printf("waiting for cluster IP assignment (%d/%d)\n", expected-remaining, expected)
 	if remaining == 0 {
 		return nil
@@ -818,10 +828,7 @@ func parsePodStatusTerminatedContainer(podName, containerName string, t *v1.Cont
 
 func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 
-	app, err := u.findAppFromObjectMeta(&pod.ObjectMeta)
-	if err != nil {
-		return err
-	}
+	app := u.findAppFromObjectMeta(&pod.ObjectMeta)
 	if app == nil {
 		return nil
 	}
@@ -1028,10 +1035,7 @@ func (u *upRunner) runWatchPodsEvent(event *k8swatch.Event) error {
 		}
 	case k8swatch.Deleted:
 		pod := event.Object.(*v1.Pod)
-		app, err := u.findAppFromObjectMeta(&pod.ObjectMeta)
-		if err != nil {
-			return err
-		}
+		app := u.findAppFromObjectMeta(&pod.ObjectMeta)
 		if app != nil {
 			return k8smeta.ErrorResourcesModifiedExternally()
 		}

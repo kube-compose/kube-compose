@@ -44,11 +44,8 @@ func (d *downRunner) deleteCommon(kind string, lister lister, deleter deleter) (
 	deleteOptions := &metav1.DeleteOptions{}
 	deletedAll := true
 	for _, item := range list {
-		composeService, err := k8smeta.FindFromObjectMeta(d.cfg, item)
-		if err != nil {
-			return false, err
-		}
-		if d.cfg.MatchesFilter(composeService) {
+		composeService := k8smeta.FindFromObjectMeta(d.cfg, item)
+		if composeService == nil || d.cfg.MatchesFilter(composeService) {
 			err = deleter(item.Name, deleteOptions)
 			if err != nil {
 				return false, err

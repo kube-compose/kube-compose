@@ -22,10 +22,7 @@ func TestFindFromObjectMeta_AnnotationSuccess(t *testing.T) {
 			AnnotationName: serviceA.Name,
 		},
 	}
-	composeService, err := FindFromObjectMeta(cfg, &objectMeta)
-	if err != nil {
-		t.Fail()
-	}
+	composeService := FindFromObjectMeta(cfg, &objectMeta)
 	if composeService != serviceA {
 		t.Fail()
 	}
@@ -43,8 +40,8 @@ func TestGetK8sName(t *testing.T) {
 func TestFindFromObjectMeta_NotFound(t *testing.T) {
 	cfg := config.Config{}
 	objectMeta := metav1.ObjectMeta{}
-	composeService, err := FindFromObjectMeta(&cfg, &objectMeta)
-	if composeService != nil || err != nil {
+	composeService := FindFromObjectMeta(&cfg, &objectMeta)
+	if composeService != nil {
 		t.Fail()
 	}
 }

@@ -232,7 +232,7 @@ func (h *bindMountHostFileToTarHelper) run(hostFile, fileNameInTar string) (isDi
 	return
 }
 
-func bindMouseHostFileToTar(tw TarWriter, hostFile, renameTo string) (isDir bool, err error) {
+func bindMountHostFileToTar(tw TarWriter, hostFile, renameTo string) (isDir bool, err error) {
 	h := &bindMountHostFileToTarHelper{
 		tw:           tw,
 		rootHostFile: hostFile,
@@ -267,7 +267,7 @@ func buildVolumeInitImageGetBuildContext(bindVolumeHostPaths []string) ([]byte, 
 
 	var isDirSlice []bool
 	for i, bindVolumeHostFile := range bindVolumeHostPaths {
-		isDir, err := bindMouseHostFileToTar(tw, bindVolumeHostFile, fmt.Sprintf("data%d", i+1))
+		isDir, err := bindMountHostFileToTar(tw, bindVolumeHostFile, fmt.Sprintf("data%d", i+1))
 		if err != nil {
 			return nil, err
 		}
@@ -298,7 +298,11 @@ type buildVolumeInitImageResult struct {
 	imageID string
 }
 
-func buildVolumeInitImage(ctx context.Context, dc *dockerClient.Client, bindVolumeHostPaths []string) (*buildVolumeInitImageResult, error) {
+func buildVolumeInitImage(
+	ctx context.Context,
+	dc *dockerClient.Client,
+	bindVolumeHostPaths []string,
+	volumeInitBaseImage string) (*buildVolumeInitImageResult, error) {
 	buildContextBytes, err := buildVolumeInitImageGetBuildContext(bindVolumeHostPaths)
 	if err != nil {
 		return nil, err
@@ -306,7 +310,7 @@ func buildVolumeInitImage(ctx context.Context, dc *dockerClient.Client, bindVolu
 	buildContext := bytes.NewReader(buildContextBytes)
 	response, err := dc.ImageBuild(ctx, buildContext, dockerTypes.ImageBuildOptions{
 		BuildArgs: map[string]*string{
-			"BASE_IMAGE": util.NewString("ubuntu:latest"),
+			"BASE_IMAGE": util.NewString(volumeInitBaseImage),
 		},
 		// Only the image ID is output when SupressOutput is true.
 		SuppressOutput: true,
