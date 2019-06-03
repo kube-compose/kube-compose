@@ -143,15 +143,27 @@ func (u *upRunner) initVolumeInfo() {
 			totalVolumeCount++
 			if totalVolumeCount > 1 {
 				fmt.Printf("WARNING: the docker compose configuration potentially has a volume that is projected into the file system f1" +
-					" and f2 of containers c1 and c2, respectively, but currently changes in f1 will not be reflected in f2\n")
+					" and f2 of containers c1 and c2, respectively, but currently changes in f1 will not be reflected in f2 (see " +
+					"https://github.com/jbrekelmans/kube-compose#limitations)\n")
 			}
 			if totalVolumeCount == 1 {
 				fmt.Printf("WARNING: the docker compose configuration has one or more bind volumes, but the current implementation " +
-					"cannot reflect changes on the host file system in containers (and vice versa)\n")
+					"cannot reflect changes on the host file system in containers (and vice versa, see " +
+					"https://github.com/jbrekelmans/kube-compose#limitations)\n")
 			}
+			flag := false
 			if u.cfg.PushImages == nil {
 				fmt.Printf("WARNING: the docker compose configuration has one or more bind volumes, but they have been disabled because " +
-					"the configuration to push images is missing\n")
+					"the configuration to push images is missing (see https://github.com/jbrekelmans/kube-compose#volumes)\n")
+				flag = true
+			}
+			if u.cfg.VolumeInitBaseImage == nil {
+				fmt.Printf("WARNING: the docker compose configuration has one or more bind volumes, but they have been disabled because " +
+					"the base image of volume init containers is not configured (see https://github.com/jbrekelmans/kube-compose#volumes)" +
+					"\n")
+				flag = true
+			}
+			if flag {
 				return
 			}
 			// TODO https://github.com/jbrekelmans/kube-compose/issues/171 overlapping bind mounted volumes do not work..
@@ -212,7 +224,7 @@ func (u *upRunner) getAppVolumeInitImage(a *app) error {
 	for _, volume := range a.volumes {
 		bindMountHostFiles = append(bindMountHostFiles, volume.resolvedHostPath)
 	}
-	r, err := buildVolumeInitImage(u.opts.Context, u.dockerClient, bindMountHostFiles)
+	r, err := buildVolumeInitImage(u.opts.Context, u.dockerClient, bindMountHostFiles, *u.cfg.VolumeInitBaseImage)
 	if err != nil {
 		return err
 	}

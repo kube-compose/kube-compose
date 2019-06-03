@@ -28,12 +28,12 @@ type Config struct {
 
 	// All Kubernetes resources are named with "-"+EnvironmentID as a suffix,
 	// and have an additional label "env="+EnvironmentID so that namespaces can be shared.
-	EnvironmentID    string
-	EnvironmentLabel string
-
-	KubeConfig *rest.Config
-	Namespace  string
-	PushImages *PushImagesConfig
+	EnvironmentID       string
+	EnvironmentLabel    string
+	KubeConfig          *rest.Config
+	Namespace           string
+	PushImages          *PushImagesConfig
+	VolumeInitBaseImage *string
 
 	Services map[*dockerComposeConfig.Service]*Service
 }
@@ -84,8 +84,9 @@ func New(file *string) (*Config, error) {
 		cfg.Services[dcService] = service
 	}
 	var custom struct {
-		Custom struct {
-			PushImages *PushImagesConfig `mapdecode:"push_images"`
+		XKubeCompose struct {
+			PushImages          *PushImagesConfig `mapdecode:"push_images"`
+			VolumeInitBaseImage *string           `mapdecode:"volume_init_base_image"`
 		} `mapdecode:"x-kube-compose"`
 	}
 	err = mapdecode.Decode(&custom, dcCfg.XProperties, mapdecode.IgnoreUnused(true))
@@ -93,9 +94,10 @@ func New(file *string) (*Config, error) {
 		return nil, errors.Wrap(err, fmt.Sprintf("error while parsing x-kube-compose of %#v", *file))
 	}
 
-	if custom.Custom.PushImages != nil {
-		cfg.PushImages = custom.Custom.PushImages
+	if custom.XKubeCompose.PushImages != nil {
+		cfg.PushImages = custom.XKubeCompose.PushImages
 	}
+	cfg.VolumeInitBaseImage = custom.XKubeCompose.VolumeInitBaseImage
 
 	return cfg, nil
 }
