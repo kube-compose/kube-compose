@@ -14,6 +14,9 @@ services:
     ports:
     - "8080"
     working_dir: /app/test
+    volumes:
+    - './docker-compose.yml:/mnt/vol1/docker-compose.yml:ro'
+    - './data:/mnt/vol2/root:ro'
   generic-service:
     image: ubuntu:latest
     environment:
@@ -50,7 +53,3 @@ services:
       timeout: 5s
       retries: 5
     user: root
-
-x-kube-compose:
-  push_images:
-    docker_registry: 'localhost:5000'
