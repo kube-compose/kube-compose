@@ -2,22 +2,25 @@
 [![License](https://img.shields.io/badge/license-Apache_v2.0-blue.svg)](https://github.com/jbrekelmans/kube-compose/blob/master/LICENSE.md)
 [![Coverage Status](https://coveralls.io/repos/github/jbrekelmans/kube-compose/badge.svg?branch=master&r=3)](https://coveralls.io/github/jbrekelmans/kube-compose?branch=master?r=3)
 
-# Introduction
+# kube-compose
 
 kube-compose is a CI tool that can create and destroy environments in Kubernetes based on docker compose files.
 
-## Contents
+# Contents
 
 * [Installation](#Installation)
+  * [Manual installation](#Manual-installation)
 * [Getting Started](#Getting-Started)
-  * [Build And Package](#Build-And-Package)
-  * [Running Tests](#Running-Tests)
-* [Commands](#Commands)
 * [Examples](#Examples)
-* [Advanced Usage](#Advanced-Usage)
+  * [Waiting for and ordering startup](#Waiting-for-and-ordering-startup)
+  * [Volumes](#Volumes)
+    * [Limitations](#Limitations)
+  * [Running containers as specific users](#Running-containers-as-specific-users)
+* [Developer information](#Developer-information)
+* [Why another tool?](#Why-another-tool?)
 
-## Installation
-### Using Homebrew
+# Installation
+## Using Homebrew
 Add the tap:
 ```bash
 brew tap kube-compose/homebrew-kube-compose
@@ -31,10 +34,10 @@ To upgrade `kube-compose` to the latest stable version:
 brew upgrade kube-compose
 ```
 
-### Manual installation
+## Manual installation
 Download the binary from https://github.com/jbrekelmans/kube-compose/releases, ensure it has execute permissions and place it on your `PATH`.
 
-## Getting Started
+# Getting Started
 `kube-compose` targets a Kubernetes namespace, and will need a running Kubernetes cluster and [a kube config file](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/). If you do not have a running Kubernetes cluster, consider running one locally using [Minikube](https://kubernetes.io/docs/setup/minikube/).
 
 `kube-compose` loads Kubernetes configuration the same way `kubectl` does, and it is recommended you use `kubectl` to manage Kubernetes configuration.
@@ -65,7 +68,7 @@ For a full list of options and commands:
 kube-compose --help
 ```
 
-## Examples
+# Examples
 A CI pipeline that does system testing typically includes the following steps:
 1. Start environment
 2. Wait until the environment has fully started
@@ -74,7 +77,7 @@ A CI pipeline that does system testing typically includes the following steps:
 
 We will see how these examples support this use case.
 
-### `depends_on` with `condition: service_healthy`
+## Waiting for and ordering startup
 `kube-compose` supports ordered startup and can wait for the environment to be ready through [depends_on](https://docs.docker.com/compose/compose-file/compose-file-v2/#depends_on) with `condition: service_healthy` and healthchecks. This approach is powerful, because it requires minimal code changes. NOTE: version 3 docker compose files do not support `depends_on` conditions anymore, and docker instead recommends [using startup scripts](https://docs.docker.com/compose/startup-order/).
 
 For example, if `docker-compose.yml` is...
@@ -101,38 +104,50 @@ kube-compose up -d 'helper'
 ...will create the environment and wait for it to have fully started. NOTE: the service `helper` is used to to make sure that `web` is healthy as soon as `kube-compose` returns, so that we can immediately use the environment (e.g. for running system testing). NOTE: in the background `kube-compose` converts [Docker healthchecks](https://docs.docker.com/engine/reference/builder/#healthcheck) to [readiness probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/) and will only start service `web` when the pod of `db` is ready, and will only start `helper` when the pod of `web` is ready. The pod of `helper` exits immediately, but this pattern is very powerful. 
 
 
-### Volumes
-`kube-compose` has very basic support for bind-mount volumes, which supports the use case of mounting configuration files into containers. It achieves this by:
+## Volumes
+`kube-compose` currently only supports a basic simulation of `docker-compose`'s bind mounted volumes. This supports the use case of mounting configuration files into containers. 
+
+`kube-compose` implements this by:
 1. Building a helper image with the relevant host files;
-2. Pushing the helper image to a registry (see below);
+2. Pushing the helper image to a registry;
 3. Running the helper image as an [initContainer](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/) that initialises an [emptyDir](https://kubernetes.io/docs/concepts/storage/volumes/) volume; -and
-4. Mounting the emptyDir volume into the application container as per the bind-mount volume configuration.
+4. Mounting the emptyDir volume into the application container as per the configuration of the bind mounted volume.
 
-NOTE: because we have to push images, a registry needs to be configured. Currently `kube-compose` only supports the default docker registry included in Openshift (e.g. it assumes Bearer token authentication and the internal hostname `docker-registry.default.svc:5000`).
+NOTE: because `kube-compose` builds and pushes helper images, a base image and docker registry need to be configured. The base image must have `bash` and `cp` installed (see `volume_init_base_image`). Currently `kube-compose` can only push to docker registries that are configured like OpenShift's default docker registry. In particular, `kube-compose` makes the following assumptions:
+1. Within the cluster the hostname of the cluster is assumed to be `docker-registry.default.svc:5000`.
+2. The kube configuration is assumed to have bearer token credentials, that are supplied as the password to the docker registry (the username will be `unused`).
+3. The reference of the image to be pushed has the form `<registry>/<project>/<imagestream>:latest`, [as required by OpenShift](https://blog.openshift.com/remotely-push-pull-container-images-openshift/).
 
-Nevertheless, this can be demonstrated with the following `docker-compose.yml`
+Nevertheless, simulation of bind mount volumes can be demonstrated with the following `docker-compose.yml`:
 ```yaml
 version: '2.4'
 services:
   volumedemo:
-    image: ubuntu:latest
+    image: 'ubuntu:latest'
     entrypoint:
     - /bin/bash
     - -c
     - |
-      echo 'I should not know this:'
+      echo 'Inception...'
       cat /mnt/inception
     volume:
     - './docker-compose.yml:/mnt/inception:ro'
 x-kube-compose:
   push_images:
     docker_registry: 'docker-registry.apps.openshift-cluster.example.com'
+  volume_init_base_image: 'ubuntu:latest'
 ```
-```bash
-kube-compose up
-```
+When `kube-compose up` is run with the above `docker-compose.yml` a pod is created that prints the contents of `docker-compose.yml`.
 
-### Running containers as specific users
+### Limitations
+1. Only bind mounted volumes are simulated.
+2. If a docker compose service makes changes in a mount of the bind mounted volume then those changes will not be reflected in the host file system, and vice versa.
+4. If docker compose services `s1` and `s2` have mounts `m1` and `m2`, respectively, and `m1` and `m2` mount overlapping portions of the host file system, then changes in `m1` will not be reflected in `m2` (if `c1=c2` then this can be implemented easily with the current implementation by mounting one volume multiple times).
+
+The third limitation implies that sharing volumes between two docker compose services is not supported, even though this could be implemented through persistent volumes.
+
+
+## Running containers as specific users
 If the Kubernetes namespace has a pod security policy such that some images run with `kube-compose` will not run with the correct user, you can use the `--run-as-user` flag as follows:
 ```bash
 kube-compose up --run-as-user
@@ -141,14 +156,14 @@ This will set each pod's `runAsUser` (and `runAsGroup`) based on the [`user` pro
 
 NOTE: if a Dockerfile does not have a `USER` instruction, then the user is inherited from the base image. This makes it very easy to run images as root.
 
-## Developer information
+# Developer information
 
-### Building
+## Building
 ```bash
 go build .
 ```
 
-### Linting
+## Linting
 Install the linter if you do not have it already:
 ```bash
 brew install golangci-lint
@@ -158,13 +173,13 @@ Run the linter:
 golangci-lint run
 ```
 
-### Unit tests
+## Unit testing
 To run unit tests:
 ```bash
 go test ./...
 ```
 
-### Testing
+## Testing
 
 Use `kubectl` to set the target Kubernetes namespace and the service account of kube-compose.
 
@@ -182,7 +197,7 @@ To clean up after the test:
 kube-compose down
 ```
 
-## Why another tool
+# Why another tool
 
 Although [kompose](https://github.com/kubernetes/kompose) can already convert docker compose files into Kubernetes resources, the main differences between kube-compose and Kompose are:
 
