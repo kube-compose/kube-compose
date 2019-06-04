@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	version "github.com/hashicorp/go-version"
-	fsPackage "github.com/jbrekelmans/kube-compose/internal/pkg/fs"
-	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
+	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
+	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	"github.com/pkg/errors"
 	"github.com/uber-go/mapdecode"
 	yaml "gopkg.in/yaml.v2"
@@ -24,7 +24,7 @@ var (
 	v3_3 = version.Must(version.NewVersion("3.3"))
 )
 
-// TODO https://github.com/jbrekelmans/kube-compose/issues/11 ensure that the YAML decoder actually produces this
+// TODO https://github.com/kube-compose/kube-compose/issues/11 ensure that the YAML decoder actually produces this
 // type for any YAML where the root is a mapping in the absence of type information.
 type genericMap map[interface{}]interface{}
 
@@ -47,7 +47,7 @@ type Service struct {
 	Entrypoint []string
 
 	// docker-compose distinguishes between an empty Entrypoint and an absent Entrypoint.
-	// TODO https://github.com/jbrekelmans/kube-compose/issues/157 remove this field
+	// TODO https://github.com/kube-compose/kube-compose/issues/157 remove this field
 	EntrypointPresent   bool
 	Environment         map[string]string
 	Healthcheck         *Healthcheck
@@ -292,7 +292,7 @@ func (c *configLoader) resolveExtends(
 			cfServiceParsed.extends.Service,
 		)
 	}
-	// TODO https://github.com/jbrekelmans/kube-compose/issues/122 perform full validation of extended service
+	// TODO https://github.com/kube-compose/kube-compose/issues/122 perform full validation of extended service
 	err := c.processExtends(cfServiceParsed.extends.Service, cfExtendedServiceParsed, cfParsedExtends)
 	if err != nil {
 		return nil, err
@@ -325,7 +325,7 @@ func New(files []string) (*CanonicalDockerComposeConfig, error) {
 	}
 
 	if len(resolvedFiles) > 1 {
-		// TODO https://github.com/jbrekelmans/kube-compose/issues/121 merge files together
+		// TODO https://github.com/kube-compose/kube-compose/issues/121 merge files together
 		// This should be a matter of calling merge repeatedly.
 		return nil, fmt.Errorf("sorry, merging multiple docker compose files is not supported")
 	}
@@ -341,8 +341,8 @@ func New(files []string) (*CanonicalDockerComposeConfig, error) {
 		return nil, err
 	}
 
-	// TODO https://github.com/jbrekelmans/kube-compose/issues/165 resolve named volumes
-	// TODO https://github.com/jbrekelmans/kube-compose/issues/166 error on duplicate mount points
+	// TODO https://github.com/kube-compose/kube-compose/issues/165 resolve named volumes
+	// TODO https://github.com/kube-compose/kube-compose/issues/166 error on duplicate mount points
 
 	configCanonical := &CanonicalDockerComposeConfig{}
 	configCanonical.Services = map[string]*Service{}
@@ -471,7 +471,7 @@ func (c *configLoader) parseComposeFileService(resolvedFile string, cfService *c
 	}
 	service.Environment = environment
 
-	// TODO https://github.com/jbrekelmans/kube-compose/issues/163 only resolve volume paths if volume_driver is not set.
+	// TODO https://github.com/kube-compose/kube-compose/issues/163 only resolve volume paths if volume_driver is not set.
 	for i := 0; i < len(service.Volumes); i++ {
 		err = resolveHostPath(resolvedFile, &service.Volumes[i])
 		if err != nil {

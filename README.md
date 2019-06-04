@@ -1,10 +1,10 @@
-[![Build Status](https://travis-ci.com/jbrekelmans/kube-compose.svg?branch=master)](https://travis-ci.com/jbrekelmans/kube-compose)
-[![License](https://img.shields.io/badge/license-Apache_v2.0-blue.svg)](https://github.com/jbrekelmans/kube-compose/blob/master/LICENSE.md)
-[![Coverage Status](https://coveralls.io/repos/github/jbrekelmans/kube-compose/badge.svg?branch=master&r=3)](https://coveralls.io/github/jbrekelmans/kube-compose?branch=master?r=3)
+[![Build Status](https://travis-ci.com/kube-compose/kube-compose.svg?branch=master)](https://travis-ci.com/kube-compose/kube-compose)
+[![License](https://img.shields.io/badge/license-Apache_v2.0-blue.svg)](https://github.com/kube-compose/kube-compose/blob/master/LICENSE.md)
+[![Coverage Status](https://coveralls.io/repos/github/kube-compose/kube-compose/badge.svg?branch=master&r=3)](https://coveralls.io/github/kube-compose/kube-compose?branch=master?r=3)
 
 # kube-compose
 
-kube-compose is a CI tool that can create and destroy environments in Kubernetes based on docker compose files.
+kube-compose can create and destroy environments in Kubernetes based on docker compose files with an emphasis on CI use cases
 
 # Contents
 
@@ -35,7 +35,7 @@ brew upgrade kube-compose
 ```
 
 ## Manual installation
-Download the binary from https://github.com/jbrekelmans/kube-compose/releases, ensure it has execute permissions and place it on your `PATH`.
+Download the binary from https://github.com/kube-compose/kube-compose/releases, ensure it has execute permissions and place it on your `PATH`.
 
 # Getting Started
 `kube-compose` targets a Kubernetes namespace, and will need a running Kubernetes cluster and [a kube config file](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/). If you do not have a running Kubernetes cluster, consider running one locally using [Minikube](https://kubernetes.io/docs/setup/minikube/).
@@ -196,3 +196,5 @@ To clean up after the test:
 ```bash
 kube-compose down
 ```
+
+

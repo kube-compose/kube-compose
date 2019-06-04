@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
+	"github.com/kube-compose/kube-compose/internal/pkg/util"
 )
 
 func TestParseRetries_Normal(t *testing.T) {

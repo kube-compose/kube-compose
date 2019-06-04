@@ -3,8 +3,8 @@ package config
 import (
 	"fmt"
 
-	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
-	dockerComposeConfig "github.com/jbrekelmans/kube-compose/pkg/docker/compose/config"
+	"github.com/kube-compose/kube-compose/internal/pkg/util"
+	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
 	"github.com/pkg/errors"
 	"github.com/uber-go/mapdecode"
 	"k8s.io/apimachinery/pkg/util/validation"

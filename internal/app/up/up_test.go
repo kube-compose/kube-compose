@@ -3,8 +3,8 @@ package up
 import (
 	"testing"
 
-	"github.com/jbrekelmans/kube-compose/internal/app/config"
-	dockerComposeConfig "github.com/jbrekelmans/kube-compose/pkg/docker/compose/config"
+	"github.com/kube-compose/kube-compose/internal/app/config"
+	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
 	"k8s.io/client-go/rest"
 )
 

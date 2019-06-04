@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/jbrekelmans/kube-compose/cmd"
+	"github.com/kube-compose/kube-compose/cmd"
 )
 
 func main() {

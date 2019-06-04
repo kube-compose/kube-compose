@@ -7,7 +7,7 @@ import (
 	"io"
 
 	dockerTypes "github.com/docker/docker/api/types"
-	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
+	"github.com/kube-compose/kube-compose/internal/pkg/util"
 )
 
 func EncodeRegistryAuth(username, password string) string {

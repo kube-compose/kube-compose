@@ -191,7 +191,7 @@ func (waiter *pullOrPushWaiter) handleMessage(d *PullOrPush, msg *jsonmessage.JS
 
 // FindDigest finds a digest within a string. If it is found the digest is returned, otherwise returns the empty string.
 func FindDigest(s string) string {
-	// TODO https://github.com/jbrekelmans/kube-compose/issues/5 support non-sha256 digests
+	// TODO https://github.com/kube-compose/kube-compose/issues/5 support non-sha256 digests
 	loc := digestRegexp.FindStringIndex(s)
 	if loc == nil {
 		return ""

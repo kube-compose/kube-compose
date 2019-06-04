@@ -5,11 +5,11 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
+	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	"github.com/pkg/errors"
 )
 
-// TODO https://github.com/jbrekelmans/kube-compose/issues/46
+// TODO https://github.com/kube-compose/kube-compose/issues/46
 var portBindingSpecRegexp = regexp.MustCompile(
 	"^" + // Match full string
 		"(?:" + // External part

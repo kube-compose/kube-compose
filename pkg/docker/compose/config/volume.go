@@ -134,10 +134,10 @@ func resolveHostPath(resolvedFile string, sv *ServiceVolume) error {
 			sv.Short.HostPath = filepath.Join(filepath.Dir(resolvedFile), sv.Short.HostPath)
 		}
 		if sv.Short.HostPath[0] == '~' {
-			// TODO https://github.com/jbrekelmans/kube-compose/issues/162 support expanding tilde
+			// TODO https://github.com/kube-compose/kube-compose/issues/162 support expanding tilde
 			return fmt.Errorf("a docker compose service has a volume that includes a ~, but expanding users is not supported")
 		}
 	}
-	// TODO https://github.com/jbrekelmans/kube-compose/issues/161 expanding source of long volume syntax
+	// TODO https://github.com/kube-compose/kube-compose/issues/161 expanding source of long volume syntax
 	return nil
 }

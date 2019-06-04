@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/jbrekelmans/kube-compose/internal/app/down"
+	"github.com/kube-compose/kube-compose/internal/app/down"
 	"github.com/spf13/cobra"
 )
 

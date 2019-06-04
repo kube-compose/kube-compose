@@ -3,8 +3,8 @@ package k8smeta
 import (
 	"testing"
 
-	"github.com/jbrekelmans/kube-compose/internal/app/config"
-	dockerComposeConfig "github.com/jbrekelmans/kube-compose/pkg/docker/compose/config"
+	"github.com/kube-compose/kube-compose/internal/app/config"
+	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

@@ -6,8 +6,8 @@ import (
 
 	"text/template"
 
-	details "github.com/jbrekelmans/kube-compose/internal/app/get"
-	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
+	details "github.com/kube-compose/kube-compose/internal/app/get"
+	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +23,7 @@ func newGetCli() *cobra.Command {
 }
 
 // TODO: If no service is specified then it should iterate through all services in the docker-compose
-// https://github.com/jbrekelmans/kube-compose/issues/126
+// https://github.com/kube-compose/kube-compose/issues/126
 func getCommand(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("no args provided")
