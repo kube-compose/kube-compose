@@ -4,7 +4,7 @@
 
 # kube-compose
 
-kube-compose is a CI tool that can create and destroy environments in Kubernetes based on docker compose files.
+kube-compose can create and destroy environments in Kubernetes based on docker compose files with an emphasis on CI use cases
 
 # Contents
 
