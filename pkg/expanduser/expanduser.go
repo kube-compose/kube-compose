@@ -12,6 +12,7 @@ import (
 )
 
 var isNT = runtime.GOOS == "windows"
+var getUID = os.Getuid
 
 // LookupEnvFunc is a function used to get environment variables. It is useful for unit testing.
 var LookupEnvFunc = os.LookupEnv
@@ -40,7 +41,7 @@ func Home() (string, error) {
 func HomePosix() (string, error) {
 	home, ok := LookupEnvFunc("HOME")
 	if !ok {
-		uid := os.Getuid()
+		uid := getUID()
 		if uid < 0 {
 			return "", fmt.Errorf("not available on Windows")
 		}
@@ -60,7 +61,7 @@ func Posix(path string) string {
 		return path
 	}
 	i := 1
-	for i < len(path) && path[i] != os.PathSeparator {
+	for i < len(path) && path[i] != '/' {
 		i++
 	}
 	var err error
@@ -79,9 +80,9 @@ func Posix(path string) string {
 			return path
 		}
 	}
-	path = strings.TrimSuffix(userhome, string(os.PathSeparator)) + path[i:]
+	path = strings.TrimSuffix(userhome, "/") + path[i:]
 	if path == "" {
-		path = string(os.PathSeparator)
+		path = "/"
 	}
 	return path
 }
@@ -94,7 +95,7 @@ func HomeNT() (string, error) {
 		if !ok {
 			return "", fmt.Errorf("the environment variables USERPROFILE and HOMEPATH are both unset")
 		}
-		homedrive := os.Getenv("HOMEDRIVE")
+		homedrive, _ := LookupEnvFunc("HOMEDRIVE")
 		// This behaves slightly differently than the Python implementation because
 		// Go's Join will also clean the path, whereas Python's join does not.
 		// This is ok.
@@ -118,8 +119,20 @@ func NT(path string) string {
 		return path
 	}
 	if i > 1 {
-		// Go's Dir might not behave exactly the same as Python's dirname, but that's ok.
-		userhome = filepath.Join(filepath.Dir(userhome), path[1:i])
+		j := dirname(userhome)
+		userhome = userhome[:j] + path[1:i]
 	}
 	return userhome + path[i:]
+}
+
+func dirname(name string) int {
+	volLen := fsPackage.NTVolumeNameLength(name)
+	j := len(name)
+	for j > volLen && fsPackage.IsPathSeparatorWindows(name[j-1]) {
+		j--
+	}
+	for j > volLen && !fsPackage.IsPathSeparatorWindows(name[j-1]) {
+		j--
+	}
+	return j
 }

@@ -12,7 +12,7 @@ import (
 
 const EtcPasswd = "/etc/passwd"
 
-var fs = fsPackage.OSFileSystem()
+var FS = fsPackage.OSFileSystem()
 
 // FindUIDByNameInPasswd finds the UID of a user by name in an /etc/passwd file. It can also find the GID of a group by name in an
 // /etc/group file.
@@ -41,13 +41,19 @@ func FindHomeByUIDInPasswd(file string, uid int64) (string, error) {
 	var home string
 	err := findCommon(file, func(line string) error {
 		parts := strings.SplitN(line, ":", 7)
+		if len(parts) < 3 {
+			return nil
+		}
 		uidString := parts[2]
 		uidLocal := util.TryParseInt64(uidString)
 		if uidLocal == nil {
 			return errUnexpectedFileFormat
 		}
 		if *uidLocal == uid {
-			home = parts[6]
+			if len(parts) < 6 {
+				return errUnexpectedFileFormat
+			}
+			home = parts[5]
 			return errFindCommonBreak
 		}
 		return nil
@@ -64,7 +70,10 @@ func FindHomeByNameInPasswd(file, name string) (string, error) {
 	err := findCommon(file, func(line string) error {
 		parts := strings.SplitN(line, ":", 7)
 		if parts[0] == name {
-			home = parts[6]
+			if len(parts) < 6 {
+				return errUnexpectedFileFormat
+			}
+			home = parts[5]
 			return errFindCommonBreak
 		}
 		return nil
@@ -100,7 +109,7 @@ var errFindCommonBreak = fmt.Errorf("")
 var errUnexpectedFileFormat = fmt.Errorf("unexpected file format")
 
 func findCommon(file string, callback findCommonCallback) error {
-	fd, err := fs.Open(file)
+	fd, err := FS.Open(file)
 	if err != nil {
 		return err
 	}

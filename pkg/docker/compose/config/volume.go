@@ -7,8 +7,6 @@ import (
 	"github.com/kube-compose/kube-compose/pkg/expanduser"
 )
 
-var isSlash = fsPackage.IsPathSeparatorWindows
-
 // PathMapping is a representation of a short docker-compose volume.
 // Instead of a string pointer we use a pair of boolean and string for host path and mode. This is because
 // merging (and detection of duplicates) is to be implemented with struct equality. Defining the struct this way would align
@@ -72,56 +70,9 @@ func volumeNameLength(s string) int {
 	case '~':
 		return 0
 	}
-	// Since we know that s does not start with '/' or '\\', the function ntpathVolumeNameLength is overkill.
+	// Since we know that s does not start with '/' or '\\', the function NTVolumeNameLength is overkill.
 	// But we leave it here to maintain a similar structure to docker-compose.
-	return ntpathVolumeNameLength(s)
-}
-
-// ntpathVolumeNameLength is similar to Go's "file/filepath".VolumeName, but is used to interpret the volume of a docker-compose service
-// exactly like docker compose and interprets UNC paths and drive letters on non-Windows platforms.
-// This function has the same logic as ntpath.splitdrive:
-// https://github.com/python/cpython/blob/74510e2a57f6d4b51ac1ab4f778cd7a4c54b541e/Lib/ntpath.py#L116.
-// Even on Windows we cannot use "file/filepath".VolumeName because it differs from Python's ntpath.splitdrive:
-// 1. Go requires ASCII letter to precede colon for drive letters, but Python does not.
-// 2. Go never considers paths that have a . after the third slash a UNC path, but Python does.
-func ntpathVolumeNameLength(s string) int {
-	n := len(s)
-	if n >= 2 {
-		if isSlash(s[0]) && isSlash(s[1]) && (n < 3 || !isSlash(s[2])) {
-			return ntpathVolumeNameLengthCore(s)
-		}
-		if s[1] == ':' {
-			return 2
-		}
-	}
-	return 0
-}
-
-func ntpathVolumeNameLengthCore(s string) int {
-	n := len(s)
-	index := 3
-	for {
-		if index >= n {
-			return 0
-		}
-		if isSlash(s[index]) {
-			break
-		}
-		index++
-	}
-	if index+1 < n && isSlash(s[index+1]) {
-		return 0
-	}
-	index2 := index + 2
-	for {
-		if index2 >= n {
-			return n
-		}
-		if isSlash(s[index2]) {
-			return index2
-		}
-		index2++
-	}
+	return fsPackage.NTVolumeNameLength(s)
 }
 
 // Copy of the resolve_volume_path function:

@@ -8,23 +8,23 @@ import (
 )
 
 var mockFileSystem fsPackage.FileSystem = fsPackage.NewMockFileSystem(map[string]fsPackage.MockFile{
-	"/passwd": {
+	EtcPasswd: {
 		Content: []byte("root:x:0:"),
 	},
 })
 
 func withMockFS(cb func()) {
-	fsOld := fs
+	fsOld := FS
 	defer func() {
-		fs = fsOld
+		FS = fsOld
 	}()
-	fs = mockFileSystem
+	FS = mockFileSystem
 	cb()
 }
 
 func TestFindUIDByNameInPasswd_Success(t *testing.T) {
 	withMockFS(func() {
-		_, _ = FindUIDByNameInPasswd("/passwd", "")
+		_, _ = FindUIDByNameInPasswd(EtcPasswd, "")
 	})
 }
 func TestFindUIDByNameInPasswd_ENOENT(t *testing.T) {

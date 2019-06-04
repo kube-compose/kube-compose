@@ -39,55 +39,6 @@ func TestParsePathMapping_Case3(t *testing.T) {
 	}
 }
 
-func TestNTPathVolumeNameLength_Case1(t *testing.T) {
-	i := ntpathVolumeNameLength("")
-	if i != 0 {
-		t.Fail()
-	}
-}
-
-func TestNTPathVolumeNameLength_Case2(t *testing.T) {
-	i := ntpathVolumeNameLength("///")
-	if i != 0 {
-		t.Fail()
-	}
-}
-
-func TestNTPathVolumeNameLength_Case3(t *testing.T) {
-	i := ntpathVolumeNameLength("//")
-	if i != 0 {
-		t.Fail()
-	}
-}
-
-func TestNTPathVolumeNameLength_Case4(t *testing.T) {
-	i := ntpathVolumeNameLength("//host//")
-	if i != 0 {
-		t.Fail()
-	}
-}
-
-func TestNTPathVolumeNameLength_Case5(t *testing.T) {
-	i := ntpathVolumeNameLength("//host/servername")
-	if i != 17 {
-		t.Fail()
-	}
-}
-
-func TestNTPathVolumeNameLength_Case6(t *testing.T) {
-	i := ntpathVolumeNameLength("//host/servername/path")
-	if i != 17 {
-		t.Fail()
-	}
-}
-
-func TestNTPathVolumeNameLength_Case7(t *testing.T) {
-	i := ntpathVolumeNameLength("C:\\Windows")
-	if i != 2 {
-		t.Fail()
-	}
-}
-
 func TestVolumeNameLength_Case1(t *testing.T) {
 	i := volumeNameLength("")
 	if i != 0 {

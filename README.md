@@ -178,6 +178,12 @@ To run unit tests:
 ```bash
 go test ./...
 ```
+To run unit tests with code coverage:
+```bash
+go test -coverpkg=./... -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+```
+
 
 ## Testing
 
