@@ -61,7 +61,7 @@ deploy:
   # Overwrite existing files
   overwrite: true
   on:
-    repo: jbrekelmans/kube-compose
+    repo: kube-compose/kube-compose
     # Only deploy when on matching branch selector
     branch: master
     # With on.tags: true, your Releases deployment will trigger if and only if the build is a tagged build.

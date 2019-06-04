@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	fsPackage "github.com/jbrekelmans/kube-compose/internal/pkg/fs"
+	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
 )
 
 var errTest = fmt.Errorf("test error")

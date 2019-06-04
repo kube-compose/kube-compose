@@ -14,9 +14,9 @@ import (
 	dockerTypes "github.com/docker/docker/api/types"
 	dockerClient "github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
-	"github.com/jbrekelmans/kube-compose/internal/pkg/docker"
-	fsPackage "github.com/jbrekelmans/kube-compose/internal/pkg/fs"
-	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
+	"github.com/kube-compose/kube-compose/internal/pkg/docker"
+	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
+	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	"github.com/pkg/errors"
 )
 
@@ -116,7 +116,7 @@ func (h *bindMountHostFileToTarHelper) runDirectory(fileInfo os.FileInfo, hostFi
 
 func (h *bindMountHostFileToTarHelper) isFileWithinBindHostRoot(target string) bool {
 	// Can assume target and h.rootHostFile are cleaned.
-	// TODO https://github.com/jbrekelmans/kube-compose/issues/173 support case sensitive file systems
+	// TODO https://github.com/kube-compose/kube-compose/issues/173 support case sensitive file systems
 	// We do not have to split off the prefix here, but we do so in case drive letters are case-insensitive
 	// independent of the file system.
 	vol := filepath.VolumeName(target)
@@ -194,7 +194,7 @@ func (h *bindMountHostFileToTarHelper) runRecursive(fileInfo os.FileInfo, hostFi
 }
 
 func (h *bindMountHostFileToTarHelper) endHeaderCommon(header *tar.Header) error {
-	// TODO https://github.com/jbrekelmans/kube-compose/issues/154 change owner of files here, as appropriate...
+	// TODO https://github.com/kube-compose/kube-compose/issues/154 change owner of files here, as appropriate...
 	// For example:
 	// header.Uid = ...
 	// header.Gid = ...

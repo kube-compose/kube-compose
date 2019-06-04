@@ -4,9 +4,9 @@ import (
 	"reflect"
 	"testing"
 
-	fsPackage "github.com/jbrekelmans/kube-compose/internal/pkg/fs"
-	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
-	dockerComposeConfig "github.com/jbrekelmans/kube-compose/pkg/docker/compose/config"
+	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
+	"github.com/kube-compose/kube-compose/internal/pkg/util"
+	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
 )
 
 func newTestConfig() *Config {

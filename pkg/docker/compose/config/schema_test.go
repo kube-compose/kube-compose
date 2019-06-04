@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
+	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	"github.com/uber-go/mapdecode"
 )
 

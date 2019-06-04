@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	fsPackage "github.com/jbrekelmans/kube-compose/internal/pkg/fs"
+	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
 )
 
 var mockFileSystem fsPackage.FileSystem = fsPackage.NewMockFileSystem(map[string]fsPackage.MockFile{

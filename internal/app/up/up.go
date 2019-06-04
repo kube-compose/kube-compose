@@ -11,11 +11,11 @@ import (
 	dockerRef "github.com/docker/distribution/reference"
 	dockerTypes "github.com/docker/docker/api/types"
 	dockerClient "github.com/docker/docker/client"
-	"github.com/jbrekelmans/kube-compose/internal/app/config"
-	"github.com/jbrekelmans/kube-compose/internal/app/k8smeta"
-	"github.com/jbrekelmans/kube-compose/internal/pkg/docker"
-	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
-	dockerComposeConfig "github.com/jbrekelmans/kube-compose/pkg/docker/compose/config"
+	"github.com/kube-compose/kube-compose/internal/app/config"
+	"github.com/kube-compose/kube-compose/internal/app/k8smeta"
+	"github.com/kube-compose/kube-compose/internal/pkg/docker"
+	"github.com/kube-compose/kube-compose/internal/pkg/util"
+	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
 	cmdColor "github.com/logrusorgru/aurora"
 	goDigest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -144,29 +144,29 @@ func (u *upRunner) initVolumeInfo() {
 			if totalVolumeCount > 1 {
 				fmt.Printf("WARNING: the docker compose configuration potentially has a volume that is projected into the file system f1" +
 					" and f2 of containers c1 and c2, respectively, but currently changes in f1 will not be reflected in f2 (see " +
-					"https://github.com/jbrekelmans/kube-compose#limitations)\n")
+					"https://github.com/kube-compose/kube-compose#limitations)\n")
 			}
 			if totalVolumeCount == 1 {
 				fmt.Printf("WARNING: the docker compose configuration has one or more bind volumes, but the current implementation " +
 					"cannot reflect changes on the host file system in containers (and vice versa, see " +
-					"https://github.com/jbrekelmans/kube-compose#limitations)\n")
+					"https://github.com/kube-compose/kube-compose#limitations)\n")
 			}
 			flag := false
 			if u.cfg.PushImages == nil {
 				fmt.Printf("WARNING: the docker compose configuration has one or more bind volumes, but they have been disabled because " +
-					"the configuration to push images is missing (see https://github.com/jbrekelmans/kube-compose#volumes)\n")
+					"the configuration to push images is missing (see https://github.com/kube-compose/kube-compose#volumes)\n")
 				flag = true
 			}
 			if u.cfg.VolumeInitBaseImage == nil {
 				fmt.Printf("WARNING: the docker compose configuration has one or more bind volumes, but they have been disabled because " +
-					"the base image of volume init containers is not configured (see https://github.com/jbrekelmans/kube-compose#volumes)" +
+					"the base image of volume init containers is not configured (see https://github.com/kube-compose/kube-compose#volumes)" +
 					"\n")
 				flag = true
 			}
 			if flag {
 				return
 			}
-			// TODO https://github.com/jbrekelmans/kube-compose/issues/171 overlapping bind mounted volumes do not work..
+			// TODO https://github.com/kube-compose/kube-compose/issues/171 overlapping bind mounted volumes do not work..
 			// For now we assume that there is no overlap...
 			a.volumes = append(a.volumes, appVolume)
 		}
@@ -209,11 +209,11 @@ func initVolumeInfoGetAppVolume(a *app, serviceVolume dockerComposeConfig.Servic
 			// The volume is initialized with data of the image's file system.
 			// If docker compose is smart enough to reuse these implicit volumes across restarts of the service's containers, then
 			// this would need to be a persistent volume.
-			// TODO https://github.com/jbrekelmans/kube-compose/issues/169
+			// TODO https://github.com/kube-compose/kube-compose/issues/169
 			return nil
 		}
 	} else {
-		// TODO https://github.com/jbrekelmans/kube-compose/issues/161 support long volume syntax
+		// TODO https://github.com/kube-compose/kube-compose/issues/161 support long volume syntax
 		return nil
 	}
 	return r
@@ -320,7 +320,7 @@ func (u *upRunner) getAppImageEnsureCorrectPodImage(a *app, sourceImageRef docke
 	} else if a.imageInfo.podImage == "" {
 		_, sourceImageIsNamed := sourceImageRef.(dockerRef.Named)
 		if !sourceImageIsNamed {
-			// TODO https://github.com/jbrekelmans/kube-compose/issues/6
+			// TODO https://github.com/kube-compose/kube-compose/issues/6
 			return fmt.Errorf("image reference %#v is likely unstable, "+
 				"please enable pushing of images or use named image references to improve consistency across hosts", sourceImage)
 		}
@@ -370,7 +370,7 @@ func (u *upRunner) getAppImageInfoUser(a *app, inspect *dockerTypes.ImageInspect
 		}
 	}
 	if user.UID == nil || (user.Group != "" && user.GID == nil) {
-		// TODO https://github.com/jbrekelmans/kube-compose/issues/70 confirm whether docker and our pod spec will produce the same default
+		// TODO https://github.com/kube-compose/kube-compose/issues/70 confirm whether docker and our pod spec will produce the same default
 		// group if a UID is set but no GID
 		err := getUserinfoFromImage(u.opts.Context, u.dockerClient, a.imageInfo.sourceImageID, user)
 		if err != nil {
@@ -1090,7 +1090,7 @@ func (u *upRunner) checkIfPodsReady() bool {
 
 // Run runs an operation similar docker-compose up against a Kubernetes cluster.
 func Run(cfg *config.Config, opts *Options) error {
-	// TODO https://github.com/jbrekelmans/kube-compose/issues/2 accept context as a parameter
+	// TODO https://github.com/kube-compose/kube-compose/issues/2 accept context as a parameter
 	u := &upRunner{
 		cfg:  cfg,
 		opts: opts,

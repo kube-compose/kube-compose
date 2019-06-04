@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
+	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	"github.com/uber-go/mapdecode"
 )
 
@@ -105,7 +105,7 @@ type environmentNameValuePair struct {
 	Value *environmentValue
 }
 
-// TODO https://github.com/jbrekelmans/kube-compose/issues/40 check whether handling of large numbers is consistent with docker-compose
+// TODO https://github.com/kube-compose/kube-compose/issues/40 check whether handling of large numbers is consistent with docker-compose
 // See https://github.com/docker/compose/blob/master/compose/config/config_schema_v2.1.json#L418
 type environmentValue struct {
 	FloatValue  *float64
@@ -232,7 +232,7 @@ func (sv *ServiceVolume) Decode(into mapdecode.Into) error {
 		*sv.Short = parsePathMapping(shortSyntax)
 		return nil
 	}
-	// TODO https://github.com/jbrekelmans/kube-compose/issues/161 support long volume syntax
+	// TODO https://github.com/kube-compose/kube-compose/issues/161 support long volume syntax
 	return err
 }
 
@@ -241,11 +241,11 @@ type composeFileService struct {
 		Context    string `mapdecode:"context"`
 		Dockerfile string `mapdecode:"dockerfile"`
 	} `mapdecode:"build"`
-	// TODO https://github.com/jbrekelmans/kube-compose/issues/153 interpret string command/entrypoint correctly
+	// TODO https://github.com/kube-compose/kube-compose/issues/153 interpret string command/entrypoint correctly
 	Command   stringOrStringSlice `mapdecode:"command"`
 	DependsOn *dependsOn          `mapdecode:"depends_on"`
-	// TODO https://github.com/jbrekelmans/kube-compose/issues/153 interpret string command/entrypoint correctly
-	// TODO https://github.com/jbrekelmans/kube-compose/issues/157 just use []string instead of *[]string to distinguish between empty slice
+	// TODO https://github.com/kube-compose/kube-compose/issues/153 interpret string command/entrypoint correctly
+	// TODO https://github.com/kube-compose/kube-compose/issues/157 just use []string instead of *[]string to distinguish between empty slice
 	// and absent slice.
 	Entrypoint  *stringOrStringSlice `mapdecode:"entrypoint"`
 	Environment environment          `mapdecode:"environment"`

@@ -17,10 +17,10 @@ import (
 	dockerFilters "github.com/docker/docker/api/types/filters"
 	dockerClient "github.com/docker/docker/client"
 	dockerArchive "github.com/docker/docker/pkg/archive"
-	"github.com/jbrekelmans/kube-compose/internal/pkg/docker"
-	"github.com/jbrekelmans/kube-compose/internal/pkg/linux"
-	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
-	dockerComposeConfig "github.com/jbrekelmans/kube-compose/pkg/docker/compose/config"
+	"github.com/kube-compose/kube-compose/internal/pkg/docker"
+	"github.com/kube-compose/kube-compose/internal/pkg/linux"
+	"github.com/kube-compose/kube-compose/internal/pkg/util"
+	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 )
@@ -125,7 +125,7 @@ func copyFileFromContainer(ctx context.Context, dc *dockerClient.Client, contain
 	}
 	defer util.CloseAndLogError(readCloser)
 	if (stat.Mode & os.ModeType) != 0 {
-		// TODO https://github.com/jbrekelmans/kube-compose/issues/70 we should follow symlinks
+		// TODO https://github.com/kube-compose/kube-compose/issues/70 we should follow symlinks
 		return fmt.Errorf("could not copy %#v because it is not a regular file", srcFile)
 	}
 	srcInfo := dockerArchive.CopyInfo{
@@ -175,7 +175,7 @@ func getUserinfoFromImage(ctx context.Context, dc *dockerClient.Client, image st
 }
 
 func getUserinfoFromImageUID(ctx context.Context, dc *dockerClient.Client, containerID, tmpDir string, user *docker.Userinfo) error {
-	// TODO https://github.com/jbrekelmans/kube-compose/issues/70 this is not correct for non-Linux containers
+	// TODO https://github.com/kube-compose/kube-compose/issues/70 this is not correct for non-Linux containers
 	if user.UID == nil {
 		err := copyFileFromContainer(ctx, dc, containerID, "/etc/passwd", tmpDir)
 		if err != nil {
@@ -195,7 +195,7 @@ func getUserinfoFromImageUID(ctx context.Context, dc *dockerClient.Client, conta
 }
 
 func getUserinfoFromImageGID(ctx context.Context, dc *dockerClient.Client, containerID, tmpDir string, user *docker.Userinfo) error {
-	// TODO https://github.com/jbrekelmans/kube-compose/issues/70 this is not correct for non-Linux containers
+	// TODO https://github.com/kube-compose/kube-compose/issues/70 this is not correct for non-Linux containers
 	if user.GID == nil && user.Group != "" {
 		err := copyFileFromContainer(ctx, dc, containerID, "/etc/group", tmpDir)
 		if err != nil {
