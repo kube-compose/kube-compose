@@ -167,3 +167,13 @@ ENTRYPOINT ["bash", "-c", "cp -ar /app/data/vol1 /mnt/vol1/root && cp -ar /app/d
 		t.Fail()
 	}
 }
+
+
+
+func TestResolveBindVolumeHostPath_Asdf(t *testing.T) {
+
+	withMockFS(func() {
+		resolveBindVolumeHostPath("/dir/dir2/test")
+	})
+
+}

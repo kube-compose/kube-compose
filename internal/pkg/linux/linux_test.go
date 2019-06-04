@@ -86,3 +86,12 @@ func TestFindHomeByUIDInPasswd_ErrorUIDInvalidFormat(t *testing.T) {
 		}
 	})
 }
+
+func TestFindHomeByNameInPasswd_Success(t *testing.T) {
+	withMockFS(func(){
+		_, err := FindHomeByNameInPasswd(EtcPasswd, "notfoundtest")
+		if err != nil {
+			t.Error(err)
+		}
+	})
+}

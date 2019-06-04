@@ -19,6 +19,8 @@ type FileDescriptor interface {
 // FileSystem is an abstraction of the file system to improve testability of code.
 type FileSystem interface {
 	EvalSymlinks(path string) (string, error)
+	Mkdir(name string, perm os.FileMode) error
+	MkdirAll(name string, perm os.FileMode) error
 	Lstat(name string) (os.FileInfo, error)
 	Open(name string) (FileDescriptor, error)
 	Stat(name string) (os.FileInfo, error)
@@ -29,6 +31,14 @@ type osFileSystem struct {
 
 func (fs *osFileSystem) EvalSymlinks(path string) (string, error) {
 	return filepath.EvalSymlinks(path)
+}
+
+func (fs *osFileSystem) Mkdir(name string, perm os.FileMode) error {
+	return os.Mkdir(name, perm)
+}
+
+func (fs *osFileSystem) MkdirAll(name string, perm os.FileMode) error {
+	return os.MkdirAll(name, perm)
 }
 
 func (fs *osFileSystem) Lstat(name string) (os.FileInfo, error) {
@@ -330,6 +340,7 @@ func (fs *mockFileSystem) Lstat(name string) (os.FileInfo, error) {
 	// Symbolic links are not supported in the mock file system.
 	return fs.Stat(name)
 }
+
 
 func (fs *mockFileSystem) Open(name string) (FileDescriptor, error) {
 	node, err := fs.findOrError(name)
