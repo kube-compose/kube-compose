@@ -1,7 +1,6 @@
 package linux
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
@@ -69,7 +68,7 @@ func TestFindUIDByNameInPasswdReader_InvalidFormat(t *testing.T) {
 }
 
 func TestFindHomeByUIDInPasswd_Success(t *testing.T) {
-	withMockFS(func(){
+	withMockFS(func() {
 		home, err := FindHomeByUIDInPasswd(EtcPasswd, 1)
 		if err != nil {
 			t.Error(err)
@@ -80,7 +79,7 @@ func TestFindHomeByUIDInPasswd_Success(t *testing.T) {
 }
 
 func TestFindHomeByUIDInPasswd_ErrorUIDInvalidFormat(t *testing.T) {
-	withMockFS(func(){
+	withMockFS(func() {
 		_, err := FindHomeByUIDInPasswd(EtcPasswd, 5)
 		if err == nil {
 			t.Fail()
