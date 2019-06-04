@@ -147,7 +147,7 @@ func (h *bindMountHostFileToTarHelper) runSymlink(fileInfo os.FileInfo, hostFile
 		// Windows:
 		// Handle situations where the link is absolute (but does not have a drive), or relative to the cwd of a drive:
 		// https://docs.microsoft.com/en-us/windows/desktop/api/winbase/nf-winbase-createsymboliclinka#remarks
-		// This should be a noop on non-Windows because there will never be a non-empty volume and therefore the path must
+		// This should be a noop on non-Windows because there will never be a non-empty VolumeName and therefore the path must
 		// be absolute.
 		linkResolved, err = filepath.Abs(link)
 		if err != nil {
