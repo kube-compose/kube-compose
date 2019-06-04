@@ -1,10 +1,14 @@
 package config
 
 import (
-	"fmt"
 	"path/filepath"
 	"strings"
+
+	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
+	"github.com/kube-compose/kube-compose/pkg/expanduser"
 )
+
+var isSlash = fsPackage.IsPathSeparatorWindows
 
 // PathMapping is a representation of a short docker-compose volume.
 // Instead of a string pointer we use a pair of boolean and string for host path and mode. This is because
@@ -121,22 +125,16 @@ func ntpathVolumeNameLengthCore(s string) int {
 	}
 }
 
-// isSlash returns true if and only if b is the ASCII code of a forward or backward slash.
-func isSlash(b byte) bool {
-	return b == '/' || b == '\\'
-}
-
 // Copy of the resolve_volume_path function:
 // https://github.com/docker/compose/blob/99e67d0c061fa3d9b9793391f3b7c8bdf8e841fc/compose/config/config.py#L1354
 func resolveHostPath(resolvedFile string, sv *ServiceVolume) error {
 	if sv.Short != nil && sv.Short.HasHostPath && len(sv.Short.HostPath) > 0 {
+		// NOTE: relative paths need not start with a ., but host paths that do not start with a . are interpreted as named volumes in
+		// docker compose. Therefore this check works correctly.
 		if sv.Short.HostPath[0] == '.' {
 			sv.Short.HostPath = filepath.Join(filepath.Dir(resolvedFile), sv.Short.HostPath)
 		}
-		if sv.Short.HostPath[0] == '~' {
-			// TODO https://github.com/kube-compose/kube-compose/issues/162 support expanding tilde
-			return fmt.Errorf("a docker compose service has a volume that includes a ~, but expanding users is not supported")
-		}
+		sv.Short.HostPath = expanduser.ExpandUser(sv.Short.HostPath)
 	}
 	// TODO https://github.com/kube-compose/kube-compose/issues/161 expanding source of long volume syntax
 	return nil

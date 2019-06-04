@@ -182,7 +182,7 @@ func getUserinfoFromImageUID(ctx context.Context, dc *dockerClient.Client, conta
 			return err
 		}
 		var uid *int64
-		uid, err = linux.FindUserInPasswd(path.Join(tmpDir, "passwd"), user.User)
+		uid, err = linux.FindUIDByNameInPasswd(path.Join(tmpDir, "passwd"), user.User)
 		if err != nil {
 			return err
 		}
@@ -202,7 +202,7 @@ func getUserinfoFromImageGID(ctx context.Context, dc *dockerClient.Client, conta
 			return err
 		}
 		var gid *int64
-		gid, err = linux.FindUserInPasswd(path.Join(tmpDir, "group"), user.Group)
+		gid, err = linux.FindUIDByNameInPasswd(path.Join(tmpDir, "group"), user.Group)
 		if err != nil {
 			return err
 		}
