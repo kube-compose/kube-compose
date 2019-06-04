@@ -1,6 +1,7 @@
 package linux
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -9,7 +10,7 @@ import (
 
 var mockFileSystem fsPackage.FileSystem = fsPackage.NewMockFileSystem(map[string]fsPackage.MockFile{
 	EtcPasswd: {
-		Content: []byte("root:x:0:"),
+		Content: []byte("root:x:0:\ndaemon:x:1:1:daemon:/daemonhomelol\nasdf\nuiderr:x::"),
 	},
 })
 
@@ -65,4 +66,24 @@ func TestFindUIDByNameInPasswdReader_InvalidFormat(t *testing.T) {
 	if err == nil {
 		t.Fail()
 	}
+}
+
+func TestFindHomeByUIDInPasswd_Success(t *testing.T) {
+	withMockFS(func(){
+		home, err := FindHomeByUIDInPasswd(EtcPasswd, 1)
+		if err != nil {
+			t.Error(err)
+		} else if home != "/daemonhomelol" {
+			t.Fail()
+		}
+	})
+}
+
+func TestFindHomeByUIDInPasswd_ErrorUIDInvalidFormat(t *testing.T) {
+	withMockFS(func(){
+		_, err := FindHomeByUIDInPasswd(EtcPasswd, 5)
+		if err == nil {
+			t.Fail()
+		}
+	})
 }

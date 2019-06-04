@@ -120,9 +120,6 @@ func findCommon(file string, callback findCommonCallback) error {
 func findCommonReader(reader io.Reader, callback findCommonCallback) error {
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
-		if err := scanner.Err(); err != nil {
-			return err
-		}
 		line := scanner.Text()
 		err := callback(line)
 		if err == errFindCommonBreak {
@@ -131,5 +128,5 @@ func findCommonReader(reader io.Reader, callback findCommonCallback) error {
 			return err
 		}
 	}
-	return nil
+	return scanner.Err()
 }
