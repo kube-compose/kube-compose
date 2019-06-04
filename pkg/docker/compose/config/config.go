@@ -259,10 +259,7 @@ func (c *configLoader) resolveExtends(
 	var cfExtendedServiceParsed *composeFileParsedService
 	var cfParsedExtends *composeFileParsed
 	if cfServiceParsed.extends.File != nil {
-		extendsFile := *cfServiceParsed.extends.File
-		if !filepath.IsAbs(extendsFile) {
-			extendsFile = filepath.Join(filepath.Dir(cfParsed.resolvedFile), extendsFile)
-		}
+		extendsFile := expandPath(cfParsed.resolvedFile, *cfServiceParsed.extends.File)
 		var err error
 		cfParsedExtends, err = c.loadFile(extendsFile)
 		if err != nil {

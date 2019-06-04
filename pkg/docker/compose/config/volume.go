@@ -128,13 +128,14 @@ func ntpathVolumeNameLengthCore(s string) int {
 // Copy of the resolve_volume_path function:
 // https://github.com/docker/compose/blob/99e67d0c061fa3d9b9793391f3b7c8bdf8e841fc/compose/config/config.py#L1354
 func resolveHostPath(resolvedFile string, sv *ServiceVolume) error {
-	if sv.Short != nil && sv.Short.HasHostPath && len(sv.Short.HostPath) > 0 {
-		// NOTE: relative paths need not start with a ., but host paths that do not start with a . are interpreted as named volumes in
-		// docker compose. Therefore this check works correctly.
+	if sv.Short != nil && sv.Short.HasHostPath && sv.Short.HostPath != "" {
+		// The intent of the following if is to resolve relative file paths, but not all relative file paths start with a full stop. We
+		// still perform the check as follows, because docker compose also allows specifying named volumes.
 		if sv.Short.HostPath[0] == '.' {
-			sv.Short.HostPath = filepath.Join(filepath.Dir(resolvedFile), sv.Short.HostPath)
+			sv.Short.HostPath = expandPath(resolvedFile, sv.Short.HostPath)
+		} else {
+			sv.Short.HostPath = expanduser.ExpandUser(sv.Short.HostPath)
 		}
-		sv.Short.HostPath = expanduser.ExpandUser(sv.Short.HostPath)
 	}
 	// TODO https://github.com/kube-compose/kube-compose/issues/161 expanding source of long volume syntax
 	return nil
