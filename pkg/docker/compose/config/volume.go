@@ -1,9 +1,10 @@
 package config
 
 import (
-	"fmt"
-	"path/filepath"
 	"strings"
+
+	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
+	"github.com/kube-compose/kube-compose/pkg/expanduser"
 )
 
 // PathMapping is a representation of a short docker-compose volume.
@@ -69,75 +70,22 @@ func volumeNameLength(s string) int {
 	case '~':
 		return 0
 	}
-	// Since we know that s does not start with '/' or '\\', the function ntpathVolumeNameLength is overkill.
+	// Since we know that s does not start with '/' or '\\', the function NTVolumeNameLength is overkill.
 	// But we leave it here to maintain a similar structure to docker-compose.
-	return ntpathVolumeNameLength(s)
-}
-
-// ntpathVolumeNameLength is similar to Go's "file/filepath".VolumeName, but is used to interpret the volume of a docker-compose service
-// exactly like docker compose and interprets UNC paths and drive letters on non-Windows platforms.
-// This function has the same logic as ntpath.splitdrive:
-// https://github.com/python/cpython/blob/74510e2a57f6d4b51ac1ab4f778cd7a4c54b541e/Lib/ntpath.py#L116.
-// Even on Windows we cannot use "file/filepath".VolumeName because it differs from Python's ntpath.splitdrive:
-// 1. Go requires ASCII letter to precede colon for drive letters, but Python does not.
-// 2. Go never considers paths that have a . after the third slash a UNC path, but Python does.
-func ntpathVolumeNameLength(s string) int {
-	n := len(s)
-	if n >= 2 {
-		if isSlash(s[0]) && isSlash(s[1]) && (n < 3 || !isSlash(s[2])) {
-			return ntpathVolumeNameLengthCore(s)
-		}
-		if s[1] == ':' {
-			return 2
-		}
-	}
-	return 0
-}
-
-func ntpathVolumeNameLengthCore(s string) int {
-	n := len(s)
-	index := 3
-	for {
-		if index >= n {
-			return 0
-		}
-		if isSlash(s[index]) {
-			break
-		}
-		index++
-	}
-	if index+1 < n && isSlash(s[index+1]) {
-		return 0
-	}
-	index2 := index + 2
-	for {
-		if index2 >= n {
-			return n
-		}
-		if isSlash(s[index2]) {
-			return index2
-		}
-		index2++
-	}
-}
-
-// isSlash returns true if and only if b is the ASCII code of a forward or backward slash.
-func isSlash(b byte) bool {
-	return b == '/' || b == '\\'
+	return fsPackage.NTVolumeNameLength(s)
 }
 
 // Copy of the resolve_volume_path function:
 // https://github.com/docker/compose/blob/99e67d0c061fa3d9b9793391f3b7c8bdf8e841fc/compose/config/config.py#L1354
-func resolveHostPath(resolvedFile string, sv *ServiceVolume) error {
-	if sv.Short != nil && sv.Short.HasHostPath && len(sv.Short.HostPath) > 0 {
+func resolveBindMountVolumeHostPath(resolvedFile string, sv *ServiceVolume) {
+	if sv.Short != nil && sv.Short.HasHostPath && sv.Short.HostPath != "" {
+		// The intent of the following if is to resolve relative file paths, but not all relative file paths start with a full stop. We
+		// still perform the check as follows, because docker compose also allows specifying named volumes.
 		if sv.Short.HostPath[0] == '.' {
-			sv.Short.HostPath = filepath.Join(filepath.Dir(resolvedFile), sv.Short.HostPath)
-		}
-		if sv.Short.HostPath[0] == '~' {
-			// TODO https://github.com/kube-compose/kube-compose/issues/162 support expanding tilde
-			return fmt.Errorf("a docker compose service has a volume that includes a ~, but expanding users is not supported")
+			sv.Short.HostPath = expandPath(resolvedFile, sv.Short.HostPath)
+		} else {
+			sv.Short.HostPath = expanduser.ExpandUser(sv.Short.HostPath)
 		}
 	}
 	// TODO https://github.com/kube-compose/kube-compose/issues/161 expanding source of long volume syntax
-	return nil
 }

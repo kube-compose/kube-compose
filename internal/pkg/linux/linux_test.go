@@ -8,61 +8,81 @@ import (
 )
 
 var mockFileSystem fsPackage.FileSystem = fsPackage.NewMockFileSystem(map[string]fsPackage.MockFile{
-	"/passwd": {
-		Content: []byte("root:x:0:"),
+	EtcPasswd: {
+		Content: []byte("root:x:0:\ndaemon:x:1:1:daemon:/daemonhomelol\nasdf\nuiderr:x::"),
 	},
 })
 
 func withMockFS(cb func()) {
-	fsOld := fs
+	fsOld := FS
 	defer func() {
-		fs = fsOld
+		FS = fsOld
 	}()
-	fs = mockFileSystem
+	FS = mockFileSystem
 	cb()
 }
 
-func TestFindUserInPasswd_Success(t *testing.T) {
+func TestFindUIDByNameInPasswd_Success(t *testing.T) {
 	withMockFS(func() {
-		_, _ = FindUserInPasswd("/passwd", "")
+		_, _ = FindUIDByNameInPasswd(EtcPasswd, "")
 	})
 }
-func TestFindUserInPasswd_ENOENT(t *testing.T) {
+func TestFindUIDByNameInPasswd_ENOENT(t *testing.T) {
 	withMockFS(func() {
-		_, err := FindUserInPasswd("/asdf", "")
+		_, err := FindUIDByNameInPasswd("/asdf", "")
 		if err == nil {
 			t.Fail()
 		}
 	})
 }
 
-func TestFindUserInPasswdReader_Success(t *testing.T) {
+func TestFindUIDByNameInPasswdReader_Success(t *testing.T) {
 	reader := strings.NewReader("root:x:0:\nbin:x:1:")
-	_, err := FindUserInPasswdReader(reader, "bin")
+	_, err := FindUIDByNameInPasswdReader(reader, "bin")
 	if err != nil {
 		t.Fail()
 	}
 }
-func TestFindUserInPasswdReader_NotFound(t *testing.T) {
+func TestFindUIDByNameInPasswdReader_NotFound(t *testing.T) {
 	reader := strings.NewReader("root:x:0:\nbin:x:1:")
-	_, err := FindUserInPasswdReader(reader, "henk")
+	_, err := FindUIDByNameInPasswdReader(reader, "henk")
 	if err != nil {
 		t.Fail()
 	}
 }
 
-func TestFindUserInPasswdReader_InvalidUID(t *testing.T) {
+func TestFindUIDByNameInPasswdReader_InvalidUID(t *testing.T) {
 	reader := strings.NewReader("root:x:0:\nbin:x:-1:")
-	_, err := FindUserInPasswdReader(reader, "bin")
+	_, err := FindUIDByNameInPasswdReader(reader, "bin")
 	if err == nil {
 		t.Fail()
 	}
 }
 
-func TestFindUserInPasswdReader_InvalidFormat(t *testing.T) {
+func TestFindUIDByNameInPasswdReader_InvalidFormat(t *testing.T) {
 	reader := strings.NewReader("root")
-	_, err := FindUserInPasswdReader(reader, "root")
+	_, err := FindUIDByNameInPasswdReader(reader, "root")
 	if err == nil {
 		t.Fail()
 	}
+}
+
+func TestFindHomeByUIDInPasswd_Success(t *testing.T) {
+	withMockFS(func() {
+		home, err := FindHomeByUIDInPasswd(EtcPasswd, 1)
+		if err != nil {
+			t.Error(err)
+		} else if home != "/daemonhomelol" {
+			t.Fail()
+		}
+	})
+}
+
+func TestFindHomeByUIDInPasswd_ErrorUIDInvalidFormat(t *testing.T) {
+	withMockFS(func() {
+		_, err := FindHomeByUIDInPasswd(EtcPasswd, 5)
+		if err == nil {
+			t.Fail()
+		}
+	})
 }

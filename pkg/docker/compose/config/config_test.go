@@ -834,31 +834,6 @@ func TestParseComposeFile_InvalidEnvironmentError(t *testing.T) {
 		t.Log(err)
 	}
 }
-func TestParseComposeFile_InvalidServiceVolume(t *testing.T) {
-	c := newTestConfigLoader(nil)
-	cf := &composeFile{
-		Services: map[string]*composeFileService{
-			"service1": {
-				Volumes: []ServiceVolume{
-					{
-						Short: &PathMapping{
-							HasHostPath:   true,
-							HostPath:      "~/aa",
-							ContainerPath: "bb",
-						},
-					},
-				},
-			},
-		},
-	}
-	cfParsed := &composeFileParsed{}
-	err := c.parseComposeFile(cf, cfParsed)
-	if err == nil {
-		t.Fail()
-	} else {
-		t.Log(err)
-	}
-}
 
 func TestGetXProperties_NotGenericMap(t *testing.T) {
 	v := getXProperties("")
