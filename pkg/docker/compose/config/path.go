@@ -2,6 +2,7 @@ package config
 
 import (
 	"path/filepath"
+
 	"github.com/kube-compose/kube-compose/pkg/expanduser"
 )
 

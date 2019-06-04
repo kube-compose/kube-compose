@@ -11,10 +11,11 @@ import (
 )
 
 const EtcPasswd = "/etc/passwd"
+
 var fs = fsPackage.OSFileSystem()
 
-// FindUIDByNameInPasswd finds the UID of a user by name in an /etc/passwd file. It can also find the GID of a group by name in an /etc/group
-// file.
+// FindUIDByNameInPasswd finds the UID of a user by name in an /etc/passwd file. It can also find the GID of a group by name in an
+// /etc/group file.
 func FindUIDByNameInPasswd(file, user string) (*int64, error) {
 	uid := new(int64)
 	err := findCommon(file, findUIDByNameCallback(user, uid))
@@ -24,8 +25,8 @@ func FindUIDByNameInPasswd(file, user string) (*int64, error) {
 	return uid, nil
 }
 
-// FindUIDByNameInPasswdReader finds the UID of a user by name in a stream encoded like the contents of /etc/passwd. It can also find the GID of
-// a group by name in a stream encoded like the contents of /etc/group.
+// FindUIDByNameInPasswdReader finds the UID of a user by name in a stream encoded like the contents of /etc/passwd. It can also find the
+// GID of a group by name in a stream encoded like the contents of /etc/group.
 func FindUIDByNameInPasswdReader(reader io.Reader, user string) (*int64, error) {
 	uid := new(int64)
 	err := findCommonReader(reader, findUIDByNameCallback(user, uid))
@@ -38,7 +39,7 @@ func FindUIDByNameInPasswdReader(reader io.Reader, user string) (*int64, error) 
 // FindHomeByUIDInPasswd finds the home directory of a user by the user's uid in an /etc/passwd file.
 func FindHomeByUIDInPasswd(file string, uid int64) (string, error) {
 	var home string
-	err := findCommon(file, func (line string) error {
+	err := findCommon(file, func(line string) error {
 		parts := strings.SplitN(line, ":", 7)
 		uidString := parts[2]
 		uidLocal := util.TryParseInt64(uidString)
@@ -58,9 +59,9 @@ func FindHomeByUIDInPasswd(file string, uid int64) (string, error) {
 }
 
 // FindHomeByNameInPasswd finds the home directory of a user by the user's name in an /etc/passwd file.
-func FindHomeByNameInPasswd(file string, name string) (string, error) {
+func FindHomeByNameInPasswd(file, name string) (string, error) {
 	var home string
-	err := findCommon(file, func (line string) error {
+	err := findCommon(file, func(line string) error {
 		parts := strings.SplitN(line, ":", 7)
 		if parts[0] == name {
 			home = parts[6]
@@ -94,6 +95,7 @@ func findUIDByNameCallback(user string, uid *int64) findCommonCallback {
 }
 
 type findCommonCallback = func(line string) error
+
 var errFindCommonBreak = fmt.Errorf("")
 var errUnexpectedFileFormat = fmt.Errorf("unexpected file format")
 

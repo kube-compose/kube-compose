@@ -1,7 +1,6 @@
 package config
 
 import (
-	"path/filepath"
 	"strings"
 
 	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
@@ -127,7 +126,7 @@ func ntpathVolumeNameLengthCore(s string) int {
 
 // Copy of the resolve_volume_path function:
 // https://github.com/docker/compose/blob/99e67d0c061fa3d9b9793391f3b7c8bdf8e841fc/compose/config/config.py#L1354
-func resolveHostPath(resolvedFile string, sv *ServiceVolume) error {
+func resolveBindMountVolumeHostPath(resolvedFile string, sv *ServiceVolume) {
 	if sv.Short != nil && sv.Short.HasHostPath && sv.Short.HostPath != "" {
 		// The intent of the following if is to resolve relative file paths, but not all relative file paths start with a full stop. We
 		// still perform the check as follows, because docker compose also allows specifying named volumes.
@@ -138,5 +137,4 @@ func resolveHostPath(resolvedFile string, sv *ServiceVolume) error {
 		}
 	}
 	// TODO https://github.com/kube-compose/kube-compose/issues/161 expanding source of long volume syntax
-	return nil
 }

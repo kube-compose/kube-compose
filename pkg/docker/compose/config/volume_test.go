@@ -3,6 +3,8 @@ package config
 import (
 	"reflect"
 	"testing"
+
+	"github.com/kube-compose/kube-compose/pkg/expanduser"
 )
 
 func TestParsePathMapping_Case1(t *testing.T) {
@@ -123,39 +125,38 @@ func TestVolumeNameLength_Case6(t *testing.T) {
 	}
 }
 
-func TestResolveVolumePath_Success(t *testing.T) {
+func TestResolveBindMountVolumeHostPath_Success(t *testing.T) {
 	sv := ServiceVolume{
 		Short: &PathMapping{
 			HasHostPath: true,
 			HostPath:    "./Documents",
 		},
 	}
-	err := resolveHostPath("/Users/henk/.bash_profile", &sv)
-	if err != nil {
-		t.Error(err)
-	} else {
-		expected := ServiceVolume{
-			Short: &PathMapping{
-				HasHostPath: true,
-				HostPath:    "/Users/henk/Documents",
-			},
-		}
-		if !reflect.DeepEqual(sv, expected) {
-			t.Logf("serviceVolume1: %+v\n", sv)
-			t.Logf("serviceVolume2: %+v\n", expected)
-			t.Fail()
-		}
+	resolveBindMountVolumeHostPath("/Users/henk/.bash_profile", &sv)
+	expected := ServiceVolume{
+		Short: &PathMapping{
+			HasHostPath: true,
+			HostPath:    "/Users/henk/Documents",
+		},
+	}
+	if !reflect.DeepEqual(sv, expected) {
+		t.Logf("serviceVolume1: %+v\n", sv)
+		t.Logf("serviceVolume2: %+v\n", expected)
+		t.Fail()
 	}
 }
-func TestResolveVolumePath_TildeNotSupported(t *testing.T) {
+func TestResolveBindMountVolumeHostPath_TildeNotSupported(t *testing.T) {
 	sv := ServiceVolume{
 		Short: &PathMapping{
 			HasHostPath: true,
 			HostPath:    "~/Documents",
 		},
 	}
-	err := resolveHostPath("/Users/henk/.bash_profile", &sv)
-	if err == nil {
-		t.Fail()
+	expanduser.LookupEnvFunc = func(name string) (string, bool) {
+		if name == "HOME" || name == "USERPROFILE" {
+			return "/home/henk", true
+		}
+		return "", false
 	}
+	resolveBindMountVolumeHostPath("/Users/henk/.bash_profile", &sv)
 }

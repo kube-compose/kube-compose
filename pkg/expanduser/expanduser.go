@@ -2,8 +2,8 @@ package expanduser
 
 import (
 	"fmt"
-	"path/filepath"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -11,12 +11,15 @@ import (
 	"github.com/kube-compose/kube-compose/internal/pkg/linux"
 )
 
-var goos = runtime.GOOS
+var isNT = runtime.GOOS == "windows"
+
+// LookupEnvFunc is a function used to get environment variables. It is useful for unit testing.
+var LookupEnvFunc = os.LookupEnv
 
 // ExpandUser expands a tidle prefix of the specified path by calling either
 // Posix or NT.
 func ExpandUser(path string) string {
-	if goos == "windows" {
+	if isNT {
 		return NT(path)
 	}
 	return Posix(path)
@@ -24,7 +27,7 @@ func ExpandUser(path string) string {
 
 // Home returns the home directory by calling either HomeNT or HomePosix.
 func Home() (string, error) {
-	if goos == "windows" {
+	if isNT {
 		return HomeNT()
 	}
 	return HomePosix()
@@ -35,7 +38,7 @@ func Home() (string, error) {
 // such an entry is found then returns the 6th field of the entry. An error is returned if and only if before mentioned return conditions
 // were not met.
 func HomePosix() (string, error) {
-	home, ok := os.LookupEnv("HOME")
+	home, ok := LookupEnvFunc("HOME")
 	if !ok {
 		uid := os.Getuid()
 		if uid < 0 {
@@ -53,7 +56,7 @@ func HomePosix() (string, error) {
 // Posix expands a tidle prefix of the specified path using posix semantics.
 // Ported from expanduser https://github.com/python/cpython/blob/master/Lib/posixpath.py.
 func Posix(path string) string {
-	if path == "" || path[0] == '~' {
+	if path == "" || path[0] != '~' {
 		return path
 	}
 	i := 1
@@ -85,14 +88,14 @@ func Posix(path string) string {
 
 // HomeNT returns the home directory of the current user using Windows semantics.
 func HomeNT() (string, error) {
-	userhome, ok := os.LookupEnv("USERPROFILE")
+	userhome, ok := LookupEnvFunc("USERPROFILE")
 	if !ok {
-		homepath, ok := os.LookupEnv("HOMEPATH")
+		homepath, ok := LookupEnvFunc("HOMEPATH")
 		if !ok {
 			return "", fmt.Errorf("the environment variables USERPROFILE and HOMEPATH are both unset")
 		}
 		homedrive := os.Getenv("HOMEDRIVE")
-		// This behaves sligthly differently than the Python implementation because
+		// This behaves slightly differently than the Python implementation because
 		// Go's Join will also clean the path, whereas Python's join does not.
 		// This is ok.
 		userhome = filepath.Join(homedrive, homepath)
@@ -103,7 +106,7 @@ func HomeNT() (string, error) {
 // NT expands a tidle prefix of the specified path using Windows semantics.
 // Ported from expanduser in https://github.com/python/cpython/blob/master/Lib/ntpath.py.
 func NT(path string) string {
-	if path == "" || path[0] == '~' {
+	if path == "" || path[0] != '~' {
 		return path
 	}
 	i := 1

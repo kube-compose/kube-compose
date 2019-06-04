@@ -177,7 +177,7 @@ func getUserinfoFromImage(ctx context.Context, dc *dockerClient.Client, image st
 func getUserinfoFromImageUID(ctx context.Context, dc *dockerClient.Client, containerID, tmpDir string, user *docker.Userinfo) error {
 	// TODO https://github.com/kube-compose/kube-compose/issues/70 this is not correct for non-Linux containers
 	if user.UID == nil {
-		err := copyFileFromContainer(ctx, dc, containerID, "/etc/passwd", tmpDir)
+		err := copyFileFromContainer(ctx, dc, containerID, linux.EtcPasswd, tmpDir)
 		if err != nil {
 			return err
 		}
