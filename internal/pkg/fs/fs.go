@@ -100,7 +100,7 @@ var (
 	errBadMode           = fmt.Errorf("file has a bad mode (or operation is not supported on this file)")
 	errIsDirDisagreement = fmt.Errorf("data contains a name X that is not a directory, but another name Y indicates " +
 		"that X must be a directory")
-	errTooManyLinks = fmt.Errorf("EvalSymlinks: too many links")
+	errTooManyLinks = fmt.Errorf("too many links")
 )
 
 func (fs *virtualFileSystem) abs(name string) string {
@@ -112,8 +112,7 @@ func (fs *virtualFileSystem) abs(name string) string {
 
 func (fs *virtualFileSystem) find(
 	name string,
-	ignoreInjectedFaults bool,
-	resolveSymlinks bool) (n *node, nameRem string, err error) {
+	ignoreInjectedFaults, resolveSymlinks bool) (n *node, nameRem string, err error) {
 	n = fs.root
 	nameRem = fs.abs(name)[1:]
 	links := 0
@@ -141,27 +140,32 @@ func (fs *virtualFileSystem) find(
 				err = os.ErrNotExist
 				return
 			}
-			n = childN
 		}
 		if slashPos < 0 {
 			nameRem = ""
 		} else {
 			nameRem = nameRem[slashPos+1:]
 		}
-		if nameComp != "" && (n.mode&os.ModeSymlink) != 0 && resolveSymlinks {
-			links++
-			if links > 255 {
-				err = errTooManyLinks
-				return
+		if nameComp != "" {
+			if (childN.mode&os.ModeSymlink) != 0{
+				if resolveSymlinks  {
+					links++
+					if links > 255 {
+						err = errTooManyLinks
+						return
+					}
+					target := childN.extra.([]byte)
+					j := 0
+					if len(target) > 0 && target[0] == '/' {
+						// Absolute path
+						j = 1
+						n = fs.root
+					}
+					nameRem = string(target)[j:] + "/" + nameRem
+				}
+			} else {
+				n = childN
 			}
-			target := childN.extra.([]byte)
-			j := 0
-			if len(target) > 0 && target[0] == '/' {
-				// Absolute path
-				j = 1
-				n = fs.root
-			}
-			nameRem = string(target)[j:] + "/" + nameRem
 		}
 	}
 	if !ignoreInjectedFaults {
