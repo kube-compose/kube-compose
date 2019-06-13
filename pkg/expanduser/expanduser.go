@@ -35,9 +35,9 @@ func Home() (string, error) {
 }
 
 // HomePosix returns the home directory of the current user using non-Windows semantics. If the HOME environment variable is present it
-// returns its value. Otherwise, it looks for an entry with at least 6 fields and a uid equal to os.Getuid() in the /etc/passwd file. If
-// such an entry is found then returns the 6th field of the entry. An error is returned if and only if before mentioned return conditions
-// were not met.
+// returns its value. Otherwise, it looks for an entry in the /etc/passwd file with at least 6 fields and a uid equal to os.Getuid(). If
+// such an entry is found then returns the 6th field of the entry. If the before mentioned return conditions cannot be met an error is
+// returned.
 func HomePosix() (string, error) {
 	home, ok := LookupEnvFunc("HOME")
 	if !ok {

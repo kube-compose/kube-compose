@@ -73,7 +73,7 @@ func withMockEtcPasswd(s string, cb func()) {
 	defer func() {
 		linux.FS = orig
 	}()
-	linux.FS = fsPackage.NewMockFileSystem(map[string]fsPackage.MockFile{
+	linux.FS = fsPackage.NewVirtualFileSystem(map[string]fsPackage.VirtualFile{
 		linux.EtcPasswd: {
 			Content: []byte(s),
 		},

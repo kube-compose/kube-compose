@@ -25,7 +25,7 @@ const testDockerComposeYmlDependsOnDoesNotExist = "/docker-compose.depends-on-do
 const testDockerComposeYmlDependsOnCycle = "/docker-compose.depends-on-cycle.yml"
 const testDockerComposeYmlDependsOn = "/docker-compose.depends-on.yml"
 
-var mockFileSystem = fsPackage.NewMockFileSystem(map[string]fsPackage.MockFile{
+var vfs = fsPackage.NewVirtualFileSystem(map[string]fsPackage.VirtualFile{
 	testDockerComposeYml: {
 		Content: []byte(`testservice:
   entrypoint: []
@@ -162,7 +162,7 @@ services:
 	},
 })
 
-var mockFileSystemStandardFileError = fsPackage.NewMockFileSystem(map[string]fsPackage.MockFile{
+var mockFileSystemStandardFileError = fsPackage.NewVirtualFileSystem(map[string]fsPackage.VirtualFile{
 	"/docker-compose.yml": {
 		Error: errors.New("unknown error 2"),
 	},
@@ -173,7 +173,7 @@ func withMockFS(cb func()) {
 	defer func() {
 		FS = fsOld
 	}()
-	FS = mockFileSystem
+	FS = vfs
 	cb()
 }
 

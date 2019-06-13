@@ -226,7 +226,7 @@ func (h *bindMountHostFileToTarHelper) run(hostFile, fileNameInTar string) (isDi
 		return
 	}
 	header.Typeflag = tar.TypeDir
-	header.Name += "/"
+	header.Name = fileNameInTar + "/"
 	err = h.endHeaderCommon(header)
 	isDir = true
 	return

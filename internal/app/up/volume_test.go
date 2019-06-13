@@ -13,12 +13,12 @@ import (
 var errTest = fmt.Errorf("test error")
 var testFileContent = "content"
 
-var mockFileSystem fsPackage.MockFileSystem
+var vfs fsPackage.VirtualFileSystem
 
 // init here is justified because a common mock file system is used, and we require calling Set to make tests deterministic.
 // nolint
 func init() {
-	mockFileSystem = fsPackage.NewMockFileSystem(map[string]fsPackage.MockFile{
+	vfs = fsPackage.NewVirtualFileSystem(map[string]fsPackage.VirtualFile{
 		"/orig": {
 			Content: []byte(testFileContent),
 		},
@@ -26,10 +26,10 @@ func init() {
 			Error: errTest,
 		},
 	})
-	mockFileSystem.Set("/dir/file1", fsPackage.MockFile{
+	vfs.Set("/dir/file1", fsPackage.VirtualFile{
 		Content: []byte(testFileContent),
 	})
-	mockFileSystem.Set("/dir/file2", fsPackage.MockFile{
+	vfs.Set("/dir/file2", fsPackage.VirtualFile{
 		Content: []byte(testFileContent),
 	})
 }
@@ -39,7 +39,7 @@ func withMockFS(cb func()) {
 	defer func() {
 		fs = fsOld
 	}()
-	fs = mockFileSystem
+	fs = vfs
 	cb()
 }
 
@@ -167,8 +167,6 @@ ENTRYPOINT ["bash", "-c", "cp -ar /app/data/vol1 /mnt/vol1/root && cp -ar /app/d
 		t.Fail()
 	}
 }
-
-
 
 func TestResolveBindVolumeHostPath_Asdf(t *testing.T) {
 

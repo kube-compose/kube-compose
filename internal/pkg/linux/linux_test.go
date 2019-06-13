@@ -7,7 +7,7 @@ import (
 	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
 )
 
-var mockFileSystem fsPackage.FileSystem = fsPackage.NewMockFileSystem(map[string]fsPackage.MockFile{
+var vfs fsPackage.FileSystem = fsPackage.NewVirtualFileSystem(map[string]fsPackage.VirtualFile{
 	EtcPasswd: {
 		Content: []byte("root:x:0:\ndaemon:x:1:1:daemon:/daemonhomelol\nasdf\nuiderr:x::"),
 	},
@@ -18,7 +18,7 @@ func withMockFS(cb func()) {
 	defer func() {
 		FS = fsOld
 	}()
-	FS = mockFileSystem
+	FS = vfs
 	cb()
 }
 
@@ -88,7 +88,7 @@ func TestFindHomeByUIDInPasswd_ErrorUIDInvalidFormat(t *testing.T) {
 }
 
 func TestFindHomeByNameInPasswd_Success(t *testing.T) {
-	withMockFS(func(){
+	withMockFS(func() {
 		_, err := FindHomeByNameInPasswd(EtcPasswd, "notfoundtest")
 		if err != nil {
 			t.Error(err)

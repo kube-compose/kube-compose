@@ -88,7 +88,7 @@ var dockerComposeYmlInvalid = "/docker-compose.invalid.yml"
 var dockerComposeYmlInvalidServiceName = "/docker-compose.invalid-service-name.yml"
 var dockerComposeYmlInvalidXKubeCompose = "/docker-compose.invalid-x-kube-compose.yml"
 var dockerComposeYmlValidPushImages = "/docker-compose.valid-push-images.yml"
-var mockFileSystem fsPackage.FileSystem = fsPackage.NewMockFileSystem(map[string]fsPackage.MockFile{
+var vfs fsPackage.FileSystem = fsPackage.NewVirtualFileSystem(map[string]fsPackage.VirtualFile{
 	dockerComposeYmlInvalid: {
 		Content: []byte(`version: 'asdf'`),
 	},
@@ -123,7 +123,7 @@ func withMockFS(cb func()) {
 	defer func() {
 		dockerComposeConfig.FS = fsOld
 	}()
-	dockerComposeConfig.FS = mockFileSystem
+	dockerComposeConfig.FS = vfs
 	cb()
 }
 
