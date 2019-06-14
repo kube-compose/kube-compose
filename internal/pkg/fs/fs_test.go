@@ -211,7 +211,6 @@ func Test_VirtualFileSystem_Readdir_EmptyDirSuccess(t *testing.T) {
 	}
 }
 
-
 func Test_VirtualFileDescriptor_Readdir_NNotSupported(t *testing.T) {
 	fs := NewVirtualFileSystem(map[string]VirtualFile{})
 	fd, err := fs.Open("")
@@ -349,7 +348,7 @@ func Test_VirtualFileSystem_Stat_TooManyLinks(t *testing.T) {
 	fs := NewVirtualFileSystem(map[string]VirtualFile{
 		"/selflink": {
 			Content: []byte("selflink"),
-			Mode: os.ModeSymlink,
+			Mode:    os.ModeSymlink,
 		},
 	})
 	_, err := fs.Stat("/selflink")
@@ -363,7 +362,7 @@ func Test_VirtualFileSystem_Stat_AbsSymlink(t *testing.T) {
 		"/file": {},
 		"/link": {
 			Content: []byte("/file"),
-			Mode: os.ModeSymlink,
+			Mode:    os.ModeSymlink,
 		},
 	})
 	_, err := fs.Stat("/link")

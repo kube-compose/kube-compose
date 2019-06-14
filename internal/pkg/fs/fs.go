@@ -110,67 +110,105 @@ func (fs *virtualFileSystem) abs(name string) string {
 	return name
 }
 
+type findHelper struct {
+	fs                   *virtualFileSystem
+	ignoreInjectedFaults bool
+	links                int
+	nameRem              string
+	n                    *node
+	resolveSymlinks      bool
+}
+
+func (f *findHelper) getChildN(nameComp string) (*node, error) {
+	var childN *node
+	if nameComp != "" {
+		validateNameComp(nameComp)
+		if (f.n.mode & os.ModeDir) == 0 {
+			return nil, syscall.ENOTDIR
+		}
+		childN = f.n.dirLookup(nameComp)
+		if childN == nil {
+			return nil, os.ErrNotExist
+		}
+	}
+	return childN, nil
+}
+
+func (f *findHelper) getNameComp(slashPos int) string {
+	if slashPos < 0 {
+		return f.nameRem
+	}
+	return f.nameRem[:slashPos]
+}
+
+func (f *findHelper) run() error {
+	for f.nameRem != "" {
+		if !f.ignoreInjectedFaults && f.n.err != nil {
+			return f.n.err
+		}
+		slashPos := strings.IndexByte(f.nameRem, '/')
+		nameComp := f.getNameComp(slashPos)
+		childN, err := f.getChildN(nameComp)
+		if err != nil {
+			return err
+		}
+		f.updateNameRemFromSlashPos(slashPos)
+		if nameComp != "" {
+			err := f.updateFromChildN(childN)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	if !f.ignoreInjectedFaults && f.n.err != nil {
+		return f.n.err
+	}
+	return nil
+}
+
+func (f *findHelper) updateFromChildN(childN *node) error {
+	if (childN.mode & os.ModeSymlink) != 0 {
+		if f.resolveSymlinks {
+			f.links++
+			if f.links > 255 {
+				return errTooManyLinks
+			}
+			target := childN.extra.([]byte)
+			j := 0
+			if len(target) > 0 && target[0] == '/' {
+				// Absolute path
+				j = 1
+				f.n = f.fs.root
+			}
+			f.nameRem = string(target)[j:] + "/" + f.nameRem
+		}
+	} else {
+		f.n = childN
+	}
+	return nil
+}
+
+func (f *findHelper) updateNameRemFromSlashPos(slashPos int) {
+	if slashPos < 0 {
+		f.nameRem = ""
+	} else {
+		f.nameRem = f.nameRem[slashPos+1:]
+	}
+}
+
 func (fs *virtualFileSystem) find(
 	name string,
 	ignoreInjectedFaults, resolveSymlinks bool) (n *node, nameRem string, err error) {
-	n = fs.root
-	nameRem = fs.abs(name)[1:]
-	links := 0
-	for nameRem != "" {
-		if !ignoreInjectedFaults && n.err != nil {
-			err = n.err
-			return
-		}
-		slashPos := strings.IndexByte(nameRem, '/')
-		var nameComp string
-		if slashPos < 0 {
-			nameComp = nameRem
-		} else {
-			nameComp = nameRem[:slashPos]
-		}
-		var childN *node
-		if nameComp != "" {
-			validateNameComp(nameComp)
-			if (n.mode & os.ModeDir) == 0 {
-				err = syscall.ENOTDIR
-				return
-			}
-			childN = n.dirLookup(nameComp)
-			if childN == nil {
-				err = os.ErrNotExist
-				return
-			}
-		}
-		if slashPos < 0 {
-			nameRem = ""
-		} else {
-			nameRem = nameRem[slashPos+1:]
-		}
-		if nameComp != "" {
-			if (childN.mode&os.ModeSymlink) != 0{
-				if resolveSymlinks  {
-					links++
-					if links > 255 {
-						err = errTooManyLinks
-						return
-					}
-					target := childN.extra.([]byte)
-					j := 0
-					if len(target) > 0 && target[0] == '/' {
-						// Absolute path
-						j = 1
-						n = fs.root
-					}
-					nameRem = string(target)[j:] + "/" + nameRem
-				}
-			} else {
-				n = childN
-			}
-		}
+	f := findHelper{
+		fs:                   fs,
+		ignoreInjectedFaults: ignoreInjectedFaults,
+		nameRem:              fs.abs(name)[1:],
+		n:                    fs.root,
+		resolveSymlinks:      resolveSymlinks,
 	}
-	if !ignoreInjectedFaults {
-		err = n.err
-	}
+	err = f.run()
+	n = f.n
+	nameRem = f.nameRem
 	return
 }
 
@@ -322,76 +360,6 @@ func (r *virtualFileDescriptor) Readdir(n int) ([]os.FileInfo, error) {
 		fileInfoSlice[i] = dir[i]
 	}
 	return fileInfoSlice, nil
-}
-
-func (fs *virtualFileSystem) EvalSymlinks(path string) (string, error) {
-	n := fs.root
-	if n.err != nil {
-		return "", n.err
-	}
-	links := 0
-	var resolved string
-	var nameRem string
-	if path != "" && path[0] == '/' {
-		resolved = "/"
-		nameRem = path[1:]
-	} else {
-		resolved = fs.cwd
-		nameRem = path
-	}
-	for nameRem != "" {
-		slashPos := strings.IndexByte(nameRem, '/')
-		var nameComp string
-		if slashPos < 0 {
-			nameComp = nameRem
-		} else {
-			nameComp = nameRem[:slashPos]
-		}
-		var childN *node
-		if nameComp != "" {
-			validateNameComp(nameComp)
-			if (n.mode & os.ModeDir) == 0 {
-				return "", syscall.ENOTDIR
-			}
-			childN = n.dirLookup(nameComp)
-			if childN == nil {
-				return "", os.ErrNotExist
-			}
-			n = childN
-			if n.err != nil {
-				return "", n.err
-			}
-		}
-		if slashPos < 0 {
-			nameRem = ""
-		} else {
-			nameRem = nameRem[slashPos+1:]
-		}
-		if nameComp != "" {
-			if (n.mode & os.ModeSymlink) != 0 {
-				links++
-				if links > 255 {
-					return "", errTooManyLinks
-				}
-				target := childN.extra.([]byte)
-				j := 0
-				if len(target) > 0 && target[0] == '/' {
-					// Absolute path, reset resolved
-					resolved = string(target)
-					n = fs.root
-					j = 1
-				}
-				if nameRem != "" {
-					nameRem = string(target)[j:] + "/" + nameRem
-				} else {
-					nameRem = string(target)[j:]
-				}
-			} else {
-				resolved += "/" + nameComp
-			}
-		}
-	}
-	return resolved, nil
 }
 
 func trimTrailingSlashes(name string) string {
