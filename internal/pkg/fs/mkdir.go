@@ -22,11 +22,10 @@ func (fs *VirtualFileSystem) mkdirCommon(name string, perm os.FileMode, all bool
 		if nameRem == "" {
 			return os.ErrExist
 		}
-	}
-	if !n.mode.IsDir() {
-		return syscall.ENOTDIR
-	}
-	if all {
+	} else {
+		if !n.mode.IsDir() {
+			return syscall.ENOTDIR
+		}
 		fs.mkdirCommonAll(n, nameRem, perm)
 		return nil
 	}

@@ -55,13 +55,13 @@ func Test_VirtualFileSystem_Mkdir_EEXIST(t *testing.T) {
 	}
 }
 
-func Test_VirtualFileSystem_Mkdir_ENOTDIR(t *testing.T) {
+func Test_VirtualFileSystem_MkdirAll_ENOTDIR(t *testing.T) {
 	fs := NewVirtualFileSystem(map[string]VirtualFile{
 		"file": {
 			Content: []byte("filecontent"),
 		},
 	})
-	err := fs.Mkdir("file/dir", 0)
+	err := fs.MkdirAll("file", 0)
 	if err != syscall.ENOTDIR {
 		t.Fail()
 	}
