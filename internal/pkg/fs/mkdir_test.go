@@ -15,7 +15,6 @@ func Test_VirtualFileSystem_Mkdir_Success(t *testing.T) {
 	} else {
 		dir := fs.root.extra.([]*node)
 		expectedNode := newDirNode(
-			nil,
 			os.ModePerm,
 			expectedName,
 		)

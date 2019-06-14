@@ -87,6 +87,7 @@ func (h *evalSymlinksHelper) updateNameRemFromSlashPos(slashPos int) {
 	}
 }
 
+// EvalSymlinks should behave the same as "path/filepath".EvalSymlinks, but on the virtual file system.
 func (fs *VirtualFileSystem) EvalSymlinks(path string) (string, error) {
 	h := &evalSymlinksHelper{
 		fs: fs,

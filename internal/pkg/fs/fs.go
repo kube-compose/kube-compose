@@ -75,11 +75,11 @@ type node struct {
 	extra interface{}
 }
 
-func newDirNode(err error, mode os.FileMode, name string) *node {
+func newDirNode(mode os.FileMode, name string) *node {
 	return &node{
 		extra: []*node{},
-		mode: mode | os.ModeDir,
-		name: name,
+		mode:  mode | os.ModeDir,
+		name:  name,
 	}
 }
 
@@ -236,7 +236,7 @@ func (fs *VirtualFileSystem) createChildren(n *node, nameRem string, vfile *Virt
 			if slashPos < 0 {
 				// initialize file or directory as per VirtualFile
 				childN = &node{
-					err: vfile.Error,
+					err:  vfile.Error,
 					mode: vfile.Mode,
 					name: nameComp,
 				}
@@ -248,7 +248,6 @@ func (fs *VirtualFileSystem) createChildren(n *node, nameRem string, vfile *Virt
 			}
 			// initialize directory with defaults
 			childN = newDirNode(
-				nil,
 				os.ModeDir,
 				nameComp,
 			)
@@ -276,7 +275,6 @@ func NewVirtualFileSystem(data map[string]VirtualFile) *VirtualFileSystem {
 	fs := &VirtualFileSystem{
 		cwd: "/",
 		root: newDirNode(
-			nil,
 			0,
 			"/",
 		),

@@ -31,7 +31,6 @@ func (fs *VirtualFileSystem) mkdirCommon(name string, perm os.FileMode, all bool
 		return nil
 	}
 	n.dirAppend(newDirNode(
-		nil,
 		perm,
 		nameRem,
 	))
@@ -48,7 +47,6 @@ func (fs *VirtualFileSystem) mkdirCommonAll(n *node, nameRem string, perm os.Fil
 		if nameComp != "" {
 			validateNameComp(nameComp)
 			childN := newDirNode(
-				nil,
 				perm,
 				nameComp,
 			)

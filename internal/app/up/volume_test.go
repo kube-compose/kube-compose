@@ -13,7 +13,7 @@ import (
 var errTest = fmt.Errorf("test error")
 var testFileContent = "content"
 
-var vfs fsPackage.VirtualFileSystem
+var vfs *fsPackage.VirtualFileSystem
 
 // init here is justified because a common mock file system is used, and we require calling Set to make tests deterministic.
 // nolint

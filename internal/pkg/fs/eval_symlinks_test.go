@@ -3,13 +3,13 @@ package fs
 import (
 	"fmt"
 	"os"
-	"testing"
 	"syscall"
+	"testing"
 )
 
 func Test_VirtualFileSystem_EvalSymlinks_AbsRootInjectedFault(t *testing.T) {
 	fs := NewVirtualFileSystem(map[string]VirtualFile{})
-	errExpected := fmt.Errorf("AbsRootInjectedFault")
+	errExpected := fmt.Errorf("absRootInjectedFault")
 	fs.root.err = errExpected
 	_, errActual := fs.EvalSymlinks("/")
 	if errActual != errExpected {
@@ -19,7 +19,7 @@ func Test_VirtualFileSystem_EvalSymlinks_AbsRootInjectedFault(t *testing.T) {
 
 func Test_VirtualFileSystem_EvalSymlinks_RelCwdInjectedFault(t *testing.T) {
 	fs := NewVirtualFileSystem(map[string]VirtualFile{})
-	errExpected := fmt.Errorf("RelCwdInjectedFault")
+	errExpected := fmt.Errorf("relCwdInjectedFault")
 	fs.root.err = errExpected
 	_, errActual := fs.EvalSymlinks("")
 	if errActual != errExpected {
@@ -47,9 +47,9 @@ func Test_VirtualFileSystem_EvalSymlinks_ENOENT(t *testing.T) {
 	}
 }
 func Test_VirtualFileSystem_EvalSymlinks_NonRootInjectedFault(t *testing.T) {
-	errExpected := fmt.Errorf("NonRootInjectedFault")
+	errExpected := fmt.Errorf("nonRootInjectedFault")
 	fs := NewVirtualFileSystem(map[string]VirtualFile{
-		"child": VirtualFile{
+		"child": {
 			Error: errExpected,
 		},
 	})
@@ -61,9 +61,9 @@ func Test_VirtualFileSystem_EvalSymlinks_NonRootInjectedFault(t *testing.T) {
 
 func Test_VirtualFileSystem_EvalSymlinks_AbsTooManyLinks(t *testing.T) {
 	fs := NewVirtualFileSystem(map[string]VirtualFile{
-		"selflink": VirtualFile{
+		"selflink": {
 			Content: []byte("selflink"),
-			Mode: os.ModeSymlink,
+			Mode:    os.ModeSymlink,
 		},
 	})
 	_, err := fs.EvalSymlinks("/selflink")
@@ -74,15 +74,15 @@ func Test_VirtualFileSystem_EvalSymlinks_AbsTooManyLinks(t *testing.T) {
 
 func Test_VirtualFileSystem_EvalSymlinks_Success(t *testing.T) {
 	fs := NewVirtualFileSystem(map[string]VirtualFile{
-		"/dir1/link1": VirtualFile{
+		"/dir1/link1": {
 			Content: []byte("/link2"),
-			Mode: os.ModeSymlink,
+			Mode:    os.ModeSymlink,
 		},
-		"/link2": VirtualFile{
+		"/link2": {
 			Content: []byte("dir2/file"),
-			Mode: os.ModeSymlink,
+			Mode:    os.ModeSymlink,
 		},
-		"/dir2/file": VirtualFile{},
+		"/dir2/file": {},
 	})
 	resolved, err := fs.EvalSymlinks("/dir1/link1")
 	if err != nil {
@@ -91,4 +91,3 @@ func Test_VirtualFileSystem_EvalSymlinks_Success(t *testing.T) {
 		t.Fail()
 	}
 }
-
