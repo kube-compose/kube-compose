@@ -363,8 +363,3 @@ func (fs *VirtualFileSystem) Stat(name string) (os.FileInfo, error) {
 	}
 	return n, nil
 }
-
-// IsPathSeparatorWindows returns true if and only if b is the ASCII code of a forward or backward slash.
-func IsPathSeparatorWindows(b byte) bool {
-	return b == '/' || b == '\\'
-}

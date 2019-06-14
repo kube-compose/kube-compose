@@ -111,7 +111,7 @@ func NT(path string) string {
 		return path
 	}
 	i := 1
-	for i < len(path) && !fsPackage.IsPathSeparatorWindows(path[i]) {
+	for i < len(path) && !fsPackage.NTIsPathSeparator(path[i]) {
 		i++
 	}
 	userhome, err := HomeNT()
@@ -128,10 +128,10 @@ func NT(path string) string {
 func dirname(name string) int {
 	volLen := fsPackage.NTVolumeNameLength(name)
 	j := len(name)
-	for j > volLen && fsPackage.IsPathSeparatorWindows(name[j-1]) {
+	for j > volLen && fsPackage.NTIsPathSeparator(name[j-1]) {
 		j--
 	}
-	for j > volLen && !fsPackage.IsPathSeparatorWindows(name[j-1]) {
+	for j > volLen && !fsPackage.NTIsPathSeparator(name[j-1]) {
 		j--
 	}
 	return j

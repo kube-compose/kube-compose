@@ -10,7 +10,7 @@ package fs
 func NTVolumeNameLength(s string) int {
 	n := len(s)
 	if n >= 2 {
-		if IsPathSeparatorWindows(s[0]) && IsPathSeparatorWindows(s[1]) && (n < 3 || !IsPathSeparatorWindows(s[2])) {
+		if NTIsPathSeparator(s[0]) && NTIsPathSeparator(s[1]) && (n < 3 || !NTIsPathSeparator(s[2])) {
 			return NTVolumeNameLengthCore(s)
 		}
 		if s[1] == ':' {
@@ -27,12 +27,12 @@ func NTVolumeNameLengthCore(s string) int {
 		if index >= n {
 			return 0
 		}
-		if IsPathSeparatorWindows(s[index]) {
+		if NTIsPathSeparator(s[index]) {
 			break
 		}
 		index++
 	}
-	if index+1 < n && IsPathSeparatorWindows(s[index+1]) {
+	if index+1 < n && NTIsPathSeparator(s[index+1]) {
 		return 0
 	}
 	index2 := index + 2
@@ -40,9 +40,14 @@ func NTVolumeNameLengthCore(s string) int {
 		if index2 >= n {
 			return n
 		}
-		if IsPathSeparatorWindows(s[index2]) {
+		if NTIsPathSeparator(s[index2]) {
 			return index2
 		}
 		index2++
 	}
+}
+
+// NTIsPathSeparator returns true if and only if b is the ASCII code of a forward or backward slash.
+func NTIsPathSeparator(b byte) bool {
+	return b == '/' || b == '\\'
 }
