@@ -6,13 +6,11 @@ import (
 	"io"
 	"strings"
 
-	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
+	"github.com/kube-compose/kube-compose/internal/pkg/fs"
 	"github.com/kube-compose/kube-compose/internal/pkg/util"
 )
 
 const EtcPasswd = "/etc/passwd"
-
-var FS = fsPackage.OSFileSystem()
 
 // FindUIDByNameInPasswd finds the UID of a user by name in an /etc/passwd file. It can also find the GID of a group by name in an
 // /etc/group file.
@@ -109,7 +107,7 @@ var errFindCommonBreak = fmt.Errorf("")
 var errUnexpectedFileFormat = fmt.Errorf("unexpected file format")
 
 func findCommon(file string, callback findCommonCallback) error {
-	fd, err := FS.Open(file)
+	fd, err := fs.FS.Open(file)
 	if err != nil {
 		return err
 	}

@@ -13,23 +13,23 @@ import (
 // The main criticism here is that we don't have to test os.Open, but we want 100% coverage.
 
 func Test_OSFileSystem_EvalSymlinks(t *testing.T) {
-	_, _ = OSFileSystem().EvalSymlinks("")
+	_, _ = FS.EvalSymlinks("")
 }
 
 func Test_OSFileSystem_Lstat(t *testing.T) {
-	_, _ = OSFileSystem().Lstat("")
+	_, _ = FS.Lstat("")
 }
 
 func Test_OSFileSystem_Mkdir(t *testing.T) {
-	_ = OSFileSystem().Mkdir("", os.ModePerm)
+	_ = FS.Mkdir("", os.ModePerm)
 }
 
 func Test_OSFileSystem_MkdirAll(t *testing.T) {
-	_ = OSFileSystem().MkdirAll("", os.ModePerm)
+	_ = FS.MkdirAll("", os.ModePerm)
 }
 
 func Test_OSFileSystem_Open(t *testing.T) {
-	file, err := OSFileSystem().Open("")
+	file, err := FS.Open("")
 	defer func() {
 		if file != nil {
 			file.Close()
@@ -40,11 +40,11 @@ func Test_OSFileSystem_Open(t *testing.T) {
 	}
 }
 func Test_OSFileSystem_Readlink(t *testing.T) {
-	_, _ = OSFileSystem().Readlink("")
+	_, _ = FS.Readlink("")
 }
 
 func Test_OSFileSystem_Stat(t *testing.T) {
-	_, _ = OSFileSystem().Stat("")
+	_, _ = FS.Stat("")
 }
 
 func Test_VirtualFileSystem_Open_ENOENT(t *testing.T) {

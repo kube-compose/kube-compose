@@ -3,7 +3,7 @@ package expanduser
 import (
 	"testing"
 
-	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
+	"github.com/kube-compose/kube-compose/internal/pkg/fs"
 	"github.com/kube-compose/kube-compose/internal/pkg/unix"
 )
 
@@ -68,23 +68,18 @@ func TestHomeNT_SuccessAlternative(t *testing.T) {
 	})
 }
 
-func withMockEtcPasswd(s string, cb func()) {
-	orig := unix.FS
-	defer func() {
-		unix.FS = orig
-	}()
-	unix.FS = fsPackage.NewVirtualFileSystem(map[string]fsPackage.VirtualFile{
+func makeEtcPasswdFS(s string) fs.FileSystem {
+	return fs.NewVirtualFileSystem(map[string]fs.VirtualFile{
 		unix.EtcPasswd: {
 			Content: []byte(s),
 		},
 	})
-	cb()
 }
 
 func TestPosix_Error(t *testing.T) {
 	withMockUID(-1, func() {
 		withMockEnv(map[string]string{}, func() {
-			withMockEtcPasswd("henk:x:1:1:henkie penkie:/home/henkiehome", func() {
+			fs.ScopedFS(makeEtcPasswdFS("henk:x:1:1:henkie penkie:/home/henkiehome"), func() {
 				actual := Posix("~/")
 				if actual != "~/" {
 					t.Fail()
@@ -106,7 +101,7 @@ func TestPosix_NeverEmpty(t *testing.T) {
 }
 
 func TestPosix_ExplicitUserCase1(t *testing.T) {
-	withMockEtcPasswd("henk:x:1:1:henkie penkie:/home/henkiehome", func() {
+	fs.ScopedFS(makeEtcPasswdFS("henk:x:1:1:henkie penkie:/home/henkiehome"), func() {
 		actual := Posix("~henk")
 		if actual != "/home/henkiehome" {
 			t.Fail()
@@ -115,7 +110,7 @@ func TestPosix_ExplicitUserCase1(t *testing.T) {
 }
 
 func TestPosix_ExplicitUserCase2(t *testing.T) {
-	withMockEtcPasswd("henk:x:1", func() {
+	fs.ScopedFS(makeEtcPasswdFS("henk:x:1"), func() {
 		expected := "~henk"
 		actual := Posix(expected)
 		if actual != expected {
@@ -125,7 +120,7 @@ func TestPosix_ExplicitUserCase2(t *testing.T) {
 }
 
 func TestPosix_ExplicitUserCase3(t *testing.T) {
-	withMockEtcPasswd("root:x:0:0::/", func() {
+	fs.ScopedFS(makeEtcPasswdFS("root:x:0:0::/"), func() {
 		expected := "/henk"
 		actual := Posix("~root/henk")
 		if actual != expected {
@@ -158,7 +153,7 @@ func TestHomePosix_ErrorWindows(t *testing.T) {
 func TestHomePosix_ErrorInvalidEtcPasswd(t *testing.T) {
 	withMockEnv(map[string]string{}, func() {
 		withMockUID(0, func() {
-			withMockEtcPasswd("root:x:0", func() {
+			fs.ScopedFS(makeEtcPasswdFS("root:x:0"), func() {
 				_, err := HomePosix()
 				if err == nil {
 					t.Fail()

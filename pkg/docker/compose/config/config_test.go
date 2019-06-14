@@ -168,15 +168,6 @@ var mockFileSystemStandardFileError = fsPackage.NewVirtualFileSystem(map[string]
 	},
 })
 
-func withMockFS(cb func()) {
-	fsOld := FS
-	defer func() {
-		FS = fsOld
-	}()
-	FS = vfs
-	cb()
-}
-
 func newTestConfigLoader(env map[string]string) *configLoader {
 	c := &configLoader{
 		environmentGetter:     mapValueGetter(env),
@@ -251,7 +242,7 @@ func TestConfigLoaderParseEnvironment_InvalidName(t *testing.T) {
 }
 
 func TestConfigLoaderLoadFile_Success(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		c := newTestConfigLoader(nil)
 		cfParsed, err := c.loadFile(testDockerComposeYml)
 		if err != nil {
@@ -482,7 +473,7 @@ func areStringSlicesEqual(slice1, slice2 []string) bool {
 }
 
 func TestConfigLoaderLoadFile_Error(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		c := newTestConfigLoader(nil)
 		_, err := c.loadFile(testDockerComposeYmlIOError)
 		if err == nil {
@@ -492,7 +483,7 @@ func TestConfigLoaderLoadFile_Error(t *testing.T) {
 }
 
 func TestConfigLoaderLoadResolvedFile_Caching(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		c := newTestConfigLoader(nil)
 		cfParsed1, err := c.loadResolvedFile(testDockerComposeYml)
 		if err != nil {
@@ -509,7 +500,7 @@ func TestConfigLoaderLoadResolvedFile_Caching(t *testing.T) {
 }
 
 func TestConfigLoaderLoadResolvedFile_OpenFileError(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		c := newTestConfigLoader(nil)
 		_, err := c.loadResolvedFile(testDockerComposeYmlIOError)
 		if err == nil {
@@ -519,7 +510,7 @@ func TestConfigLoaderLoadResolvedFile_OpenFileError(t *testing.T) {
 }
 
 func TestConfigLoaderLoadResolvedFile_VersionError(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		c := newTestConfigLoader(nil)
 		_, err := c.loadResolvedFile(testDockerComposeYmlInvalidVersion)
 		if err == nil {
@@ -529,7 +520,7 @@ func TestConfigLoaderLoadResolvedFile_VersionError(t *testing.T) {
 }
 
 func TestConfigLoaderLoadResolvedFile_InterpolationError(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		c := newTestConfigLoader(nil)
 		_, err := c.loadResolvedFile(testDockerComposeYmlInterpolationIssue)
 		if err == nil {
@@ -539,7 +530,7 @@ func TestConfigLoaderLoadResolvedFile_InterpolationError(t *testing.T) {
 }
 
 func TestConfigLoaderLoadResolvedFile_DecodeError(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		c := newTestConfigLoader(nil)
 		_, err := c.loadResolvedFile(testDockerComposeYmlDecodeIssue)
 		if err == nil {
@@ -549,7 +540,7 @@ func TestConfigLoaderLoadResolvedFile_DecodeError(t *testing.T) {
 }
 
 func TestNew_DependsOnDoesNotExist(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		_, err := New([]string{
 			testDockerComposeYmlDependsOnDoesNotExist,
 		})
@@ -561,7 +552,7 @@ func TestNew_DependsOnDoesNotExist(t *testing.T) {
 	})
 }
 func TestNew_DependsOnCycle(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		_, err := New([]string{
 			testDockerComposeYmlDependsOnCycle,
 		})
@@ -573,7 +564,7 @@ func TestNew_DependsOnCycle(t *testing.T) {
 	})
 }
 func TestNew_DependsOn(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		c, err := New([]string{
 			testDockerComposeYmlDependsOn,
 		})
@@ -599,7 +590,7 @@ func TestNew_DependsOn(t *testing.T) {
 }
 
 func TestNew_IOError(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		_, err := New([]string{
 			testDockerComposeYmlIOError,
 		})
@@ -612,7 +603,7 @@ func TestNew_IOError(t *testing.T) {
 }
 
 func TestNew_MultipleFiles(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		_, err := New([]string{
 			testDockerComposeYml,
 			testDockerComposeYmlExtends,
@@ -626,7 +617,7 @@ func TestNew_MultipleFiles(t *testing.T) {
 }
 
 func TestNew_ExtendsCycle(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		_, err := New([]string{
 			testDockerComposeYmlExtendsCycle,
 		})
@@ -639,7 +630,7 @@ func TestNew_ExtendsCycle(t *testing.T) {
 }
 
 func TestNew_ExtendsSuccess(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		c, err := New([]string{testDockerComposeYmlExtends})
 		if err != nil {
 			t.Error(err)
@@ -663,7 +654,7 @@ func TestNew_ExtendsSuccess(t *testing.T) {
 }
 
 func TestNew_ExtendsIOError(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		_, err := New([]string{testDockerComposeYmlExtendsIOError})
 		if err == nil {
 			t.Fail()
@@ -673,7 +664,7 @@ func TestNew_ExtendsIOError(t *testing.T) {
 	})
 }
 func TestNew_ExtendsDoesNotExist(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		_, err := New([]string{testDockerComposeYmlExtendsDoesNotExist})
 		if err == nil {
 			t.Fail()
@@ -683,7 +674,7 @@ func TestNew_ExtendsDoesNotExist(t *testing.T) {
 	})
 }
 func TestNew_ExtendsDoesNotExistFile(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		_, err := New([]string{testDockerComposeYmlExtendsDoesNotExistFile})
 		if err == nil {
 			t.Fail()
@@ -693,7 +684,7 @@ func TestNew_ExtendsDoesNotExistFile(t *testing.T) {
 	})
 }
 func TestNew_ExtendsInvalidDependsOn(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		_, err := New([]string{testDockerComposeYmlExtendsInvalidDependsOn})
 		if err == nil {
 			t.Fail()
@@ -704,7 +695,7 @@ func TestNew_ExtendsInvalidDependsOn(t *testing.T) {
 }
 
 func TestNew_Success(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		_, err := New([]string{})
 		if err != nil {
 			t.Error(err)
