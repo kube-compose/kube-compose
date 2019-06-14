@@ -703,7 +703,8 @@ func TestNew_Success(t *testing.T) {
 	})
 }
 func TestNew_StandardFileError(t *testing.T) {
-	fs.ScopedFS(mockFileSystemStandardFileError, func() {
+	fs.ScopedFS(mockFileSystemStandardFileError, func(){
+
 		_, err := New([]string{})
 		if err == nil {
 			t.Fail()
@@ -765,7 +766,7 @@ func TestComposeFileParsedServiceClearRecStack_Success(t *testing.T) {
 }
 
 func TestLoadFileError_Success(t *testing.T) {
-	err := loadFileError("some file", fmt.Errorf("an error occured"))
+	err := loadFileError("some file", fmt.Errorf("an error occurred"))
 	if err == nil {
 		t.Fail()
 	}
