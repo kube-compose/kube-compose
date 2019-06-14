@@ -39,6 +39,9 @@ func Test_OSFileSystem_Open(t *testing.T) {
 		t.Fail()
 	}
 }
+func Test_OSFileSystem_Readlink(t *testing.T) {
+	_, _ = OSFileSystem().Readlink("")
+}
 
 func Test_OSFileSystem_Stat(t *testing.T) {
 	_, _ = OSFileSystem().Stat("")

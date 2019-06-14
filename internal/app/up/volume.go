@@ -54,6 +54,7 @@ type TarWriter interface {
 type bindMountHostFileToTarHelper struct {
 	tw                     TarWriter
 	twMayBeCorrupt         bool
+	twWritten              bool
 	renameTo               string
 	rootHostFile           string
 	rootHostFileVol        string
@@ -202,6 +203,7 @@ func (h *bindMountHostFileToTarHelper) endHeaderCommon(header *tar.Header) error
 	if err != nil {
 		h.twMayBeCorrupt = true
 	}
+	h.twWritten = true
 	return err
 }
 
@@ -215,7 +217,7 @@ func (h *bindMountHostFileToTarHelper) run(hostFile, fileNameInTar string) (isDi
 		isDir = fileInfo.IsDir()
 		return
 	}
-	if h.twMayBeCorrupt {
+	if h.twMayBeCorrupt || h.twWritten {
 		return
 	}
 	fmt.Printf("cannot simulate bind volume with host file %#v, interpreting as empty directory: ", hostFile)
@@ -244,7 +246,7 @@ func bindMountHostFileToTar(tw TarWriter, hostFile, renameTo string) (isDir bool
 
 	isDir, err = h.run(hostFile, renameTo)
 	if err != nil {
-		if h.twMayBeCorrupt {
+		if h.twMayBeCorrupt || h.twWritten {
 			isDir = false
 			return
 		}

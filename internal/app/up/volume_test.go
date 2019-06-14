@@ -40,6 +40,10 @@ func init() {
 		Content: []byte("file"),
 		Mode:    os.ModeSymlink,
 	})
+	vfs.Set("/dir3/symlink", fsPackage.VirtualFile{
+		Content: []byte("/dir2"),
+		Mode:    os.ModeSymlink,
+	})
 }
 
 func withMockFS(cb func()) {
@@ -191,6 +195,16 @@ func Test_BindMountHostFileToTar_SuccessSymlink(t *testing.T) {
 				t.Logf("entries2: %+v\n", expected)
 				t.Fail()
 			}
+		}
+	})
+}
+
+func Test_BindMountHostFileToTar_ErrorSymlinkNotWithinBindHostRoot(t *testing.T) {
+	withMockFS(func() {
+		tw := &mockTarWriter{}
+		_, err := bindMountHostFileToTar(tw, "dir3", "renamed")
+		if err == nil {
+			t.Fail()
 		}
 	})
 }
