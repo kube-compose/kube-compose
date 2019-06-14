@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-	"time"
 )
 
 // FileDescriptor is an abstraction of os.File to improve testability of code.
@@ -64,39 +63,6 @@ func OSFileSystem() FileSystem {
 type VirtualFileSystem struct {
 	cwd  string
 	root *node
-}
-
-type node struct {
-	name string
-	mode os.FileMode
-	// if err != nil then err is returned when this node is accessed.
-	err error
-	// Either []byte or []*node, depending on the type of this node.
-	extra interface{}
-}
-
-func newDirNode(mode os.FileMode, name string) *node {
-	return &node{
-		extra: []*node{},
-		mode:  mode | os.ModeDir,
-		name:  name,
-	}
-}
-
-func (n *node) dirAppend(childN *node) {
-	dir := n.extra.([]*node)
-	dir = append(dir, childN)
-	n.extra = dir
-}
-
-func (n *node) dirLookup(nameComp string) *node {
-	dir := n.extra.([]*node)
-	for _, childN := range dir {
-		if childN.name == nameComp {
-			return childN
-		}
-	}
-	return nil
 }
 
 var (
@@ -242,6 +208,8 @@ func (fs *VirtualFileSystem) createChildren(n *node, nameRem string, vfile *Virt
 				}
 				if (vfile.Mode & os.ModeDir) == 0 {
 					childN.extra = vfile.Content
+				} else {
+					childN.extra = []*node{}
 				}
 				n.dirAppend(childN)
 				return
@@ -373,34 +341,6 @@ func trimTrailingSlashes(name string) string {
 	return name[:n]
 }
 
-func (fs *VirtualFileSystem) Lstat(name string) (os.FileInfo, error) {
-	name = trimTrailingSlashes(name)
-	if name == "" {
-		name = fs.cwd
-	}
-	if name == "/" {
-		return fs.root, nil
-	}
-	i := strings.LastIndexByte(name, '/')
-	n, _, err := fs.find(name[:i+1], false, true)
-	if err != nil {
-		return nil, err
-	}
-	if (n.mode & os.ModeDir) == 0 {
-		return nil, syscall.ENOTDIR
-	}
-	nameComp := name
-	if i >= 0 {
-		nameComp = name[i+1:]
-	}
-	validateNameComp(nameComp)
-	n = n.dirLookup(nameComp)
-	if n == nil {
-		return nil, os.ErrNotExist
-	}
-	return n, nil
-}
-
 func (fs *VirtualFileSystem) Open(name string) (FileDescriptor, error) {
 	node, _, err := fs.find(name, false, true)
 	if err != nil {
@@ -409,33 +349,6 @@ func (fs *VirtualFileSystem) Open(name string) (FileDescriptor, error) {
 	return &virtualFileDescriptor{
 		node: node,
 	}, nil
-}
-
-func (n *node) IsDir() bool {
-	return n.mode.IsDir()
-}
-
-func (n *node) Mode() os.FileMode {
-	return n.mode
-}
-
-func (n *node) ModTime() time.Time {
-	return time.Time{}
-}
-
-func (n *node) Name() string {
-	return n.name
-}
-
-func (n *node) Size() int64 {
-	if n.mode.IsRegular() {
-		return int64(len(n.extra.([]byte)))
-	}
-	return 0
-}
-
-func (n *node) Sys() interface{} {
-	return nil
 }
 
 func (fs *VirtualFileSystem) Stat(name string) (os.FileInfo, error) {

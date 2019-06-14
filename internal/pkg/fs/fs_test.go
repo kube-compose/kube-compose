@@ -370,3 +370,10 @@ func Test_VirtualFileSystem_Stat_AbsSymlink(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func Test_TrimTrailingSlashes_Success(t *testing.T) {
+	ret := trimTrailingSlashes("/")
+	if ret != "" {
+		t.Fail()
+	}
+}

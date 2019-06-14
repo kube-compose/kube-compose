@@ -42,7 +42,7 @@ func Test_VirtualFileSystem_EvalSymlinks_ENOTDIR(t *testing.T) {
 func Test_VirtualFileSystem_EvalSymlinks_ENOENT(t *testing.T) {
 	fs := NewVirtualFileSystem(map[string]VirtualFile{})
 	_, err := fs.EvalSymlinks("doesnotexist")
-	if err != os.ErrNotExist {
+	if !os.IsNotExist(err) {
 		t.Fail()
 	}
 }
@@ -79,15 +79,16 @@ func Test_VirtualFileSystem_EvalSymlinks_Success(t *testing.T) {
 			Mode:    os.ModeSymlink,
 		},
 		"/link2": {
-			Content: []byte("dir2/file"),
+			Content: []byte("dir2"),
 			Mode:    os.ModeSymlink,
 		},
 		"/dir2/file": {},
 	})
-	resolved, err := fs.EvalSymlinks("/dir1/link1")
+	resolved, err := fs.EvalSymlinks("/dir1/link1/file")
 	if err != nil {
 		t.Error(err)
 	} else if resolved != "/dir2/file" {
+		t.Logf("%s\n", resolved)
 		t.Fail()
 	}
 }
