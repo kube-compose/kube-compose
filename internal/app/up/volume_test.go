@@ -8,18 +8,18 @@ import (
 	"reflect"
 	"testing"
 
-	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
+	"github.com/kube-compose/kube-compose/internal/pkg/fs"
 )
 
 var errTest = fmt.Errorf("test error")
 var testFileContent = "content"
 
-var vfs *fsPackage.VirtualFileSystem
+var vfs *fs.VirtualFileSystem
 
 // init here is justified because a common mock file system is used, and we require calling Set to make tests deterministic.
 // nolint
 func init() {
-	vfs = fsPackage.NewVirtualFileSystem(map[string]fsPackage.VirtualFile{
+	vfs = fs.NewVirtualFileSystem(map[string]fs.VirtualFile{
 		"/orig": {
 			Content: []byte(testFileContent),
 		},
@@ -27,32 +27,23 @@ func init() {
 			Error: errTest,
 		},
 	})
-	vfs.Set("/dir/file1", fsPackage.VirtualFile{
+	vfs.Set("/dir/file1", fs.VirtualFile{
 		Content: []byte(testFileContent),
 	})
-	vfs.Set("/dir/file2", fsPackage.VirtualFile{
+	vfs.Set("/dir/file2", fs.VirtualFile{
 		Content: []byte(testFileContent),
 	})
-	vfs.Set("/dir2/file", fsPackage.VirtualFile{
+	vfs.Set("/dir2/file", fs.VirtualFile{
 		Content: []byte(testFileContent),
 	})
-	vfs.Set("/dir2/symlink", fsPackage.VirtualFile{
+	vfs.Set("/dir2/symlink", fs.VirtualFile{
 		Content: []byte("file"),
 		Mode:    os.ModeSymlink,
 	})
-	vfs.Set("/dir3/symlink", fsPackage.VirtualFile{
+	vfs.Set("/dir3/symlink", fs.VirtualFile{
 		Content: []byte("/dir2"),
 		Mode:    os.ModeSymlink,
 	})
-}
-
-func withMockFS(cb func()) {
-	fsOld := fs
-	defer func() {
-		fs = fsOld
-	}()
-	fs = vfs
-	cb()
 }
 
 type mockTarWriterEntry struct {
@@ -108,7 +99,7 @@ func directory(name string) mockTarWriterEntry {
 }
 
 func Test_BindMountHostFileToTar_SuccessRegularFile(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		tw := &mockTarWriter{}
 		isDir, err := bindMountHostFileToTar(tw, "orig", "renamed")
 		if err != nil {
@@ -130,7 +121,7 @@ func Test_BindMountHostFileToTar_SuccessRegularFile(t *testing.T) {
 }
 
 func Test_BindMountHostFileToTar_RecoverFromRegularFileError(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		tw := &mockTarWriter{}
 		isDir, err := bindMountHostFileToTar(tw, "origerr", "renamed")
 		if err != nil {
@@ -152,7 +143,7 @@ func Test_BindMountHostFileToTar_RecoverFromRegularFileError(t *testing.T) {
 }
 
 func Test_BindMountHostFileToTar_SuccessDir(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		tw := &mockTarWriter{}
 		isDir, err := bindMountHostFileToTar(tw, "dir", "renamed")
 		if err != nil {
@@ -176,7 +167,7 @@ func Test_BindMountHostFileToTar_SuccessDir(t *testing.T) {
 }
 
 func Test_BindMountHostFileToTar_SuccessSymlink(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		tw := &mockTarWriter{}
 		isDir, err := bindMountHostFileToTar(tw, "dir2", "renamed")
 		if err != nil {
@@ -200,7 +191,7 @@ func Test_BindMountHostFileToTar_SuccessSymlink(t *testing.T) {
 }
 
 func Test_BindMountHostFileToTar_ErrorSymlinkNotWithinBindHostRoot(t *testing.T) {
-	withMockFS(func() {
+	fs.ScopedFS(vfs, func() {
 		tw := &mockTarWriter{}
 		_, err := bindMountHostFileToTar(tw, "dir3", "renamed")
 		if err == nil {
