@@ -11,7 +11,7 @@ func NTVolumeNameLength(s string) int {
 	n := len(s)
 	if n >= 2 {
 		if NTIsPathSeparator(s[0]) && NTIsPathSeparator(s[1]) && (n < 3 || !NTIsPathSeparator(s[2])) {
-			return NTVolumeNameLengthCore(s)
+			return ntVolumeNameLengthCore(s)
 		}
 		if s[1] == ':' {
 			return 2
@@ -20,7 +20,7 @@ func NTVolumeNameLength(s string) int {
 	return 0
 }
 
-func NTVolumeNameLengthCore(s string) int {
+func ntVolumeNameLengthCore(s string) int {
 	n := len(s)
 	index := 3
 	for {
