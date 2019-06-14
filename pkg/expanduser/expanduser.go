@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
-	"github.com/kube-compose/kube-compose/internal/pkg/linux"
+	"github.com/kube-compose/kube-compose/internal/pkg/unix"
 )
 
 var isNT = runtime.GOOS == "windows"
@@ -46,7 +46,7 @@ func HomePosix() (string, error) {
 			return "", fmt.Errorf("not available on Windows")
 		}
 		var err error
-		home, err = linux.FindHomeByUIDInPasswd(linux.EtcPasswd, int64(uid))
+		home, err = unix.FindHomeByUIDInPasswd(unix.EtcPasswd, int64(uid))
 		if err != nil {
 			return "", err
 		}
@@ -74,7 +74,7 @@ func Posix(path string) string {
 		}
 	} else {
 		name := path[1:i]
-		userhome, err = linux.FindHomeByNameInPasswd(linux.EtcPasswd, name)
+		userhome, err = unix.FindHomeByNameInPasswd(unix.EtcPasswd, name)
 		if err != nil {
 			// Ignore error here
 			return path

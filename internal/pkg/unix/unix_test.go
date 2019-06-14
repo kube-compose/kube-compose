@@ -1,4 +1,4 @@
-package linux
+package unix
 
 import (
 	"strings"

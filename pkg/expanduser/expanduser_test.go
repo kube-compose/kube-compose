@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
-	"github.com/kube-compose/kube-compose/internal/pkg/linux"
+	"github.com/kube-compose/kube-compose/internal/pkg/unix"
 )
 
 func TestNT_Noop(t *testing.T) {
@@ -69,12 +69,12 @@ func TestHomeNT_SuccessAlternative(t *testing.T) {
 }
 
 func withMockEtcPasswd(s string, cb func()) {
-	orig := linux.FS
+	orig := unix.FS
 	defer func() {
-		linux.FS = orig
+		unix.FS = orig
 	}()
-	linux.FS = fsPackage.NewVirtualFileSystem(map[string]fsPackage.VirtualFile{
-		linux.EtcPasswd: {
+	unix.FS = fsPackage.NewVirtualFileSystem(map[string]fsPackage.VirtualFile{
+		unix.EtcPasswd: {
 			Content: []byte(s),
 		},
 	})
