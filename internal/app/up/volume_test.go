@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"fmt"
+	"os"
 	"reflect"
 	"testing"
 
@@ -31,6 +32,13 @@ func init() {
 	})
 	vfs.Set("/dir/file2", fsPackage.VirtualFile{
 		Content: []byte(testFileContent),
+	})
+	vfs.Set("/dir2/file", fsPackage.VirtualFile{
+		Content: []byte(testFileContent),
+	})
+	vfs.Set("/dir2/symlink", fsPackage.VirtualFile{
+		Content: []byte("file"),
+		Mode:    os.ModeSymlink,
 	})
 }
 
@@ -76,6 +84,16 @@ func regularFile(name, data string) mockTarWriterEntry {
 	}
 }
 
+func symlink(name, link string) mockTarWriterEntry {
+	return mockTarWriterEntry{
+		h: &tar.Header{
+			Name:     name,
+			Typeflag: tar.TypeSymlink,
+			Linkname: link,
+		},
+	}
+}
+
 func directory(name string) mockTarWriterEntry {
 	return mockTarWriterEntry{
 		h: &tar.Header{
@@ -85,7 +103,7 @@ func directory(name string) mockTarWriterEntry {
 	}
 }
 
-func TestBindMountHostFileToTar_SuccessRegularFile(t *testing.T) {
+func Test_BindMountHostFileToTar_SuccessRegularFile(t *testing.T) {
 	withMockFS(func() {
 		tw := &mockTarWriter{}
 		isDir, err := bindMountHostFileToTar(tw, "orig", "renamed")
@@ -107,7 +125,7 @@ func TestBindMountHostFileToTar_SuccessRegularFile(t *testing.T) {
 	})
 }
 
-func TestBindMountHostFileToTar_RecoverFromRegularFileError(t *testing.T) {
+func Test_BindMountHostFileToTar_RecoverFromRegularFileError(t *testing.T) {
 	withMockFS(func() {
 		tw := &mockTarWriter{}
 		isDir, err := bindMountHostFileToTar(tw, "origerr", "renamed")
@@ -129,7 +147,7 @@ func TestBindMountHostFileToTar_RecoverFromRegularFileError(t *testing.T) {
 	})
 }
 
-func TestBindMountHostFileToTar_SuccessDir(t *testing.T) {
+func Test_BindMountHostFileToTar_SuccessDir(t *testing.T) {
 	withMockFS(func() {
 		tw := &mockTarWriter{}
 		isDir, err := bindMountHostFileToTar(tw, "dir", "renamed")
@@ -153,7 +171,31 @@ func TestBindMountHostFileToTar_SuccessDir(t *testing.T) {
 	})
 }
 
-func TestBuildVolumeInitImageGetDockerfile_Success(t *testing.T) {
+func Test_BindMountHostFileToTar_SuccessSymlink(t *testing.T) {
+	withMockFS(func() {
+		tw := &mockTarWriter{}
+		isDir, err := bindMountHostFileToTar(tw, "dir2", "renamed")
+		if err != nil {
+			t.Error(err)
+		} else {
+			if !isDir {
+				t.Fail()
+			}
+			expected := []mockTarWriterEntry{
+				directory("renamed/"),
+				regularFile("renamed/file", testFileContent),
+				symlink("renamed/symlink", "file"),
+			}
+			if !reflect.DeepEqual(tw.entries, expected) {
+				t.Logf("entries1: %+v\n", tw.entries)
+				t.Logf("entries2: %+v\n", expected)
+				t.Fail()
+			}
+		}
+	})
+}
+
+func Test_BuildVolumeInitImageGetDockerfile_Success(t *testing.T) {
 	actual := buildVolumeInitImageGetDockerfile([]bool{true, false})
 	expected := []byte(`ARG BASE_IMAGE
 FROM ${BASE_IMAGE}

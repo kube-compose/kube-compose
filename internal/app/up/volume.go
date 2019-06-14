@@ -137,7 +137,7 @@ func (h *bindMountHostFileToTarHelper) isFileWithinBindHostRoot(target string) b
 
 func (h *bindMountHostFileToTarHelper) runSymlink(fileInfo os.FileInfo, hostFile, fileNameInTar string) error {
 	// Symbolic link
-	link, err := os.Readlink(hostFile)
+	link, err := fs.Readlink(hostFile)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("error while reading link %#v", hostFile))
 	}

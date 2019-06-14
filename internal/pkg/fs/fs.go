@@ -22,6 +22,7 @@ type FileSystem interface {
 	MkdirAll(name string, perm os.FileMode) error
 	Lstat(name string) (os.FileInfo, error)
 	Open(name string) (FileDescriptor, error)
+	Readlink(name string) (string, error)
 	Stat(name string) (os.FileInfo, error)
 }
 
@@ -46,6 +47,10 @@ func (fs *osFileSystem) Lstat(name string) (os.FileInfo, error) {
 
 func (fs *osFileSystem) Open(name string) (FileDescriptor, error) {
 	return os.Open(name)
+}
+
+func (fs *osFileSystem) Readlink(name string) (string, error) {
+	return os.Readlink(name)
 }
 
 func (fs *osFileSystem) Stat(name string) (os.FileInfo, error) {
