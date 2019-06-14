@@ -61,12 +61,7 @@ func OSFileSystem() FileSystem {
 }
 
 // VirtualFileSystem is a FileSystem with some helper methods useful for testing.
-type VirtualFileSystem interface {
-	FileSystem
-	Set(name string, vfile VirtualFile)
-}
-
-type virtualFileSystem struct {
+type VirtualFileSystem struct {
 	cwd  string
 	root *node
 }
@@ -76,8 +71,16 @@ type node struct {
 	mode os.FileMode
 	// if err != nil then err is returned when this node is accessed.
 	err error
-	// Either []byte or []nodeNamed, depending on the type of this node.
+	// Either []byte or []*node, depending on the type of this node.
 	extra interface{}
+}
+
+func newDirNode(err error, mode os.FileMode, name string) *node {
+	return &node{
+		extra: []*node{},
+		mode: mode | os.ModeDir,
+		name: name,
+	}
 }
 
 func (n *node) dirAppend(childN *node) {
@@ -103,7 +106,7 @@ var (
 	errTooManyLinks = fmt.Errorf("too many links")
 )
 
-func (fs *virtualFileSystem) abs(name string) string {
+func (fs *VirtualFileSystem) abs(name string) string {
 	if name == "" || name[0] != '/' {
 		return fs.cwd + name
 	}
@@ -111,7 +114,7 @@ func (fs *virtualFileSystem) abs(name string) string {
 }
 
 type findHelper struct {
-	fs                   *virtualFileSystem
+	fs                   *VirtualFileSystem
 	ignoreInjectedFaults bool
 	links                int
 	nameRem              string
@@ -196,7 +199,7 @@ func (f *findHelper) updateNameRemFromSlashPos(slashPos int) {
 	}
 }
 
-func (fs *virtualFileSystem) find(
+func (fs *VirtualFileSystem) find(
 	name string,
 	ignoreInjectedFaults, resolveSymlinks bool) (n *node, nameRem string, err error) {
 	f := findHelper{
@@ -218,7 +221,7 @@ func validateNameComp(nameComp string) {
 	}
 }
 
-func (fs *virtualFileSystem) createChildren(n *node, nameRem string, vfile *VirtualFile) {
+func (fs *VirtualFileSystem) createChildren(n *node, nameRem string, vfile *VirtualFile) {
 	for {
 		var nameComp string
 		slashPos := strings.IndexByte(nameRem, '/')
@@ -232,25 +235,23 @@ func (fs *virtualFileSystem) createChildren(n *node, nameRem string, vfile *Virt
 			var childN *node
 			if slashPos < 0 {
 				// initialize file or directory as per VirtualFile
-				childN = &node{
-					err:  vfile.Error,
-					mode: vfile.Mode,
-					name: nameComp,
-				}
-				if (vfile.Mode & os.ModeDir) != 0 {
-					childN.extra = []*node{}
-				} else {
+				childN = newDirNode(
+					vfile.Error,
+					vfile.Mode,
+					nameComp,
+				)
+				if (vfile.Mode & os.ModeDir) == 0 {
 					childN.extra = vfile.Content
 				}
 				n.dirAppend(childN)
 				return
 			}
 			// initialize directory with defaults
-			childN = &node{
-				extra: []*node{},
-				mode:  os.ModeDir,
-				name:  nameComp,
-			}
+			childN = newDirNode(
+				nil,
+				os.ModeDir,
+				nameComp,
+			)
 			n.dirAppend(childN)
 			n = childN
 		}
@@ -271,14 +272,14 @@ type VirtualFile struct {
 }
 
 // NewVirtualFileSystem creates a mock file system based on the provided data.
-func NewVirtualFileSystem(data map[string]VirtualFile) VirtualFileSystem {
-	fs := &virtualFileSystem{
+func NewVirtualFileSystem(data map[string]VirtualFile) *VirtualFileSystem {
+	fs := &VirtualFileSystem{
 		cwd: "/",
-		root: &node{
-			extra: []*node{},
-			mode:  os.ModeDir,
-			name:  "/",
-		},
+		root: newDirNode(
+			nil,
+			0,
+			"/",
+		),
 	}
 	for name, vfile := range data {
 		fs.Set(name, vfile)
@@ -286,7 +287,11 @@ func NewVirtualFileSystem(data map[string]VirtualFile) VirtualFileSystem {
 	return fs
 }
 
-func (fs *virtualFileSystem) Set(name string, vfile VirtualFile) {
+// Set sets or updates the file at name. If one of the parents of name exists and is not a directory then the error ENOTDIR is returned. If
+// a file already exists at name and it is a directory and vfile is not a directory (or vice versa) then an error is thrown. Otherwise, if a
+// file already exists at name its attributes, injected fault, symlink target or regular file contents are updated with the values from
+// vfile.
+func (fs *VirtualFileSystem) Set(name string, vfile VirtualFile) {
 	var flag os.FileMode
 	switch {
 	case vfile.Mode.IsDir():
@@ -370,7 +375,7 @@ func trimTrailingSlashes(name string) string {
 	return name[:n]
 }
 
-func (fs *virtualFileSystem) Lstat(name string) (os.FileInfo, error) {
+func (fs *VirtualFileSystem) Lstat(name string) (os.FileInfo, error) {
 	name = trimTrailingSlashes(name)
 	if name == "" {
 		name = fs.cwd
@@ -398,15 +403,7 @@ func (fs *virtualFileSystem) Lstat(name string) (os.FileInfo, error) {
 	return n, nil
 }
 
-func (fs *virtualFileSystem) Mkdir(name string, perm os.FileMode) error {
-	return fs.mkdirCommon(name, perm, false)
-}
-
-func (fs *virtualFileSystem) MkdirAll(name string, perm os.FileMode) error {
-	return fs.mkdirCommon(name, perm, true)
-}
-
-func (fs *virtualFileSystem) Open(name string) (FileDescriptor, error) {
+func (fs *VirtualFileSystem) Open(name string) (FileDescriptor, error) {
 	node, _, err := fs.find(name, false, true)
 	if err != nil {
 		return nil, err
@@ -443,7 +440,7 @@ func (n *node) Sys() interface{} {
 	return nil
 }
 
-func (fs *virtualFileSystem) Stat(name string) (os.FileInfo, error) {
+func (fs *VirtualFileSystem) Stat(name string) (os.FileInfo, error) {
 	n, _, err := fs.find(name, false, true)
 	if err != nil {
 		return nil, err

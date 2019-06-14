@@ -7,7 +7,7 @@ import (
 )
 
 type evalSymlinksHelper struct {
-	fs       *virtualFileSystem
+	fs       *VirtualFileSystem
 	n        *node
 	links    int
 	resolved string
@@ -83,7 +83,7 @@ func (h *evalSymlinksHelper) updateNameRemFromSlashPos(slashPos int) {
 	}
 }
 
-func (fs *virtualFileSystem) EvalSymlinks(path string) (string, error) {
+func (fs *VirtualFileSystem) EvalSymlinks(path string) (string, error) {
 	h := &evalSymlinksHelper{
 		fs: fs,
 	}

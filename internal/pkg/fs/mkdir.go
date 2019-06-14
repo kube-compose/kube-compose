@@ -6,7 +6,7 @@ import (
 	"syscall"
 )
 
-func (fs *virtualFileSystem) mkdirCommon(name string, perm os.FileMode, all bool) error {
+func (fs *VirtualFileSystem) mkdirCommon(name string, perm os.FileMode, all bool) error {
 	if (perm & os.ModeType) != 0 {
 		return errBadMode
 	}
@@ -30,14 +30,15 @@ func (fs *virtualFileSystem) mkdirCommon(name string, perm os.FileMode, all bool
 		fs.mkdirCommonAll(n, nameRem, perm)
 		return nil
 	}
-	n.dirAppend(&node{
-		mode: perm | os.ModeDir,
-		name: nameRem,
-	})
+	n.dirAppend(newDirNode(
+		nil,
+		perm,
+		nameRem,
+	))
 	return nil
 }
 
-func (fs *virtualFileSystem) mkdirCommonAll(n *node, nameRem string, perm os.FileMode) {
+func (fs *VirtualFileSystem) mkdirCommonAll(n *node, nameRem string, perm os.FileMode) {
 	for nameRem != "" {
 		slashPos := strings.IndexByte(nameRem, '/')
 		nameComp := nameRem
@@ -46,10 +47,11 @@ func (fs *virtualFileSystem) mkdirCommonAll(n *node, nameRem string, perm os.Fil
 		}
 		if nameComp != "" {
 			validateNameComp(nameComp)
-			childN := &node{
-				mode: perm | os.ModeDir,
-				name: nameComp,
-			}
+			childN := newDirNode(
+				nil,
+				perm,
+				nameComp,
+			)
 			n.dirAppend(childN)
 			n = childN
 		}
@@ -59,4 +61,12 @@ func (fs *virtualFileSystem) mkdirCommonAll(n *node, nameRem string, perm os.Fil
 			nameRem = nameRem[slashPos+1:]
 		}
 	}
+}
+
+func (fs *VirtualFileSystem) Mkdir(name string, perm os.FileMode) error {
+	return fs.mkdirCommon(name, perm, false)
+}
+
+func (fs *VirtualFileSystem) MkdirAll(name string, perm os.FileMode) error {
+	return fs.mkdirCommon(name, perm, true)
 }

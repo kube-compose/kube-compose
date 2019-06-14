@@ -125,7 +125,7 @@ func Test_VirtualFileSystem_DirectoryInconsistency1(t *testing.T) {
 		"/dir/fileforreal": {
 			Content: []byte("regularfile"),
 		},
-	}).(*virtualFileSystem)
+	})
 	fs.Set("/dir", VirtualFile{
 		Content: []byte("notafile"),
 	})
@@ -141,7 +141,7 @@ func Test_VirtualFileSystem_DirectoryInconsistency2(t *testing.T) {
 		"/dir": {
 			Content: []byte("regularfile2"),
 		},
-	}).(*virtualFileSystem)
+	})
 	fs.Set("/dir/fileforreal2", VirtualFile{
 		Content: []byte("regularfile3"),
 	})
