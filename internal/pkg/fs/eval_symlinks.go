@@ -69,7 +69,11 @@ func (h *evalSymlinksHelper) updateFromChildN(childN *node, nameComp string) err
 			h.nameRem = string(target)[j:]
 		}
 	} else {
-		h.resolved += "/" + nameComp
+		if h.resolved == "/" {
+			h.resolved += nameComp
+		} else {
+			h.resolved += "/" + nameComp
+		}
 		h.n = childN
 	}
 	return nil
@@ -103,5 +107,8 @@ func (fs *VirtualFileSystem) EvalSymlinks(path string) (string, error) {
 		h.nameRem = path
 	}
 	err = h.run()
-	return h.resolved, err
+	if err != nil {
+		return "", err
+	}
+	return h.resolved, nil
 }

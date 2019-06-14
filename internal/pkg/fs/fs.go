@@ -235,11 +235,11 @@ func (fs *VirtualFileSystem) createChildren(n *node, nameRem string, vfile *Virt
 			var childN *node
 			if slashPos < 0 {
 				// initialize file or directory as per VirtualFile
-				childN = newDirNode(
-					vfile.Error,
-					vfile.Mode,
-					nameComp,
-				)
+				childN = &node{
+					err: vfile.Error,
+					mode: vfile.Mode,
+					name: nameComp,
+				}
 				if (vfile.Mode & os.ModeDir) == 0 {
 					childN.extra = vfile.Content
 				}
