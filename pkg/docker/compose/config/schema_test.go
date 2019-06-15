@@ -355,7 +355,7 @@ func TestHealthcheckTestDecode_StringSuccess(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if !reflect.DeepEqual(dst.Values, []string{HealthcheckCommandShell, src}) {
+	if !reflect.DeepEqual(dst.Values, append([]string{HealthcheckCommandShell, src})) {
 		t.Error(dst)
 	}
 }

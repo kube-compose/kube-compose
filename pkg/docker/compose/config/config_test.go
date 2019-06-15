@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/kube-compose/kube-compose/internal/pkg/fs"
+	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
 	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	"github.com/pkg/errors"
 )
@@ -25,7 +25,7 @@ const testDockerComposeYmlDependsOnDoesNotExist = "/docker-compose.depends-on-do
 const testDockerComposeYmlDependsOnCycle = "/docker-compose.depends-on-cycle.yml"
 const testDockerComposeYmlDependsOn = "/docker-compose.depends-on.yml"
 
-var vfs = fs.NewVirtualFileSystem(map[string]fs.VirtualFile{
+var vfs = fsPackage.NewVirtualFileSystem(map[string]fsPackage.VirtualFile{
 	testDockerComposeYml: {
 		Content: []byte(`testservice:
   entrypoint: []
@@ -162,7 +162,7 @@ services:
 	},
 })
 
-var mockFileSystemStandardFileError = fs.NewVirtualFileSystem(map[string]fs.VirtualFile{
+var mockFileSystemStandardFileError = fsPackage.NewVirtualFileSystem(map[string]fsPackage.VirtualFile{
 	"/docker-compose.yml": {
 		Error: errors.New("unknown error 2"),
 	},
@@ -703,12 +703,15 @@ func TestNew_Success(t *testing.T) {
 	})
 }
 func TestNew_StandardFileError(t *testing.T) {
-	fs.ScopedFS(mockFileSystemStandardFileError, func() {
-		_, err := New([]string{})
-		if err == nil {
-			t.Fail()
-		}
-	})
+	fsOld := FS
+	defer func() {
+		FS = fsOld
+	}()
+	FS = mockFileSystemStandardFileError
+	_, err := New([]string{})
+	if err == nil {
+		t.Fail()
+	}
 }
 
 func TestGetVersion_Default(t *testing.T) {

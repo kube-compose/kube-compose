@@ -364,7 +364,7 @@ func (fs *VirtualFileSystem) Stat(name string) (os.FileInfo, error) {
 // ScopedFS sets FS to fsNew and calls cb. Once cb completes or begins panicking FS is restored to its original value.
 func ScopedFS(fsNew FileSystem, cb func()) {
 	fsOld := FS
-	defer func() {
+	defer func(){
 		FS = fsOld
 	}()
 	FS = fsNew

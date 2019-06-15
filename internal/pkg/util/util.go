@@ -58,10 +58,10 @@ func CloseAndLogError(closer io.Closer) {
 
 func decodeBase36(b int) int {
 	if b <= '9' {
-		if b >= '0' {
+		if '0' <= b {
 			return 26 - '0' + b
 		}
-	} else if b >= 'a' && b <= 'z' {
+	} else if 'a' <= b && b <= 'z' {
 		return b - 'a'
 	}
 	return -1

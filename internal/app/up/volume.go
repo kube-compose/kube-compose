@@ -64,7 +64,7 @@ func (h *bindMountHostFileToTarHelper) runRegular(fileInfo os.FileInfo, hostFile
 	if err != nil {
 		return err
 	}
-	fd, err := fs.FS.Open(hostFile)
+	fd, err := fs.FS.FS.Open(hostFile)
 	if err != nil {
 		return err
 	}
