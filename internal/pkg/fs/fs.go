@@ -57,7 +57,14 @@ func (fs *osFileSystem) Stat(name string) (os.FileInfo, error) {
 	return os.Stat(name)
 }
 
-// VirtualFileSystem is an in-memory file system that is useful for testing.
+var osfs FileSystem = &osFileSystem{}
+
+// OSFileSystem returns a FileSystem instance that is backed by the os.
+func OSFileSystem() FileSystem {
+	return osfs
+}
+
+// VirtualFileSystem is a FileSystem with some helper methods useful for testing.
 type VirtualFileSystem struct {
 	cwd  string
 	root *node
@@ -68,10 +75,6 @@ var (
 	errIsDirDisagreement = fmt.Errorf("data contains a name X that is not a directory, but another name Y indicates " +
 		"that X must be a directory")
 	errTooManyLinks = fmt.Errorf("too many links")
-	// FS is a variable for a file system interface that acts as a relay control/switch. Code can call this file system interface instead
-	// of calling Go's "os" and "path/filepath" packages directly, so it can be unit tested by replacing FS with a *VirtualFileSystem
-	// temporarily (see ScopedFS).
-	FS FileSystem = &osFileSystem{}
 )
 
 func (fs *VirtualFileSystem) abs(name string) string {
@@ -359,14 +362,4 @@ func (fs *VirtualFileSystem) Stat(name string) (os.FileInfo, error) {
 		return nil, err
 	}
 	return n, nil
-}
-
-// ScopedFS sets FS to fsNew and calls cb. Once cb completes or begins panicking FS is restored to its original value.
-func ScopedFS(fsNew FileSystem, cb func()) {
-	fsOld := FS
-	defer func(){
-		FS = fsOld
-	}()
-	FS = fsNew
-	cb()
 }

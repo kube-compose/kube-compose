@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/kube-compose/kube-compose/internal/pkg/fs"
+	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
 	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
 )
@@ -88,7 +88,7 @@ var dockerComposeYmlInvalid = "/docker-compose.invalid.yml"
 var dockerComposeYmlInvalidServiceName = "/docker-compose.invalid-service-name.yml"
 var dockerComposeYmlInvalidXKubeCompose = "/docker-compose.invalid-x-kube-compose.yml"
 var dockerComposeYmlValidPushImages = "/docker-compose.valid-push-images.yml"
-var vfs fs.FileSystem = fs.NewVirtualFileSystem(map[string]fs.VirtualFile{
+var vfs fsPackage.FileSystem = fsPackage.NewVirtualFileSystem(map[string]fsPackage.VirtualFile{
 	dockerComposeYmlInvalid: {
 		Content: []byte(`version: 'asdf'`),
 	},
@@ -118,8 +118,17 @@ x-kube-compose:
 	},
 })
 
+func withMockFS(cb func()) {
+	fsOld := dockerComposeConfig.FS
+	defer func() {
+		dockerComposeConfig.FS = fsOld
+	}()
+	dockerComposeConfig.FS = vfs
+	cb()
+}
+
 func TestNew_Invalid(t *testing.T) {
-	fs.ScopedFS(vfs, func() {
+	withMockFS(func() {
 		_, err := New(util.NewString(dockerComposeYmlInvalid))
 		if err == nil {
 			t.Fail()
@@ -130,7 +139,7 @@ func TestNew_Invalid(t *testing.T) {
 }
 
 func TestNew_InvalidServiceName(t *testing.T) {
-	fs.ScopedFS(vfs, func() {
+	withMockFS(func() {
 		_, err := New(util.NewString(dockerComposeYmlInvalidServiceName))
 		if err == nil {
 			t.Fail()
@@ -141,7 +150,7 @@ func TestNew_InvalidServiceName(t *testing.T) {
 }
 
 func TestNew_InvalidXKubeCompose(t *testing.T) {
-	fs.ScopedFS(vfs, func() {
+	withMockFS(func() {
 		_, err := New(util.NewString(dockerComposeYmlInvalidXKubeCompose))
 		if err == nil {
 			t.Fail()
@@ -152,7 +161,7 @@ func TestNew_InvalidXKubeCompose(t *testing.T) {
 }
 
 func TestNew_ValidPushImages(t *testing.T) {
-	fs.ScopedFS(vfs, func() {
+	withMockFS(func() {
 		c, err := New(util.NewString(dockerComposeYmlValidPushImages))
 		if err != nil {
 			t.Error(err)

@@ -4,22 +4,31 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kube-compose/kube-compose/internal/pkg/fs"
+	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
 )
 
-var vfs fs.FileSystem = fs.NewVirtualFileSystem(map[string]fs.VirtualFile{
+var vfs fsPackage.FileSystem = fsPackage.NewVirtualFileSystem(map[string]fsPackage.VirtualFile{
 	EtcPasswd: {
 		Content: []byte("root:x:0:\ndaemon:x:1:1:daemon:/daemonhomelol\nasdf\nuiderr:x::"),
 	},
 })
 
+func withMockFS(cb func()) {
+	fsOld := FS
+	defer func() {
+		FS = fsOld
+	}()
+	FS = vfs
+	cb()
+}
+
 func TestFindUIDByNameInPasswd_Success(t *testing.T) {
-	fs.ScopedFS(vfs, func() {
+	withMockFS(func() {
 		_, _ = FindUIDByNameInPasswd(EtcPasswd, "")
 	})
 }
 func TestFindUIDByNameInPasswd_ENOENT(t *testing.T) {
-	fs.ScopedFS(vfs, func() {
+	withMockFS(func() {
 		_, err := FindUIDByNameInPasswd("/asdf", "")
 		if err == nil {
 			t.Fail()
@@ -59,7 +68,7 @@ func TestFindUIDByNameInPasswdReader_InvalidFormat(t *testing.T) {
 }
 
 func TestFindHomeByUIDInPasswd_Success(t *testing.T) {
-	fs.ScopedFS(vfs, func() {
+	withMockFS(func() {
 		home, err := FindHomeByUIDInPasswd(EtcPasswd, 1)
 		if err != nil {
 			t.Error(err)
@@ -70,7 +79,7 @@ func TestFindHomeByUIDInPasswd_Success(t *testing.T) {
 }
 
 func TestFindHomeByUIDInPasswd_ErrorUIDInvalidFormat(t *testing.T) {
-	fs.ScopedFS(vfs, func() {
+	withMockFS(func() {
 		_, err := FindHomeByUIDInPasswd(EtcPasswd, 5)
 		if err == nil {
 			t.Fail()
@@ -79,7 +88,7 @@ func TestFindHomeByUIDInPasswd_ErrorUIDInvalidFormat(t *testing.T) {
 }
 
 func TestFindHomeByNameInPasswd_Success(t *testing.T) {
-	fs.ScopedFS(vfs, func() {
+	withMockFS(func() {
 		_, err := FindHomeByNameInPasswd(EtcPasswd, "notfoundtest")
 		if err != nil {
 			t.Error(err)

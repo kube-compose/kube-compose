@@ -15,10 +15,12 @@ import (
 	dockerClient "github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/kube-compose/kube-compose/internal/pkg/docker"
-	"github.com/kube-compose/kube-compose/internal/pkg/fs"
+	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
 	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	"github.com/pkg/errors"
 )
+
+var fs = fsPackage.OSFileSystem()
 
 func buildVolumeInitImageGetDockerfile(isDirSlice []bool) []byte {
 	var b bytes.Buffer
@@ -64,7 +66,7 @@ func (h *bindMountHostFileToTarHelper) runRegular(fileInfo os.FileInfo, hostFile
 	if err != nil {
 		return err
 	}
-	fd, err := fs.FS.FS.Open(hostFile)
+	fd, err := fs.Open(hostFile)
 	if err != nil {
 		return err
 	}
@@ -82,7 +84,7 @@ func (h *bindMountHostFileToTarHelper) runRegular(fileInfo os.FileInfo, hostFile
 }
 
 func (h *bindMountHostFileToTarHelper) runDirectory(fileInfo os.FileInfo, hostFile, fileNameInTar string) error {
-	fd, err := fs.FS.Open(hostFile)
+	fd, err := fs.Open(hostFile)
 	if err != nil {
 		return err
 	}
@@ -136,7 +138,7 @@ func (h *bindMountHostFileToTarHelper) isFileWithinBindHostRoot(target string) b
 
 func (h *bindMountHostFileToTarHelper) runSymlink(fileInfo os.FileInfo, hostFile, fileNameInTar string) error {
 	// Symbolic link
-	link, err := fs.FS.Readlink(hostFile)
+	link, err := fs.Readlink(hostFile)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("error while reading link %#v", hostFile))
 	}
@@ -206,7 +208,7 @@ func (h *bindMountHostFileToTarHelper) endHeaderCommon(header *tar.Header) error
 }
 
 func (h *bindMountHostFileToTarHelper) run(hostFile, fileNameInTar string) (isDir bool, err error) {
-	fileInfo, err := fs.FS.Lstat(hostFile)
+	fileInfo, err := fs.Lstat(hostFile)
 	if err != nil {
 		return
 	}

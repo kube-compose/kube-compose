@@ -7,9 +7,9 @@ import (
 )
 
 func withMockedEnv(mockEnv map[string]string, callback func()) {
-	oldEnvGetter := envGetter
+	fsOld := envGetter
 	defer func() {
-		envGetter = oldEnvGetter
+		envGetter = fsOld
 	}()
 	envGetter = func(name string) (string, bool) {
 		value, ok := mockEnv[name]
