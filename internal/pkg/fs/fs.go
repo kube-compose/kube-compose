@@ -72,7 +72,7 @@ func OSFileSystem() FileSystem {
 // VirtualFileSystem is a FileSystem with some helper methods useful for testing.
 type VirtualFileSystem struct {
 	AbsError error
-	cwd  	 string
+	cwd      string
 	root     *node
 }
 
