@@ -6,14 +6,13 @@ import (
 	"github.com/kube-compose/kube-compose/internal/app/config"
 	"github.com/kube-compose/kube-compose/internal/app/k8smeta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	clientV1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 type deleter func(name string, options *metav1.DeleteOptions) error
 
-type lister func(listOptions metav1.ListOptions) ([]*v1.ObjectMeta, error)
+type lister func(listOptions metav1.ListOptions) ([]*metav1.ObjectMeta, error)
 
 type downRunner struct {
 	cfg              *config.Config
@@ -62,12 +61,12 @@ func (d *downRunner) deleteCommon(kind string, lister lister, deleter deleter) (
 // generics, so we choose to nolint.
 // nolint
 func (d *downRunner) deleteServices() (bool, error) {
-	lister := func(listOptions metav1.ListOptions) ([]*v1.ObjectMeta, error) {
+	lister := func(listOptions metav1.ListOptions) ([]*metav1.ObjectMeta, error) {
 		serviceList, err := d.k8sServiceClient.List(listOptions)
 		if err != nil {
 			return nil, err
 		}
-		list := make([]*v1.ObjectMeta, len(serviceList.Items))
+		list := make([]*metav1.ObjectMeta, len(serviceList.Items))
 		for i := 0; i < len(serviceList.Items); i++ {
 			list[i] = &serviceList.Items[i].ObjectMeta
 		}
@@ -80,12 +79,12 @@ func (d *downRunner) deleteServices() (bool, error) {
 // generics, so we choose to nolint.
 // nolint
 func (d *downRunner) deletePods() (bool, error) {
-	lister := func(listOptions metav1.ListOptions) ([]*v1.ObjectMeta, error) {
+	lister := func(listOptions metav1.ListOptions) ([]*metav1.ObjectMeta, error) {
 		podList, err := d.k8sPodClient.List(listOptions)
 		if err != nil {
 			return nil, err
 		}
-		list := make([]*v1.ObjectMeta, len(podList.Items))
+		list := make([]*metav1.ObjectMeta, len(podList.Items))
 		for i := 0; i < len(podList.Items); i++ {
 			list[i] = &podList.Items[i].ObjectMeta
 		}
