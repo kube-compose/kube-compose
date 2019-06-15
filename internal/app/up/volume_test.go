@@ -132,7 +132,7 @@ func Test_BindMountHostFileToTar_SuccessRegularFile(t *testing.T) {
 func Test_BindMountHostFileToTar_RecoverFromRegularFileError(t *testing.T) {
 	withMockFS(vfs, func() {
 		tw := &mockTarWriter{}
-		isDir, err := bindMountHostFileToTar(tw, "origerr", "renamed")
+		isDir, err := bindMountHostFileToTar(tw, "origerr", "renamed2")
 		if err != nil {
 			t.Error(err)
 		} else {
@@ -140,7 +140,7 @@ func Test_BindMountHostFileToTar_RecoverFromRegularFileError(t *testing.T) {
 				t.Fail()
 			}
 			expected := []mockTarWriterEntry{
-				directory("renamed/"),
+				directory("renamed2/"),
 			}
 			if !reflect.DeepEqual(tw.entries, expected) {
 				t.Logf("entries1: %+v\n", tw.entries)
