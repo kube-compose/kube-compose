@@ -17,6 +17,7 @@ type FileDescriptor interface {
 
 // FileSystem is an abstraction of the file system to improve testability of code.
 type FileSystem interface {
+	Abs(name string) (string, error)
 	EvalSymlinks(path string) (string, error)
 	Mkdir(name string, perm os.FileMode) error
 	MkdirAll(name string, perm os.FileMode) error
@@ -27,6 +28,10 @@ type FileSystem interface {
 }
 
 type osFileSystem struct {
+}
+
+func (fs *osFileSystem) Abs(name string) (string, error) {
+	return filepath.Abs(name)
 }
 
 func (fs *osFileSystem) EvalSymlinks(path string) (string, error) {
@@ -66,8 +71,9 @@ func OSFileSystem() FileSystem {
 
 // VirtualFileSystem is a FileSystem with some helper methods useful for testing.
 type VirtualFileSystem struct {
-	cwd  string
-	root *node
+	AbsError error
+	cwd  	 string
+	root     *node
 }
 
 var (
@@ -344,6 +350,13 @@ func trimTrailingSlashes(name string) string {
 		n--
 	}
 	return name[:n]
+}
+
+func (fs *VirtualFileSystem) Abs(name string) (string, error) {
+	if fs.AbsError != nil {
+		return "", fs.AbsError
+	}
+	return fs.abs(name), nil
 }
 
 func (fs *VirtualFileSystem) Open(name string) (FileDescriptor, error) {

@@ -150,7 +150,7 @@ func (h *bindMountHostFileToTarHelper) runSymlink(fileInfo os.FileInfo, hostFile
 		// https://docs.microsoft.com/en-us/windows/desktop/api/winbase/nf-winbase-createsymboliclinka#remarks
 		// This should be a noop on non-Windows because there will never be a non-empty VolumeName and therefore the path must
 		// be absolute.
-		linkResolved, err = filepath.Abs(link)
+		linkResolved, err = fs.Abs(link)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("error while converting %#v to an absolute path", link))
 		}
@@ -344,7 +344,7 @@ func buildVolumeInitImage(
 }
 
 func resolveBindVolumeHostPath(name string) (string, error) {
-	name, err := filepath.Abs(name)
+	name, err := fs.Abs(name)
 	if err != nil {
 		return "", err
 	}
@@ -355,7 +355,7 @@ func resolveBindVolumeHostPath(name string) (string, error) {
 	result := vol
 	for i := 1; i < len(parts); i++ {
 		result = result + sep + parts[i]
-		resultResolved, err := filepath.EvalSymlinks(result)
+		resultResolved, err := fs.EvalSymlinks(result)
 		if os.IsNotExist(err) {
 			if i+1 < len(parts) {
 				result = result + sep + strings.Join(parts[i+1:], sep)
