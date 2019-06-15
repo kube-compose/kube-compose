@@ -46,10 +46,10 @@ func init() {
 	})
 }
 
-func withMockFS(cb func()) {
-	fsOld := fs.OS
+func withMockFS(vfs fs.VirtualFileSystem, cb func()) {
+	orig := fs.OS
 	defer func() {
-		fs.OS = fsOld
+		fs.OS = orig
 	}()
 	fs.OS = vfs
 	cb()
@@ -108,7 +108,7 @@ func directory(name string) mockTarWriterEntry {
 }
 
 func Test_BindMountHostFileToTar_SuccessRegularFile(t *testing.T) {
-	withMockFS(func() {
+	withMockFS(vfs, func() {
 		tw := &mockTarWriter{}
 		isDir, err := bindMountHostFileToTar(tw, "orig", "renamed")
 		if err != nil {
@@ -130,7 +130,28 @@ func Test_BindMountHostFileToTar_SuccessRegularFile(t *testing.T) {
 }
 
 func Test_BindMountHostFileToTar_RecoverFromRegularFileError(t *testing.T) {
-	withMockFS(func() {
+	withMockFS(vfs, func() {
+		tw := &mockTarWriter{}
+		isDir, err := bindMountHostFileToTar(tw, "origerr", "renamed")
+		if err != nil {
+			t.Error(err)
+		} else {
+			if !isDir {
+				t.Fail()
+			}
+			expected := []mockTarWriterEntry{
+				directory("renamed/"),
+			}
+			if !reflect.DeepEqual(tw.entries, expected) {
+				t.Logf("entries1: %+v\n", tw.entries)
+				t.Logf("entries2: %+v\n", expected)
+				t.Fail()
+			}
+		}
+	})
+}
+func Test_BindMountHostFileToTar_RegularFileTarError(t *testing.T) {
+	withMockFS(vfs, func() {
 		tw := &mockTarWriter{}
 		isDir, err := bindMountHostFileToTar(tw, "origerr", "renamed")
 		if err != nil {
@@ -152,7 +173,7 @@ func Test_BindMountHostFileToTar_RecoverFromRegularFileError(t *testing.T) {
 }
 
 func Test_BindMountHostFileToTar_SuccessDir(t *testing.T) {
-	withMockFS(func() {
+	withMockFS(vfs, func() {
 		tw := &mockTarWriter{}
 		isDir, err := bindMountHostFileToTar(tw, "dir", "renamed")
 		if err != nil {
@@ -176,7 +197,7 @@ func Test_BindMountHostFileToTar_SuccessDir(t *testing.T) {
 }
 
 func Test_BindMountHostFileToTar_SuccessSymlink(t *testing.T) {
-	withMockFS(func() {
+	withMockFS(vfs, func() {
 		tw := &mockTarWriter{}
 		isDir, err := bindMountHostFileToTar(tw, "dir2", "renamed")
 		if err != nil {
@@ -200,7 +221,7 @@ func Test_BindMountHostFileToTar_SuccessSymlink(t *testing.T) {
 }
 
 func Test_BindMountHostFileToTar_ErrorSymlinkNotWithinBindHostRoot(t *testing.T) {
-	withMockFS(func() {
+	withMockFS(vfs, func() {
 		tw := &mockTarWriter{}
 		_, err := bindMountHostFileToTar(tw, "dir3", "renamed")
 		if err == nil {
