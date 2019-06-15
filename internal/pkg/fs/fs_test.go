@@ -2,6 +2,7 @@ package fs
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"syscall"
@@ -10,7 +11,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-// The main criticism here is that we don't have to test os.Open, but we want 100% coverage.
+// We don't have to test "os" and "path/filepath" functions, but we want 100% coverage.
+
+func Test_OSFileSystem_Abs(t *testing.T) {
+	_, _ = OSFileSystem().Abs("")
+}
 
 func Test_OSFileSystem_EvalSymlinks(t *testing.T) {
 	_, _ = OSFileSystem().EvalSymlinks("")
@@ -45,6 +50,16 @@ func Test_OSFileSystem_Readlink(t *testing.T) {
 
 func Test_OSFileSystem_Stat(t *testing.T) {
 	_, _ = OSFileSystem().Stat("")
+}
+
+func Test_VirtualFileSystem_Abs_InjectedFault(t *testing.T) {
+	errExpected := fmt.Errorf("absInjectedFault")
+	fs := NewVirtualFileSystem(map[string]VirtualFile{})
+	fs.AbsError = errExpected
+	_, errActual := fs.Abs("")
+	if errActual != errExpected {
+		t.Fail()
+	}
 }
 
 func Test_VirtualFileSystem_Open_ENOENT(t *testing.T) {

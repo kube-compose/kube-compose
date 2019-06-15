@@ -223,3 +223,43 @@ ENTRYPOINT ["bash", "-c", "cp -ar /app/data/vol1 /mnt/vol1/root && cp -ar /app/d
 		t.Fail()
 	}
 }
+
+func Test_ResolveBindVolumeHostPath_AbsError(t *testing.T) {
+	errExpected := fmt.Errorf("resolveBindVolumeHostPathAbsError")
+	vfs := fsPackage.NewVirtualFileSystem(map[string]fsPackage.VirtualFile{})
+	vfs.AbsError = errExpected
+	fsOld := fs
+	defer func() {
+		fs = fsOld
+	}()
+	fs = vfs
+
+	_, errActual := resolveBindVolumeHostPath("")
+	if errActual != errExpected {
+		t.Fail()
+	}
+}
+
+func Test_ResolveBindVolumeHostPath_Success(t *testing.T) {
+	vfs := fsPackage.NewVirtualFileSystem(map[string]fsPackage.VirtualFile{})
+	fsOld := fs
+	defer func() {
+		fs = fsOld
+	}()
+	fs = vfs
+
+	resolved, err := resolveBindVolumeHostPath("/dir1/dir1_1")
+	switch {
+	case err != nil:
+		t.Error(err)
+	case resolved != "/dir1/dir1_1":
+		t.Fail()
+	default:
+		fileInfo, err := fs.Stat("/dir1/dir1_1")
+		if err != nil {
+			t.Error(err)
+		} else if !fileInfo.IsDir() {
+			t.Fail()
+		}
+	}
+}

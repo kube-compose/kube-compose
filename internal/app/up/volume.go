@@ -360,7 +360,7 @@ func resolveBindVolumeHostPath(name string) (string, error) {
 			if i+1 < len(parts) {
 				result = result + sep + strings.Join(parts[i+1:], sep)
 			}
-			err = os.MkdirAll(result, 0777)
+			err = fs.MkdirAll(result, os.ModePerm)
 			return result, err
 		}
 		if err != nil {
