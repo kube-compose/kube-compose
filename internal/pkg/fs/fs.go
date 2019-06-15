@@ -15,8 +15,8 @@ type FileDescriptor interface {
 	Readdir(n int) ([]os.FileInfo, error)
 }
 
-// FileSystem is an abstraction of the file system to improve testability of code.
-type FileSystem interface {
+// VirtualFileSystem is an abstraction of the file system to improve testability of code.
+type VirtualFileSystem interface {
 	Abs(name string) (string, error)
 	EvalSymlinks(path string) (string, error)
 	Mkdir(name string, perm os.FileMode) error
@@ -62,15 +62,12 @@ func (fs *osFileSystem) Stat(name string) (os.FileInfo, error) {
 	return os.Stat(name)
 }
 
-var osfs FileSystem = &osFileSystem{}
+// OS is a VirtualFileSystem that relays directly to Go's "os" and "file/filepath" packages. OS can be replaced by a mock VirtualFileSystem
+// to improve testability of code using OS.
+var OS VirtualFileSystem = &osFileSystem{}
 
-// OSFileSystem returns a FileSystem instance that is backed by the os.
-func OSFileSystem() FileSystem {
-	return osfs
-}
-
-// VirtualFileSystem is a FileSystem with some helper methods useful for testing.
-type VirtualFileSystem struct {
+// InMemoryFileSystem is a VirtualFileSystem with additional fields and functions useful for testing.
+type InMemoryFileSystem struct {
 	AbsError error
 	cwd      string
 	root     *node
@@ -83,7 +80,7 @@ var (
 	errTooManyLinks = fmt.Errorf("too many links")
 )
 
-func (fs *VirtualFileSystem) abs(name string) string {
+func (fs *InMemoryFileSystem) abs(name string) string {
 	if name == "" || name[0] != '/' {
 		return fs.cwd + name
 	}
@@ -91,7 +88,7 @@ func (fs *VirtualFileSystem) abs(name string) string {
 }
 
 type findHelper struct {
-	fs                   *VirtualFileSystem
+	fs                   *InMemoryFileSystem
 	ignoreInjectedFaults bool
 	links                int
 	nameRem              string
@@ -176,7 +173,7 @@ func (f *findHelper) updateNameRemFromSlashPos(slashPos int) {
 	}
 }
 
-func (fs *VirtualFileSystem) find(
+func (fs *InMemoryFileSystem) find(
 	name string,
 	ignoreInjectedFaults, resolveSymlinks bool) (n *node, nameRem string, err error) {
 	f := findHelper{
@@ -198,7 +195,7 @@ func validateNameComp(nameComp string) {
 	}
 }
 
-func (fs *VirtualFileSystem) createChildren(n *node, nameRem string, vfile *VirtualFile) {
+func (fs *InMemoryFileSystem) createChildren(n *node, nameRem string, vfile *InMemoryFile) {
 	for {
 		var nameComp string
 		slashPos := strings.IndexByte(nameRem, '/')
@@ -211,7 +208,7 @@ func (fs *VirtualFileSystem) createChildren(n *node, nameRem string, vfile *Virt
 			validateNameComp(nameComp)
 			var childN *node
 			if slashPos < 0 {
-				// initialize file or directory as per VirtualFile
+				// initialize file or directory as per InMemoryFile
 				childN = &node{
 					err:  vfile.Error,
 					mode: vfile.Mode,
@@ -240,18 +237,18 @@ func (fs *VirtualFileSystem) createChildren(n *node, nameRem string, vfile *Virt
 	}
 }
 
-// VirtualFile is a helper struct used to initialize a file, directory or other type of file in a virtual file system.
+// InMemoryFile is a helper struct used to initialize a file, directory or other type of file in a virtual file system.
 // If Error is set then all file system operations will produce an error when the file is accessed. If Mode is a regular
 // file then Content is the content of that file. If Mode is Symlink then Content is the location of the Symlink.
-type VirtualFile struct {
+type InMemoryFile struct {
 	Content []byte
 	Mode    os.FileMode
 	Error   error
 }
 
-// NewVirtualFileSystem creates a mock file system based on the provided data.
-func NewVirtualFileSystem(data map[string]VirtualFile) *VirtualFileSystem {
-	fs := &VirtualFileSystem{
+// NewInMemoryFileSystem creates a mock file system based on the provided data.
+func NewInMemoryFileSystem(data map[string]InMemoryFile) *InMemoryFileSystem {
+	fs := &InMemoryFileSystem{
 		cwd: "/",
 		root: newDirNode(
 			0,
@@ -268,7 +265,7 @@ func NewVirtualFileSystem(data map[string]VirtualFile) *VirtualFileSystem {
 // a file already exists at name and it is a directory and vfile is not a directory (or vice versa) then an error is thrown. Otherwise, if a
 // file already exists at name its attributes, injected fault, symlink target or regular file contents are updated with the values from
 // vfile.
-func (fs *VirtualFileSystem) Set(name string, vfile VirtualFile) {
+func (fs *InMemoryFileSystem) Set(name string, vfile InMemoryFile) {
 	var flag os.FileMode
 	switch {
 	case vfile.Mode.IsDir():
@@ -352,14 +349,14 @@ func trimTrailingSlashes(name string) string {
 	return name[:n]
 }
 
-func (fs *VirtualFileSystem) Abs(name string) (string, error) {
+func (fs *InMemoryFileSystem) Abs(name string) (string, error) {
 	if fs.AbsError != nil {
 		return "", fs.AbsError
 	}
 	return fs.abs(name), nil
 }
 
-func (fs *VirtualFileSystem) Open(name string) (FileDescriptor, error) {
+func (fs *InMemoryFileSystem) Open(name string) (FileDescriptor, error) {
 	node, _, err := fs.find(name, false, true)
 	if err != nil {
 		return nil, err
@@ -369,7 +366,7 @@ func (fs *VirtualFileSystem) Open(name string) (FileDescriptor, error) {
 	}, nil
 }
 
-func (fs *VirtualFileSystem) Stat(name string) (os.FileInfo, error) {
+func (fs *InMemoryFileSystem) Stat(name string) (os.FileInfo, error) {
 	n, _, err := fs.find(name, false, true)
 	if err != nil {
 		return nil, err

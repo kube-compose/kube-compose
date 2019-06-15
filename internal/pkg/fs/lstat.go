@@ -6,7 +6,7 @@ import (
 	"syscall"
 )
 
-func (fs *VirtualFileSystem) lstatNode(name string) (*node, error) {
+func (fs *InMemoryFileSystem) lstatNode(name string) (*node, error) {
 	if name == "" {
 		name = fs.cwd
 	}
@@ -41,7 +41,7 @@ func (fs *VirtualFileSystem) lstatNode(name string) (*node, error) {
 }
 
 // Lstat should behave the same as os.Lstat but operates on the virtual file system.
-func (fs *VirtualFileSystem) Lstat(name string) (os.FileInfo, error) {
+func (fs *InMemoryFileSystem) Lstat(name string) (os.FileInfo, error) {
 	n, err := fs.lstatNode(name)
 	if err != nil {
 		return nil, err

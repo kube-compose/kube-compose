@@ -8,7 +8,7 @@ import (
 )
 
 func Test_Lstat_RootSuccess(t *testing.T) {
-	fs := NewVirtualFileSystem(map[string]VirtualFile{})
+	fs := NewInMemoryFileSystem(map[string]InMemoryFile{})
 	fileInfo, err := fs.Lstat("")
 	if err != nil {
 		t.Error(err)
@@ -18,7 +18,7 @@ func Test_Lstat_RootSuccess(t *testing.T) {
 }
 
 func Test_Lstat_InjectedFault1(t *testing.T) {
-	fs := NewVirtualFileSystem(map[string]VirtualFile{})
+	fs := NewInMemoryFileSystem(map[string]InMemoryFile{})
 	errExpected := fmt.Errorf("injectedFault1")
 	fs.root.err = errExpected
 	_, errActual := fs.Lstat("")
@@ -29,13 +29,13 @@ func Test_Lstat_InjectedFault1(t *testing.T) {
 
 func Test_Lstat_InjectedFault2(t *testing.T) {
 	errExpected := fmt.Errorf("injectedFault2")
-	fs := NewVirtualFileSystem(map[string]VirtualFile{
+	fs := NewInMemoryFileSystem(map[string]InMemoryFile{
 		"/dir": {
 			Error: errExpected,
 			Mode:  os.ModeDir,
 		},
 	})
-	fs.Set("/dir/file", VirtualFile{})
+	fs.Set("/dir/file", InMemoryFile{})
 	_, errActual := fs.Lstat("/dir/file")
 	if errActual != errExpected {
 		t.Fail()
@@ -43,7 +43,7 @@ func Test_Lstat_InjectedFault2(t *testing.T) {
 }
 
 func Test_Lstat_ENOTDIR(t *testing.T) {
-	fs := NewVirtualFileSystem(map[string]VirtualFile{
+	fs := NewInMemoryFileSystem(map[string]InMemoryFile{
 		"/notadir": {},
 	})
 	_, err := fs.Lstat("/notadir/file")
@@ -53,7 +53,7 @@ func Test_Lstat_ENOTDIR(t *testing.T) {
 }
 
 func Test_Lstat_ENOENT(t *testing.T) {
-	fs := NewVirtualFileSystem(map[string]VirtualFile{})
+	fs := NewInMemoryFileSystem(map[string]InMemoryFile{})
 	_, err := fs.Lstat("/doesnotexist")
 	if !os.IsNotExist(err) {
 		t.Fail()

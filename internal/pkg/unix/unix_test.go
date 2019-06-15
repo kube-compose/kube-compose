@@ -4,21 +4,21 @@ import (
 	"strings"
 	"testing"
 
-	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
+	"github.com/kube-compose/kube-compose/internal/pkg/fs"
 )
 
-var vfs fsPackage.FileSystem = fsPackage.NewVirtualFileSystem(map[string]fsPackage.VirtualFile{
+var vfs fs.VirtualFileSystem = fs.NewInMemoryFileSystem(map[string]fs.InMemoryFile{
 	EtcPasswd: {
 		Content: []byte("root:x:0:\ndaemon:x:1:1:daemon:/daemonhomelol\nasdf\nuiderr:x::"),
 	},
 })
 
 func withMockFS(cb func()) {
-	fsOld := FS
+	orig := fs.OS
 	defer func() {
-		FS = fsOld
+		fs.OS = orig
 	}()
-	FS = vfs
+	fs.OS = vfs
 	cb()
 }
 

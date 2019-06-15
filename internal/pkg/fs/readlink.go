@@ -5,7 +5,7 @@ import (
 )
 
 // Readlink should behave the same as os.Readlink but operates on the virtual file system.
-func (fs *VirtualFileSystem) Readlink(name string) (string, error) {
+func (fs *InMemoryFileSystem) Readlink(name string) (string, error) {
 	n, err := fs.lstatNode(name)
 	if err != nil {
 		return "", err

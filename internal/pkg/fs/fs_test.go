@@ -14,27 +14,27 @@ import (
 // We don't have to test "os" and "path/filepath" functions, but we want 100% coverage.
 
 func Test_OSFileSystem_Abs(t *testing.T) {
-	_, _ = OSFileSystem().Abs("")
+	_, _ = OS.Abs("")
 }
 
 func Test_OSFileSystem_EvalSymlinks(t *testing.T) {
-	_, _ = OSFileSystem().EvalSymlinks("")
+	_, _ = OS.EvalSymlinks("")
 }
 
 func Test_OSFileSystem_Lstat(t *testing.T) {
-	_, _ = OSFileSystem().Lstat("")
+	_, _ = OS.Lstat("")
 }
 
 func Test_OSFileSystem_Mkdir(t *testing.T) {
-	_ = OSFileSystem().Mkdir("", os.ModePerm)
+	_ = OS.Mkdir("", os.ModePerm)
 }
 
 func Test_OSFileSystem_MkdirAll(t *testing.T) {
-	_ = OSFileSystem().MkdirAll("", os.ModePerm)
+	_ = OS.MkdirAll("", os.ModePerm)
 }
 
 func Test_OSFileSystem_Open(t *testing.T) {
-	file, err := OSFileSystem().Open("")
+	file, err := OS.Open("")
 	defer func() {
 		if file != nil {
 			file.Close()
@@ -45,16 +45,16 @@ func Test_OSFileSystem_Open(t *testing.T) {
 	}
 }
 func Test_OSFileSystem_Readlink(t *testing.T) {
-	_, _ = OSFileSystem().Readlink("")
+	_, _ = OS.Readlink("")
 }
 
 func Test_OSFileSystem_Stat(t *testing.T) {
-	_, _ = OSFileSystem().Stat("")
+	_, _ = OS.Stat("")
 }
 
 func Test_VirtualFileSystem_Abs_InjectedFault(t *testing.T) {
 	errExpected := fmt.Errorf("absInjectedFault")
-	fs := NewVirtualFileSystem(map[string]VirtualFile{})
+	fs := NewInMemoryFileSystem(map[string]InMemoryFile{})
 	fs.AbsError = errExpected
 	_, errActual := fs.Abs("")
 	if errActual != errExpected {
@@ -63,7 +63,7 @@ func Test_VirtualFileSystem_Abs_InjectedFault(t *testing.T) {
 }
 
 func Test_VirtualFileSystem_Open_ENOENT(t *testing.T) {
-	fs := NewVirtualFileSystem(map[string]VirtualFile{})
+	fs := NewInMemoryFileSystem(map[string]InMemoryFile{})
 	file, err := fs.Open("/data")
 	if file != nil {
 		defer file.Close()
@@ -75,7 +75,7 @@ func Test_VirtualFileSystem_Open_ENOENT(t *testing.T) {
 
 func Test_VirtualFileSystem(t *testing.T) {
 	dataExpected := []byte("root:x:0:")
-	fs := NewVirtualFileSystem(map[string]VirtualFile{
+	fs := NewInMemoryFileSystem(map[string]InMemoryFile{
 		"/passwd": {Content: dataExpected},
 	})
 	file, err := fs.Open("/passwd")
@@ -97,7 +97,7 @@ func Test_VirtualFileSystem(t *testing.T) {
 }
 
 func Test_VirtualFileSystem_SuccessEmptyString(t *testing.T) {
-	NewVirtualFileSystem(map[string]VirtualFile{
+	NewInMemoryFileSystem(map[string]InMemoryFile{
 		"": {
 			Mode: os.ModeDir,
 		},
@@ -111,7 +111,7 @@ func Test_VirtualFileSystem_InvalidMode1(t *testing.T) {
 			t.Fail()
 		}
 	}()
-	NewVirtualFileSystem(map[string]VirtualFile{
+	NewInMemoryFileSystem(map[string]InMemoryFile{
 		"/invalidmode1": {
 			Mode: os.ModeDir | os.ModeSymlink,
 		},
@@ -125,7 +125,7 @@ func Test_VirtualFileSystem_InvalidMode2(t *testing.T) {
 			t.Fail()
 		}
 	}()
-	NewVirtualFileSystem(map[string]VirtualFile{
+	NewInMemoryFileSystem(map[string]InMemoryFile{
 		"/invalidmode2": {
 			Mode: os.ModeDevice | os.ModeSymlink,
 		},
@@ -139,12 +139,12 @@ func Test_VirtualFileSystem_DirectoryInconsistency1(t *testing.T) {
 			t.Fail()
 		}
 	}()
-	var fs = NewVirtualFileSystem(map[string]VirtualFile{
+	var fs = NewInMemoryFileSystem(map[string]InMemoryFile{
 		"/dir/fileforreal": {
 			Content: []byte("regularfile"),
 		},
 	})
-	fs.Set("/dir", VirtualFile{
+	fs.Set("/dir", InMemoryFile{
 		Content: []byte("notafile"),
 	})
 }
@@ -155,18 +155,18 @@ func Test_VirtualFileSystem_DirectoryInconsistency2(t *testing.T) {
 			t.Fail()
 		}
 	}()
-	var fs = NewVirtualFileSystem(map[string]VirtualFile{
+	var fs = NewInMemoryFileSystem(map[string]InMemoryFile{
 		"/dir": {
 			Content: []byte("regularfile2"),
 		},
 	})
-	fs.Set("/dir/fileforreal2", VirtualFile{
+	fs.Set("/dir/fileforreal2", InMemoryFile{
 		Content: []byte("regularfile3"),
 	})
 }
 
 func Test_VirtualFileDescriptor_Read_EmptyBuffer(t *testing.T) {
-	fs := NewVirtualFileSystem(map[string]VirtualFile{
+	fs := NewInMemoryFileSystem(map[string]InMemoryFile{
 		"/emptybuffer": {Content: []byte("nope")},
 	})
 	fd, err := fs.Open("/emptybuffer")
@@ -184,7 +184,7 @@ func Test_VirtualFileDescriptor_Read_EmptyBuffer(t *testing.T) {
 }
 
 func Test_VirtualFileDescriptor_Read_EISDIR(t *testing.T) {
-	fs := NewVirtualFileSystem(map[string]VirtualFile{})
+	fs := NewInMemoryFileSystem(map[string]InMemoryFile{})
 	fd, err := fs.Open("/")
 	if err != nil {
 		t.Error(err)
@@ -197,7 +197,7 @@ func Test_VirtualFileDescriptor_Read_EISDIR(t *testing.T) {
 }
 
 func Test_VirtualFileDescriptor_Readdir_ENOTDIR(t *testing.T) {
-	fs := NewVirtualFileSystem(map[string]VirtualFile{
+	fs := NewInMemoryFileSystem(map[string]InMemoryFile{
 		"/enotdir": {Content: []byte("ENOTDIR")},
 	})
 	fd, err := fs.Open("/enotdir")
@@ -212,7 +212,7 @@ func Test_VirtualFileDescriptor_Readdir_ENOTDIR(t *testing.T) {
 }
 
 func Test_VirtualFileSystem_Readdir_EmptyDirSuccess(t *testing.T) {
-	fs := NewVirtualFileSystem(map[string]VirtualFile{
+	fs := NewInMemoryFileSystem(map[string]InMemoryFile{
 		// Trailing slash is intentional.
 		"/dir1/dir1_1/": {},
 	})
@@ -230,7 +230,7 @@ func Test_VirtualFileSystem_Readdir_EmptyDirSuccess(t *testing.T) {
 }
 
 func Test_VirtualFileDescriptor_Readdir_NNotSupported(t *testing.T) {
-	fs := NewVirtualFileSystem(map[string]VirtualFile{})
+	fs := NewInMemoryFileSystem(map[string]InMemoryFile{})
 	fd, err := fs.Open("")
 	if err != nil {
 		t.Error(err)
@@ -249,7 +249,7 @@ func Test_VirtualFileDescriptor_Readdir_NNotSupported(t *testing.T) {
 }
 
 func Test_VirtualFileSystem_Lstat_Success(t *testing.T) {
-	fs := NewVirtualFileSystem(map[string]VirtualFile{
+	fs := NewInMemoryFileSystem(map[string]InMemoryFile{
 		"/passwd":       {Content: []byte("root:x:0:")},
 		"/path/to/dir/": {Mode: os.ModeDir},
 	})
@@ -278,17 +278,17 @@ func Test_VirtualFileSystem_Lstat_InvalidPath(t *testing.T) {
 			t.Fail()
 		}
 	}()
-	fs := NewVirtualFileSystem(map[string]VirtualFile{})
+	fs := NewInMemoryFileSystem(map[string]InMemoryFile{})
 	_, _ = fs.Lstat("/.")
 }
 
 func Test_VirtualFileSystem_Set_ReplacesFileContentsCorrectly(t *testing.T) {
 	name := "/replacesfilecontents"
-	fs := NewVirtualFileSystem(map[string]VirtualFile{
+	fs := NewInMemoryFileSystem(map[string]InMemoryFile{
 		name: {Content: []byte("filecontentsorig")},
 	})
 	expected := []byte("filecontentsreplaces")
-	fs.Set(name, VirtualFile{
+	fs.Set(name, InMemoryFile{
 		Content: expected,
 	})
 	fd, err := fs.Open(name)
@@ -306,7 +306,7 @@ func Test_VirtualFileSystem_Set_ReplacesFileContentsCorrectly(t *testing.T) {
 }
 
 func Test_VirtualFileSystem_Stat_ENOENT(t *testing.T) {
-	fs := NewVirtualFileSystem(map[string]VirtualFile{})
+	fs := NewInMemoryFileSystem(map[string]InMemoryFile{})
 	_, err := fs.Stat("/passwd")
 	if err == nil || !os.IsNotExist(err) {
 		t.Fail()
@@ -315,7 +315,7 @@ func Test_VirtualFileSystem_Stat_ENOENT(t *testing.T) {
 
 func Test_VirtualFileSystem_Stat_DirError2(t *testing.T) {
 	errExpected := errors.New("unknown error 14")
-	fs := NewVirtualFileSystem(map[string]VirtualFile{
+	fs := NewInMemoryFileSystem(map[string]InMemoryFile{
 		"/": {
 			Error: errExpected,
 			Mode:  os.ModeDir,
@@ -329,7 +329,7 @@ func Test_VirtualFileSystem_Stat_DirError2(t *testing.T) {
 
 func Test_VirtualFileSystem_Stat_DirError3(t *testing.T) {
 	errExpected := errors.New("unknown error 15")
-	fs := NewVirtualFileSystem(map[string]VirtualFile{
+	fs := NewInMemoryFileSystem(map[string]InMemoryFile{
 		"/": {
 			Error: errExpected,
 			Mode:  os.ModeDir,
@@ -343,7 +343,7 @@ func Test_VirtualFileSystem_Stat_DirError3(t *testing.T) {
 
 func Test_VirtualFileSystem_Stat_FileError(t *testing.T) {
 	errExpected := errors.New("unknown error 12")
-	fs := NewVirtualFileSystem(map[string]VirtualFile{
+	fs := NewInMemoryFileSystem(map[string]InMemoryFile{
 		"/passwd": {Error: errExpected},
 	})
 	_, errActual := fs.Stat("/passwd")
@@ -353,7 +353,7 @@ func Test_VirtualFileSystem_Stat_FileError(t *testing.T) {
 }
 
 func Test_VirtualFileSystem_Stat_ENOTDIR(t *testing.T) {
-	fs := NewVirtualFileSystem(map[string]VirtualFile{
+	fs := NewInMemoryFileSystem(map[string]InMemoryFile{
 		"/enotdir2": {},
 	})
 	_, err := fs.Stat("/enotdir2/file3")
@@ -363,7 +363,7 @@ func Test_VirtualFileSystem_Stat_ENOTDIR(t *testing.T) {
 }
 
 func Test_VirtualFileSystem_Stat_TooManyLinks(t *testing.T) {
-	fs := NewVirtualFileSystem(map[string]VirtualFile{
+	fs := NewInMemoryFileSystem(map[string]InMemoryFile{
 		"/selflink": {
 			Content: []byte("selflink"),
 			Mode:    os.ModeSymlink,
@@ -376,7 +376,7 @@ func Test_VirtualFileSystem_Stat_TooManyLinks(t *testing.T) {
 }
 
 func Test_VirtualFileSystem_Stat_AbsSymlink(t *testing.T) {
-	fs := NewVirtualFileSystem(map[string]VirtualFile{
+	fs := NewInMemoryFileSystem(map[string]InMemoryFile{
 		"/file": {},
 		"/link": {
 			Content: []byte("/file"),

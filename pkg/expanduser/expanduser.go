@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"strings"
 
-	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
+	"github.com/kube-compose/kube-compose/internal/pkg/fs"
 	"github.com/kube-compose/kube-compose/internal/pkg/unix"
 )
 
@@ -111,7 +111,7 @@ func NT(path string) string {
 		return path
 	}
 	i := 1
-	for i < len(path) && !fsPackage.NTIsPathSeparator(path[i]) {
+	for i < len(path) && !fs.NTIsPathSeparator(path[i]) {
 		i++
 	}
 	userhome, err := HomeNT()
@@ -126,12 +126,12 @@ func NT(path string) string {
 }
 
 func dirname(name string) int {
-	volLen := fsPackage.NTVolumeNameLength(name)
+	volLen := fs.NTVolumeNameLength(name)
 	j := len(name)
-	for j > volLen && fsPackage.NTIsPathSeparator(name[j-1]) {
+	for j > volLen && fs.NTIsPathSeparator(name[j-1]) {
 		j--
 	}
-	for j > volLen && !fsPackage.NTIsPathSeparator(name[j-1]) {
+	for j > volLen && !fs.NTIsPathSeparator(name[j-1]) {
 		j--
 	}
 	return j

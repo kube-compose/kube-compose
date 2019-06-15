@@ -6,7 +6,7 @@ import (
 	"syscall"
 )
 
-func (fs *VirtualFileSystem) mkdirCommon(name string, perm os.FileMode, all bool) error {
+func (fs *InMemoryFileSystem) mkdirCommon(name string, perm os.FileMode, all bool) error {
 	if (perm & os.ModeType) != 0 {
 		return errBadMode
 	}
@@ -36,7 +36,7 @@ func (fs *VirtualFileSystem) mkdirCommon(name string, perm os.FileMode, all bool
 	return nil
 }
 
-func (fs *VirtualFileSystem) mkdirCommonAll(n *node, nameRem string, perm os.FileMode) {
+func (fs *InMemoryFileSystem) mkdirCommonAll(n *node, nameRem string, perm os.FileMode) {
 	for nameRem != "" {
 		slashPos := strings.IndexByte(nameRem, '/')
 		nameComp := nameRem
@@ -60,10 +60,10 @@ func (fs *VirtualFileSystem) mkdirCommonAll(n *node, nameRem string, perm os.Fil
 	}
 }
 
-func (fs *VirtualFileSystem) Mkdir(name string, perm os.FileMode) error {
+func (fs *InMemoryFileSystem) Mkdir(name string, perm os.FileMode) error {
 	return fs.mkdirCommon(name, perm, false)
 }
 
-func (fs *VirtualFileSystem) MkdirAll(name string, perm os.FileMode) error {
+func (fs *InMemoryFileSystem) MkdirAll(name string, perm os.FileMode) error {
 	return fs.mkdirCommon(name, perm, true)
 }

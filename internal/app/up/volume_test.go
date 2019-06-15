@@ -8,18 +8,18 @@ import (
 	"reflect"
 	"testing"
 
-	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
+	"github.com/kube-compose/kube-compose/internal/pkg/fs"
 )
 
 var errTest = fmt.Errorf("test error")
 var testFileContent = "content"
 
-var vfs *fsPackage.VirtualFileSystem
+var vfs *fs.InMemoryFileSystem
 
 // init here is justified because a common mock file system is used, and we require calling Set to make tests deterministic.
 // nolint
 func init() {
-	vfs = fsPackage.NewVirtualFileSystem(map[string]fsPackage.VirtualFile{
+	vfs = fs.NewInMemoryFileSystem(map[string]fs.InMemoryFile{
 		"/orig": {
 			Content: []byte(testFileContent),
 		},
@@ -27,31 +27,31 @@ func init() {
 			Error: errTest,
 		},
 	})
-	vfs.Set("/dir/file1", fsPackage.VirtualFile{
+	vfs.Set("/dir/file1", fs.InMemoryFile{
 		Content: []byte(testFileContent),
 	})
-	vfs.Set("/dir/file2", fsPackage.VirtualFile{
+	vfs.Set("/dir/file2", fs.InMemoryFile{
 		Content: []byte(testFileContent),
 	})
-	vfs.Set("/dir2/file", fsPackage.VirtualFile{
+	vfs.Set("/dir2/file", fs.InMemoryFile{
 		Content: []byte(testFileContent),
 	})
-	vfs.Set("/dir2/symlink", fsPackage.VirtualFile{
+	vfs.Set("/dir2/symlink", fs.InMemoryFile{
 		Content: []byte("file"),
 		Mode:    os.ModeSymlink,
 	})
-	vfs.Set("/dir3/symlink", fsPackage.VirtualFile{
+	vfs.Set("/dir3/symlink", fs.InMemoryFile{
 		Content: []byte("/dir2"),
 		Mode:    os.ModeSymlink,
 	})
 }
 
 func withMockFS(cb func()) {
-	fsOld := fs
+	fsOld := fs.OS
 	defer func() {
-		fs = fsOld
+		fs.OS = fsOld
 	}()
-	fs = vfs
+	fs.OS = vfs
 	cb()
 }
 
@@ -226,13 +226,13 @@ ENTRYPOINT ["bash", "-c", "cp -ar /app/data/vol1 /mnt/vol1/root && cp -ar /app/d
 
 func Test_ResolveBindVolumeHostPath_AbsError(t *testing.T) {
 	errExpected := fmt.Errorf("resolveBindVolumeHostPathAbsError")
-	vfs := fsPackage.NewVirtualFileSystem(map[string]fsPackage.VirtualFile{})
+	vfs := fs.NewInMemoryFileSystem(map[string]fs.InMemoryFile{})
 	vfs.AbsError = errExpected
-	fsOld := fs
+	fsOld := fs.OS
 	defer func() {
-		fs = fsOld
+		fs.OS = fsOld
 	}()
-	fs = vfs
+	fs.OS = vfs
 
 	_, errActual := resolveBindVolumeHostPath("")
 	if errActual != errExpected {
@@ -240,13 +240,13 @@ func Test_ResolveBindVolumeHostPath_AbsError(t *testing.T) {
 	}
 }
 
-func Test_ResolveBindVolumeHostPath_Success(t *testing.T) {
-	vfs := fsPackage.NewVirtualFileSystem(map[string]fsPackage.VirtualFile{})
-	fsOld := fs
+func Test_ResolveBindVolumeHostPath_SuccessMkdirAll(t *testing.T) {
+	vfs := fs.NewInMemoryFileSystem(map[string]fs.InMemoryFile{})
+	fsOld := fs.OS
 	defer func() {
-		fs = fsOld
+		fs.OS = fsOld
 	}()
-	fs = vfs
+	fs.OS = vfs
 
 	resolved, err := resolveBindVolumeHostPath("/dir1/dir1_1")
 	switch {
@@ -255,7 +255,7 @@ func Test_ResolveBindVolumeHostPath_Success(t *testing.T) {
 	case resolved != "/dir1/dir1_1":
 		t.Fail()
 	default:
-		fileInfo, err := fs.Stat("/dir1/dir1_1")
+		fileInfo, err := fs.OS.Stat("/dir1/dir1_1")
 		if err != nil {
 			t.Error(err)
 		} else if !fileInfo.IsDir() {

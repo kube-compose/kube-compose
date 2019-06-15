@@ -3,7 +3,7 @@ package expanduser
 import (
 	"testing"
 
-	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
+	"github.com/kube-compose/kube-compose/internal/pkg/fs"
 	"github.com/kube-compose/kube-compose/internal/pkg/unix"
 )
 
@@ -69,11 +69,11 @@ func TestHomeNT_SuccessAlternative(t *testing.T) {
 }
 
 func withMockEtcPasswd(s string, cb func()) {
-	orig := unix.FS
+	original := fs.OS
 	defer func() {
-		unix.FS = orig
+		fs.OS = original
 	}()
-	unix.FS = fsPackage.NewVirtualFileSystem(map[string]fsPackage.VirtualFile{
+	fs.OS = fs.NewInMemoryFileSystem(map[string]fs.InMemoryFile{
 		unix.EtcPasswd: {
 			Content: []byte(s),
 		},

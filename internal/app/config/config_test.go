@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
+	"github.com/kube-compose/kube-compose/internal/pkg/fs"
 	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
 )
@@ -88,7 +88,7 @@ var dockerComposeYmlInvalid = "/docker-compose.invalid.yml"
 var dockerComposeYmlInvalidServiceName = "/docker-compose.invalid-service-name.yml"
 var dockerComposeYmlInvalidXKubeCompose = "/docker-compose.invalid-x-kube-compose.yml"
 var dockerComposeYmlValidPushImages = "/docker-compose.valid-push-images.yml"
-var vfs fsPackage.FileSystem = fsPackage.NewVirtualFileSystem(map[string]fsPackage.VirtualFile{
+var vfs fs.VirtualFileSystem = fs.NewInMemoryFileSystem(map[string]fs.InMemoryFile{
 	dockerComposeYmlInvalid: {
 		Content: []byte(`version: 'asdf'`),
 	},
@@ -119,11 +119,11 @@ x-kube-compose:
 })
 
 func withMockFS(cb func()) {
-	fsOld := dockerComposeConfig.FS
+	orig := fs.OS
 	defer func() {
-		dockerComposeConfig.FS = fsOld
+		fs.OS = orig
 	}()
-	dockerComposeConfig.FS = vfs
+	fs.OS = vfs
 	cb()
 }
 
