@@ -141,7 +141,7 @@ func Test_BindMountHostFileToTar_StatError(t *testing.T) {
 
 func withTarFileInfoHeaderError(err error, symlinkOnly bool, cb func()) {
 	orig := tarFileInfoHeader
-	defer func(){
+	defer func() {
 		tarFileInfoHeader = orig
 	}()
 	tarFileInfoHeader = func(fileInfo os.FileInfo, link string) (*tar.Header, error) {
@@ -155,7 +155,7 @@ func withTarFileInfoHeaderError(err error, symlinkOnly bool, cb func()) {
 
 func Test_BindMountHostFileToTar_RegularFileTarHeaderError(t *testing.T) {
 	errExpected := fmt.Errorf("regularFileTarHeaderError")
-	withTarFileInfoHeaderError(errExpected, false, func(){
+	withTarFileInfoHeaderError(errExpected, false, func() {
 		withMockFS(vfs, func() {
 			tw := &mockTarWriter{}
 			_, errActual := bindMountHostFileToTar(tw, "orig", "renamed")
@@ -168,7 +168,7 @@ func Test_BindMountHostFileToTar_RegularFileTarHeaderError(t *testing.T) {
 
 func Test_BindMountHostFileToTar_DirTarHeaderError(t *testing.T) {
 	errExpected := fmt.Errorf("dirTarHeaderError")
-	withTarFileInfoHeaderError(errExpected, false, func(){
+	withTarFileInfoHeaderError(errExpected, false, func() {
 		withMockFS(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 			"/dir": {
 				Mode: os.ModeDir,
@@ -242,7 +242,7 @@ func Test_BindMountHostFileToTar_ErrorSymlinkNotWithinBindHostRoot(t *testing.T)
 }
 func Test_BindMountHostFileToTar_SymlinkTarHeaderError(t *testing.T) {
 	errExpected := fmt.Errorf("symlinkTarHeaderError")
-	withTarFileInfoHeaderError(errExpected, true, func(){
+	withTarFileInfoHeaderError(errExpected, true, func() {
 		withMockFS(vfs, func() {
 			tw := &mockTarWriter{}
 			_, errActual := bindMountHostFileToTar(tw, "dir2", "renamed")

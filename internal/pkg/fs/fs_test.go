@@ -73,6 +73,19 @@ func Test_VirtualFileSystem_Open_ENOENT(t *testing.T) {
 	}
 }
 
+func Test_VirtualFileSystem_Open_OpenError(t *testing.T) {
+	errExpected := fmt.Errorf("openError")
+	fs := NewInMemoryUnixFileSystem(map[string]InMemoryFile{
+		"/openerror": {
+			OpenError: errExpected,
+		},
+	})
+	_, errActual := fs.Open("/openerror")
+	if errActual != errExpected {
+		t.Fail()
+	}
+}
+
 func Test_VirtualFileSystem(t *testing.T) {
 	dataExpected := []byte("root:x:0:")
 	fs := NewInMemoryUnixFileSystem(map[string]InMemoryFile{

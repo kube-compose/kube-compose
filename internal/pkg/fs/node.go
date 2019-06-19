@@ -8,8 +8,10 @@ import (
 type node struct {
 	name string
 	mode os.FileMode
-	// if err != nil then err is returned when this node is accessed.
+	// if err != nil then err is returned when path resolution walks across this file.
 	err error
+	// if errOpen != nil then errOpen is returned when this file is opened.
+	errOpen error
 	// Either []byte or []*node, depending on the type of this node.
 	extra interface{}
 }

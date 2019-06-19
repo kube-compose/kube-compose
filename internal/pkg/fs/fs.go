@@ -210,9 +210,10 @@ func (fs *InMemoryFileSystem) createChildren(n *node, nameRem string, vfile *InM
 			if slashPos < 0 {
 				// initialize file or directory as per InMemoryFile
 				childN = &node{
-					err:  vfile.Error,
-					mode: vfile.Mode,
-					name: nameComp,
+					err:     vfile.Error,
+					errOpen: vfile.OpenError,
+					mode:    vfile.Mode,
+					name:    nameComp,
 				}
 				if (vfile.Mode & os.ModeDir) == 0 {
 					childN.extra = vfile.Content
@@ -241,9 +242,10 @@ func (fs *InMemoryFileSystem) createChildren(n *node, nameRem string, vfile *InM
 // If Error is set then all file system operations will produce an error when the file is accessed. If Mode is a regular
 // file then Content is the content of that file. If Mode is Symlink then Content is the location of the Symlink.
 type InMemoryFile struct {
-	Content []byte
-	Mode    os.FileMode
-	Error   error
+	Content   []byte
+	Error     error
+	Mode      os.FileMode
+	OpenError error
 }
 
 // NewInMemoryUnixFileSystem creates a mock file system based on the provided data.
@@ -290,11 +292,12 @@ func (fs *InMemoryFileSystem) Set(name string, vfile InMemoryFile) {
 		if nodeIsDir != vfileIsDir {
 			panic(errIsDirDisagreement)
 		}
-		n.mode = vfile.Mode
-		n.err = vfile.Error
 		if !vfileIsDir {
 			n.extra = vfile.Content
 		}
+		n.err = vfile.Error
+		n.errOpen = vfile.OpenError
+		n.mode = vfile.Mode
 	}
 }
 
@@ -360,6 +363,9 @@ func (fs *InMemoryFileSystem) Open(name string) (FileDescriptor, error) {
 	node, _, err := fs.find(name, false, true)
 	if err != nil {
 		return nil, err
+	}
+	if node.errOpen != nil {
+		return nil, node.errOpen
 	}
 	return &virtualFileDescriptor{
 		node: node,
