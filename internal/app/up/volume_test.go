@@ -432,40 +432,66 @@ func Test_ResolveBindVolumeHostPath_AbsError(t *testing.T) {
 	errExpected := fmt.Errorf("resolveBindVolumeHostPathAbsError")
 	vfsTest := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{})
 	vfsTest.AbsError = errExpected
-	fsOld := fs.OS
-	defer func() {
-		fs.OS = fsOld
-	}()
-	fs.OS = vfsTest
-
-	_, errActual := resolveBindVolumeHostPath("")
-	if errActual != errExpected {
-		t.Fail()
-	}
+	withMockFS(vfsTest, func() {
+		_, errActual := resolveBindVolumeHostPath("")
+		if errActual != errExpected {
+			t.Fail()
+		}
+	})
 }
 
 func Test_ResolveBindVolumeHostPath_SuccessMkdirAll(t *testing.T) {
-	vfsTest := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{})
-	fsOld := fs.OS
-	defer func() {
-		fs.OS = fsOld
-	}()
-	fs.OS = vfsTest
-
-	resolved, err := resolveBindVolumeHostPath("/dir1/dir1_1")
-	switch {
-	case err != nil:
-		t.Error(err)
-	case resolved != "/dir1/dir1_1":
-		t.Fail()
-	default:
-		fileInfo, err := fs.OS.Stat("/dir1/dir1_1")
-		if err != nil {
+	withMockFS(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{}), func() {
+		resolved, err := resolveBindVolumeHostPath("/dir1/dir1_1")
+		switch {
+		case err != nil:
 			t.Error(err)
-		} else if !fileInfo.IsDir() {
+		case resolved != "/dir1/dir1_1":
+			t.Fail()
+		default:
+			fileInfo, err := fs.OS.Stat("/dir1/dir1_1")
+			if err != nil {
+				t.Error(err)
+			} else if !fileInfo.IsDir() {
+				t.Fail()
+			}
+		}
+	})
+}
+
+func Test_ResolveBindVolumeHostPath_EvalSymlinksError(t *testing.T) {
+	errExpected := fmt.Errorf("evalSymlinksError")
+	withMockFS(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+		"evalsymlinkserror": {
+			Content: []byte("evalsymlinkserror"),
+			Mode:    os.ModeSymlink,
+			Error:   errExpected,
+		},
+	}), func() {
+		_, errActual := resolveBindVolumeHostPath("evalsymlinkserror")
+		if errActual != errExpected {
 			t.Fail()
 		}
-	}
+	})
+}
+
+func Test_ResolveBindVolumeHostPath_SuccessAlreadyExists(t *testing.T) {
+	withMockFS(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+		"successalreadyexists": {
+			Content: []byte("file"),
+			Mode:    os.ModeSymlink,
+		},
+		"file": {
+			Content: []byte("filecontent"),
+		},
+	}), func() {
+		resolved, err := resolveBindVolumeHostPath("successalreadyexists")
+		if err != nil {
+			t.Error(err)
+		} else if resolved != "/file" {
+			t.Fail()
+		}
+	})
 }
 
 func Test_BuildVolumeInitImageGetBuildContext_Success(t *testing.T) {
@@ -475,6 +501,17 @@ func Test_BuildVolumeInitImageGetBuildContext_Success(t *testing.T) {
 		})
 		if err != nil {
 			t.Error(err)
+		}
+	})
+}
+
+func Test_BuildVolumeInitImageGetBuildContext_BindMouseHostFileToTarError(t *testing.T) {
+	withMockFS(vfs, func() {
+		_, err := buildVolumeInitImageGetBuildContext([]string{
+			"origerr",
+		})
+		if err == nil {
+			t.Fail()
 		}
 	})
 }
