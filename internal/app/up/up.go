@@ -284,7 +284,7 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 	// Use the same interpretation of images as docker-compose (use ParseAnyReferenceWithSet)
 	sourceImageRef, err := dockerRef.ParseAnyReferenceWithSet(sourceImage, localImageIDSet)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("error while parsing image %#v", sourceImage))
+		return errors.Wrapf(err, "error while parsing image %#v", sourceImage)
 	}
 	err = u.getAppImageInfoEnsureSourceImageID(sourceImage, sourceImageRef, app, localImageIDSet)
 	if err != nil {
@@ -361,12 +361,12 @@ func (u *upRunner) getAppImageInfoUser(a *app, inspect *dockerTypes.ImageInspect
 	if userRaw == nil {
 		user, err = docker.ParseUserinfo(inspect.Config.User)
 		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("image %#v has an invalid user %#v", sourceImage, inspect.Config.User))
+			return errors.Wrapf(err, "image %#v has an invalid user %#v", sourceImage, inspect.Config.User)
 		}
 	} else {
 		user, err = docker.ParseUserinfo(*userRaw)
 		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("docker-compose service %s has an invalid user %#v", a.name(), *userRaw))
+			return errors.Wrapf(err, "docker-compose service %s has an invalid user %#v", a.name(), *userRaw)
 		}
 	}
 	if user.UID == nil || (user.Group != "" && user.GID == nil) {
@@ -374,7 +374,7 @@ func (u *upRunner) getAppImageInfoUser(a *app, inspect *dockerTypes.ImageInspect
 		// group if a UID is set but no GID
 		err := getUserinfoFromImage(u.opts.Context, u.dockerClient, a.imageInfo.sourceImageID, user)
 		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("error getting uid/gid from image %#v", sourceImage))
+			return errors.Wrapf(err, "error getting uid/gid from image %#v", sourceImage)
 		}
 	}
 	a.imageInfo.user = user

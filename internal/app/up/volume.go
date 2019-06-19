@@ -15,12 +15,12 @@ import (
 	dockerClient "github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/kube-compose/kube-compose/internal/pkg/docker"
-	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
+	"github.com/kube-compose/kube-compose/internal/pkg/fs"
 	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	"github.com/pkg/errors"
 )
 
-var fs = fsPackage.OSFileSystem()
+var tarFileInfoHeader = tar.FileInfoHeader
 
 func buildVolumeInitImageGetDockerfile(isDirSlice []bool) []byte {
 	var b bytes.Buffer
@@ -53,7 +53,6 @@ type TarWriter interface {
 
 type bindMountHostFileToTarHelper struct {
 	tw                     TarWriter
-	twMayBeCorrupt         bool
 	renameTo               string
 	rootHostFile           string
 	rootHostFileVol        string
@@ -61,11 +60,11 @@ type bindMountHostFileToTarHelper struct {
 }
 
 func (h *bindMountHostFileToTarHelper) runRegular(fileInfo os.FileInfo, hostFile, fileNameInTar string) error {
-	header, err := tar.FileInfoHeader(fileInfo, "")
+	header, err := tarFileInfoHeader(fileInfo, "")
 	if err != nil {
 		return err
 	}
-	fd, err := fs.Open(hostFile)
+	fd, err := fs.OS.Open(hostFile)
 	if err != nil {
 		return err
 	}
@@ -76,19 +75,16 @@ func (h *bindMountHostFileToTarHelper) runRegular(fileInfo os.FileInfo, hostFile
 		return err
 	}
 	_, err = io.Copy(h.tw, fd)
-	if err != nil {
-		h.twMayBeCorrupt = true
-	}
 	return err
 }
 
 func (h *bindMountHostFileToTarHelper) runDirectory(fileInfo os.FileInfo, hostFile, fileNameInTar string) error {
-	fd, err := fs.Open(hostFile)
+	fd, err := fs.OS.Open(hostFile)
 	if err != nil {
 		return err
 	}
 	defer util.CloseAndLogError(fd)
-	header, err := tar.FileInfoHeader(fileInfo, "")
+	header, err := tarFileInfoHeader(fileInfo, "")
 	if err != nil {
 		return err
 	}
@@ -137,9 +133,9 @@ func (h *bindMountHostFileToTarHelper) isFileWithinBindHostRoot(target string) b
 
 func (h *bindMountHostFileToTarHelper) runSymlink(fileInfo os.FileInfo, hostFile, fileNameInTar string) error {
 	// Symbolic link
-	link, err := os.Readlink(hostFile)
+	link, err := fs.OS.Readlink(hostFile)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("error while reading link %#v", hostFile))
+		return errors.Wrapf(err, "error while reading link %#v", hostFile)
 	}
 	var linkResolved string
 	linkIsAbsLike := link != "" && (link[0] == '\\' || link[0] == '/')
@@ -149,9 +145,9 @@ func (h *bindMountHostFileToTarHelper) runSymlink(fileInfo os.FileInfo, hostFile
 		// https://docs.microsoft.com/en-us/windows/desktop/api/winbase/nf-winbase-createsymboliclinka#remarks
 		// This should be a noop on non-Windows because there will never be a non-empty VolumeName and therefore the path must
 		// be absolute.
-		linkResolved, err = filepath.Abs(link)
+		linkResolved, err = fs.OS.Abs(link)
 		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("error while converting %#v to an absolute path", link))
+			return errors.Wrapf(err, "error while converting %#v to an absolute path", link)
 		}
 	} else {
 		// Windows: no drive.
@@ -165,7 +161,7 @@ func (h *bindMountHostFileToTarHelper) runSymlink(fileInfo os.FileInfo, hostFile
 		// Convert the target to a relative path within the tar. This can be done a bit more efficiently since we know the paths are
 		// relative, cleaned and slashed. We assign the error to underscore because it should never happen.
 		linkResolvedInTarRel, _ := filepath.Rel(filepath.Dir(fileNameInTar), linkResolvedInTar)
-		header, err := tar.FileInfoHeader(fileInfo, linkResolvedInTarRel)
+		header, err := tarFileInfoHeader(fileInfo, linkResolvedInTarRel)
 		if err != nil {
 			return err
 		}
@@ -198,37 +194,16 @@ func (h *bindMountHostFileToTarHelper) endHeaderCommon(header *tar.Header) error
 	// For example:
 	// header.Uid = ...
 	// header.Gid = ...
-	err := h.tw.WriteHeader(header)
-	if err != nil {
-		h.twMayBeCorrupt = true
-	}
-	return err
+	return h.tw.WriteHeader(header)
 }
 
 func (h *bindMountHostFileToTarHelper) run(hostFile, fileNameInTar string) (isDir bool, err error) {
-	fileInfo, err := fs.Lstat(hostFile)
+	fileInfo, err := fs.OS.Lstat(hostFile)
 	if err != nil {
 		return
 	}
+	isDir = fileInfo.IsDir()
 	err = h.runRecursive(fileInfo, hostFile, fileNameInTar)
-	if err == nil {
-		isDir = fileInfo.IsDir()
-		return
-	}
-	if h.twMayBeCorrupt {
-		return
-	}
-	fmt.Printf("cannot simulate bind volume with host file %#v, interpreting as empty directory: ", hostFile)
-	fmt.Println(err)
-	// Change type to an empty directory
-	header, err := tar.FileInfoHeader(fileInfo, "")
-	if err != nil {
-		return
-	}
-	header.Typeflag = tar.TypeDir
-	header.Name += "/"
-	err = h.endHeaderCommon(header)
-	isDir = true
 	return
 }
 
@@ -243,20 +218,6 @@ func bindMountHostFileToTar(tw TarWriter, hostFile, renameTo string) (isDir bool
 	h.rootHostFileWithoutVol = hostFile[len(vol):]
 
 	isDir, err = h.run(hostFile, renameTo)
-	if err != nil {
-		if h.twMayBeCorrupt {
-			isDir = false
-			return
-		}
-		fmt.Printf("cannot simulate bind volume with host file %#v, interpreting as empty directory: ", hostFile)
-		fmt.Println(err)
-		header := &tar.Header{
-			Name:     renameTo + "/",
-			Typeflag: tar.TypeDir,
-		}
-		err = h.endHeaderCommon(header)
-		isDir = true
-	}
 	return
 }
 
@@ -342,7 +303,7 @@ func buildVolumeInitImage(
 }
 
 func resolveBindVolumeHostPath(name string) (string, error) {
-	name, err := filepath.Abs(name)
+	name, err := fs.OS.Abs(name)
 	if err != nil {
 		return "", err
 	}
@@ -353,12 +314,12 @@ func resolveBindVolumeHostPath(name string) (string, error) {
 	result := vol
 	for i := 1; i < len(parts); i++ {
 		result = result + sep + parts[i]
-		resultResolved, err := filepath.EvalSymlinks(result)
+		resultResolved, err := fs.OS.EvalSymlinks(result)
 		if os.IsNotExist(err) {
 			if i+1 < len(parts) {
 				result = result + sep + strings.Join(parts[i+1:], sep)
 			}
-			err = os.MkdirAll(result, 0777)
+			err = fs.OS.MkdirAll(result, os.ModePerm)
 			return result, err
 		}
 		if err != nil {

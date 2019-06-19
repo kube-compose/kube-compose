@@ -7,8 +7,8 @@ import (
 	"runtime"
 	"strings"
 
-	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
-	"github.com/kube-compose/kube-compose/internal/pkg/linux"
+	"github.com/kube-compose/kube-compose/internal/pkg/fs"
+	"github.com/kube-compose/kube-compose/internal/pkg/unix"
 )
 
 var isNT = runtime.GOOS == "windows"
@@ -35,9 +35,9 @@ func Home() (string, error) {
 }
 
 // HomePosix returns the home directory of the current user using non-Windows semantics. If the HOME environment variable is present it
-// returns its value. Otherwise, it looks for an entry with at least 6 fields and a uid equal to os.Getuid() in the /etc/passwd file. If
-// such an entry is found then returns the 6th field of the entry. An error is returned if and only if before mentioned return conditions
-// were not met.
+// returns its value. Otherwise, it looks for an entry in the /etc/passwd file with at least 6 fields and a uid equal to os.Getuid(). If
+// such an entry is found then returns the 6th field of the entry. If the before mentioned return conditions cannot be met an error is
+// returned.
 func HomePosix() (string, error) {
 	home, ok := LookupEnvFunc("HOME")
 	if !ok {
@@ -46,7 +46,7 @@ func HomePosix() (string, error) {
 			return "", fmt.Errorf("not available on Windows")
 		}
 		var err error
-		home, err = linux.FindHomeByUIDInPasswd(linux.EtcPasswd, int64(uid))
+		home, err = unix.FindHomeByUIDInPasswd(unix.EtcPasswd, int64(uid))
 		if err != nil {
 			return "", err
 		}
@@ -74,7 +74,7 @@ func Posix(path string) string {
 		}
 	} else {
 		name := path[1:i]
-		userhome, err = linux.FindHomeByNameInPasswd(linux.EtcPasswd, name)
+		userhome, err = unix.FindHomeByNameInPasswd(unix.EtcPasswd, name)
 		if err != nil {
 			// Ignore error here
 			return path
@@ -111,7 +111,7 @@ func NT(path string) string {
 		return path
 	}
 	i := 1
-	for i < len(path) && !fsPackage.IsPathSeparatorWindows(path[i]) {
+	for i < len(path) && !fs.NTIsPathSeparator(path[i]) {
 		i++
 	}
 	userhome, err := HomeNT()
@@ -126,12 +126,12 @@ func NT(path string) string {
 }
 
 func dirname(name string) int {
-	volLen := fsPackage.NTVolumeNameLength(name)
+	volLen := fs.NTVolumeNameLength(name)
 	j := len(name)
-	for j > volLen && fsPackage.IsPathSeparatorWindows(name[j-1]) {
+	for j > volLen && fs.NTIsPathSeparator(name[j-1]) {
 		j--
 	}
-	for j > volLen && !fsPackage.IsPathSeparatorWindows(name[j-1]) {
+	for j > volLen && !fs.NTIsPathSeparator(name[j-1]) {
 		j--
 	}
 	return j

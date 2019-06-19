@@ -3,8 +3,8 @@ package expanduser
 import (
 	"testing"
 
-	fsPackage "github.com/kube-compose/kube-compose/internal/pkg/fs"
-	"github.com/kube-compose/kube-compose/internal/pkg/linux"
+	"github.com/kube-compose/kube-compose/internal/pkg/fs"
+	"github.com/kube-compose/kube-compose/internal/pkg/unix"
 )
 
 func TestNT_Noop(t *testing.T) {
@@ -69,12 +69,12 @@ func TestHomeNT_SuccessAlternative(t *testing.T) {
 }
 
 func withMockEtcPasswd(s string, cb func()) {
-	orig := linux.FS
+	original := fs.OS
 	defer func() {
-		linux.FS = orig
+		fs.OS = original
 	}()
-	linux.FS = fsPackage.NewMockFileSystem(map[string]fsPackage.MockFile{
-		linux.EtcPasswd: {
+	fs.OS = fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+		unix.EtcPasswd: {
 			Content: []byte(s),
 		},
 	})

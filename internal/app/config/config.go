@@ -91,7 +91,7 @@ func New(file *string) (*Config, error) {
 	}
 	err = mapdecode.Decode(&custom, dcCfg.XProperties, mapdecode.IgnoreUnused(true))
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("error while parsing x-kube-compose of %#v", *file))
+		return nil, errors.Wrapf(err, "error while parsing x-kube-compose of %#v", *file)
 	}
 
 	if custom.XKubeCompose.PushImages != nil {

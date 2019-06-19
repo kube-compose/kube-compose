@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-	"time"
 )
 
 // FileDescriptor is an abstraction of os.File to improve testability of code.
@@ -16,19 +15,35 @@ type FileDescriptor interface {
 	Readdir(n int) ([]os.FileInfo, error)
 }
 
-// FileSystem is an abstraction of the file system to improve testability of code.
-type FileSystem interface {
+// VirtualFileSystem is an abstraction of the file system to improve testability of code.
+type VirtualFileSystem interface {
+	Abs(name string) (string, error)
 	EvalSymlinks(path string) (string, error)
+	Mkdir(name string, perm os.FileMode) error
+	MkdirAll(name string, perm os.FileMode) error
 	Lstat(name string) (os.FileInfo, error)
 	Open(name string) (FileDescriptor, error)
+	Readlink(name string) (string, error)
 	Stat(name string) (os.FileInfo, error)
 }
 
 type osFileSystem struct {
 }
 
+func (fs *osFileSystem) Abs(name string) (string, error) {
+	return filepath.Abs(name)
+}
+
 func (fs *osFileSystem) EvalSymlinks(path string) (string, error) {
 	return filepath.EvalSymlinks(path)
+}
+
+func (fs *osFileSystem) Mkdir(name string, perm os.FileMode) error {
+	return os.Mkdir(name, perm)
+}
+
+func (fs *osFileSystem) MkdirAll(name string, perm os.FileMode) error {
+	return os.MkdirAll(name, perm)
 }
 
 func (fs *osFileSystem) Lstat(name string) (os.FileInfo, error) {
@@ -39,359 +54,342 @@ func (fs *osFileSystem) Open(name string) (FileDescriptor, error) {
 	return os.Open(name)
 }
 
+func (fs *osFileSystem) Readlink(name string) (string, error) {
+	return os.Readlink(name)
+}
+
 func (fs *osFileSystem) Stat(name string) (os.FileInfo, error) {
 	return os.Stat(name)
 }
 
-var osfs FileSystem = &osFileSystem{}
+// OS is a VirtualFileSystem that relays directly to Go's "os" and "file/filepath" packages. OS can be replaced by a mock VirtualFileSystem
+// to improve testability of code using OS.
+var OS VirtualFileSystem = &osFileSystem{}
 
-// OSFileSystem returns a FileSystem instance that is backed by the os.
-func OSFileSystem() FileSystem {
-	return osfs
+// InMemoryFileSystem is a VirtualFileSystem with additional fields and functions useful for testing.
+type InMemoryFileSystem struct {
+	AbsError error
+	cwd      string
+	root     *node
 }
 
-type MockFileSystem interface {
-	FileSystem
-	Set(name string, mockFile MockFile)
+var (
+	errBadMode           = fmt.Errorf("file has a bad mode (or operation is not supported on this file)")
+	errIsDirDisagreement = fmt.Errorf("data contains a name X that is not a directory, but another name Y indicates " +
+		"that X must be a directory")
+	errTooManyLinks = fmt.Errorf("too many links")
+)
+
+func (fs *InMemoryFileSystem) abs(name string) string {
+	if name == "" || name[0] != '/' {
+		return fs.cwd + name
+	}
+	return name
 }
 
-type mockFileSystem struct {
-	root *mockINode
+type findHelper struct {
+	fs                   *InMemoryFileSystem
+	ignoreInjectedFaults bool
+	links                int
+	nameRem              string
+	n                    *node
+	resolveSymlinks      bool
 }
 
-type mockINode struct {
-	mode os.FileMode
-	// if err != nil then err is returned when this node is accessed.
-	err error
-	// Either mockINodeExtraDir or mockINodeExtraBytes, depending on the type of this node.
-	extra interface{}
-}
-
-type mockINodeExtraDir = []struct {
-	name string
-	node *mockINode
-}
-type mockINodeExtraBytes = []byte
-
-func (node *mockINode) dirLookup(nameComp string) *mockINode {
-	dir := node.extra.(mockINodeExtraDir)
-	for _, item := range dir {
-		if item.name == nameComp {
-			return item.node
+func (f *findHelper) getChildN(nameComp string) (*node, error) {
+	var childN *node
+	if nameComp != "" {
+		validateNameComp(nameComp)
+		if (f.n.mode & os.ModeDir) == 0 {
+			return nil, syscall.ENOTDIR
 		}
+		childN = f.n.dirLookup(nameComp)
+		if childN == nil {
+			return nil, os.ErrNotExist
+		}
+	}
+	return childN, nil
+}
+
+func (f *findHelper) getNameComp(slashPos int) string {
+	if slashPos < 0 {
+		return f.nameRem
+	}
+	return f.nameRem[:slashPos]
+}
+
+func (f *findHelper) run() error {
+	for f.nameRem != "" {
+		if !f.ignoreInjectedFaults && f.n.err != nil {
+			return f.n.err
+		}
+		slashPos := strings.IndexByte(f.nameRem, '/')
+		nameComp := f.getNameComp(slashPos)
+		childN, err := f.getChildN(nameComp)
+		if err != nil {
+			return err
+		}
+		f.updateNameRemFromSlashPos(slashPos)
+		if nameComp != "" {
+			err := f.updateFromChildN(childN)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	if !f.ignoreInjectedFaults && f.n.err != nil {
+		return f.n.err
 	}
 	return nil
 }
 
-func (node *mockINode) dirAppend(nameComp string, childNode *mockINode) {
-	dir := node.extra.(mockINodeExtraDir)
-	dir = append(dir, struct {
-		name string
-		node *mockINode
-	}{
-		name: nameComp,
-		node: childNode,
-	})
-	node.extra = dir
+func (f *findHelper) updateFromChildN(childN *node) error {
+	if (childN.mode & os.ModeSymlink) != 0 {
+		if f.resolveSymlinks {
+			f.links++
+			if f.links > 255 {
+				return errTooManyLinks
+			}
+			target := childN.extra.([]byte)
+			j := 0
+			if len(target) > 0 && target[0] == '/' {
+				// Absolute path
+				j = 1
+				f.n = f.fs.root
+			}
+			f.nameRem = string(target)[j:] + "/" + f.nameRem
+		}
+	} else {
+		f.n = childN
+	}
+	return nil
 }
 
-var (
-	errMockBadMode                = fmt.Errorf("mock file has a bad mode")
-	errMockDirectoryInconsistency = fmt.Errorf("data contains a name X that is not a directory, but another name Y indicates " +
-		"that X must be a directory")
-	errMockReadNonRegularFile = fmt.Errorf("cannot read non regular file")
-)
-
-// returns -1 if an item along the path is not a directory
-// panics if the supplied name is not normalized (we do not want to complicate things by requiring normalization)
-// otherwise, returns the index of the deepest path component and the parent inode of that component
-func (fs *mockFileSystem) find(name string) (node *mockINode, start int) {
-	node = fs.root
-	// All relative files are relative to the root.
-	if name == "" {
-		return
-	}
-	if name == "/" {
-		start = 1
-		return
-	}
-	if name[0] == '/' {
-		start = 1
-	}
-	for {
-		nameComp := name[start:]
-		end := strings.IndexByte(nameComp, '/')
-		if end >= 0 {
-			end += start
-			nameComp = name[start:end]
-		}
-		validateNameComp(nameComp)
-		if (node.mode & os.ModeDir) == 0 {
-			return node, -1
-		}
-		childNode := node.dirLookup(nameComp)
-		if childNode == nil {
-			return node, start
-		}
-		node = childNode
-		if end < 0 {
-			return node, len(name)
-		}
-		start = end + 1
+func (f *findHelper) updateNameRemFromSlashPos(slashPos int) {
+	if slashPos < 0 {
+		f.nameRem = ""
+	} else {
+		f.nameRem = f.nameRem[slashPos+1:]
 	}
 }
 
-func (fs *mockFileSystem) findOrError(name string) (*mockINode, error) {
-	node := fs.root
-	// All relative files are relative to the root.
-	if name == "" {
-		return node, node.err
+func (fs *InMemoryFileSystem) find(
+	name string,
+	ignoreInjectedFaults, resolveSymlinks bool) (n *node, nameRem string, err error) {
+	f := findHelper{
+		fs:                   fs,
+		ignoreInjectedFaults: ignoreInjectedFaults,
+		nameRem:              fs.abs(name)[1:],
+		n:                    fs.root,
+		resolveSymlinks:      resolveSymlinks,
 	}
-	start := 0
-	if name[0] == '/' {
-		start = 1
-	}
-	for start < len(name) {
-		if node.err != nil {
-			return node, node.err
-		}
-		nameComp := name[start:]
-		end := strings.IndexByte(nameComp, '/')
-		if end >= 0 {
-			end += start
-			nameComp = name[start:end]
-		}
-		validateNameComp(nameComp)
-		if (node.mode & os.ModeDir) == 0 {
-			return node, syscall.ENOTDIR
-		}
-		childNode := node.dirLookup(nameComp)
-		if childNode == nil {
-			return node, os.ErrNotExist
-		}
-		node = childNode
-		if end < 0 {
-			break
-		}
-		start = end + 1
-	}
-	return node, node.err
+	err = f.run()
+	n = f.n
+	nameRem = f.nameRem
+	return
 }
 
 func validateNameComp(nameComp string) {
-	if nameComp == "" || nameComp == "." || nameComp == ".." {
+	if nameComp == "." || nameComp == ".." {
 		panic(fmt.Errorf("name must not contain '//' and must not have a path component that is one of  '..' and '.'"))
 	}
 }
 
-func (fs *mockFileSystem) createChildren(node *mockINode, name string, mockFile MockFile) {
-	start := 0
+func (fs *InMemoryFileSystem) createChildren(n *node, nameRem string, vfile *InMemoryFile) {
 	for {
-		nameComp := name[start:]
-		end := strings.IndexByte(nameComp, '/')
-		if end >= 0 {
-			end += start
-			nameComp = name[start:end]
-		}
-		validateNameComp(nameComp)
-		var childNode *mockINode
-		if end >= 0 {
-			// initialize directory with defaults
-			childNode = &mockINode{
-				mode:  os.ModeDir,
-				extra: mockINodeExtraDir{},
-			}
-			node.dirAppend(nameComp, childNode)
-			node = childNode
+		var nameComp string
+		slashPos := strings.IndexByte(nameRem, '/')
+		if slashPos < 0 {
+			nameComp = nameRem
 		} else {
-			// initialize file or directory as per MockFile
-			childNode = &mockINode{
-				err:  mockFile.Error,
-				mode: mockFile.Mode,
-			}
-			if (mockFile.Mode & os.ModeDir) != 0 {
-				childNode.extra = mockINodeExtraDir{}
-			} else {
-				childNode.extra = mockFile.Content
-			}
-			node.dirAppend(nameComp, childNode)
-			return
+			nameComp = nameRem[:slashPos]
 		}
-		start = end + 1
+		if nameComp != "" {
+			validateNameComp(nameComp)
+			var childN *node
+			if slashPos < 0 {
+				// initialize file or directory as per InMemoryFile
+				childN = &node{
+					err:     vfile.Error,
+					errOpen: vfile.OpenError,
+					errRead: vfile.ReadError,
+					mode:    vfile.Mode,
+					name:    nameComp,
+				}
+				if (vfile.Mode & os.ModeDir) == 0 {
+					childN.extra = vfile.Content
+				} else {
+					childN.extra = []*node{}
+				}
+				n.dirAppend(childN)
+				return
+			}
+			// initialize directory with defaults
+			childN = newDirNode(
+				os.ModeDir,
+				nameComp,
+			)
+			n.dirAppend(childN)
+			n = childN
+		}
+		if slashPos < 0 {
+			break
+		}
+		nameRem = nameRem[slashPos+1:]
 	}
 }
 
-// MockFile is a helper struct used to initialize a file or directory in a mock file system. If Error is set then all file system
-// operations will produce an error when this file is accessed. If Mode is a regular file then Content is the content of that file.
-// If Mode is not a regular file or directory then an error is produced in MockFileSystem.
-type MockFile struct {
-	Content []byte
-	Mode    os.FileMode
-	Error   error
+// InMemoryFile is a helper struct used to initialize a file, directory or other type of file in a virtual file system.
+// If Error is set then all file system operations will produce an error when the file is accessed. If Mode is a regular
+// file then Content is the content of that file. If Mode is Symlink then Content is the location of the Symlink.
+type InMemoryFile struct {
+	Content   []byte
+	Error     error
+	Mode      os.FileMode
+	OpenError error
+	ReadError error
 }
 
-// NewMockFileSystem creates a mock file system based on the provided data.
-func NewMockFileSystem(data map[string]MockFile) MockFileSystem {
-	fs := &mockFileSystem{
-		root: &mockINode{
-			mode:  os.ModeDir,
-			extra: mockINodeExtraDir{},
-		},
+// NewInMemoryUnixFileSystem creates a mock file system based on the provided data.
+func NewInMemoryUnixFileSystem(data map[string]InMemoryFile) *InMemoryFileSystem {
+	fs := &InMemoryFileSystem{
+		cwd: "/",
+		root: newDirNode(
+			0,
+			"/",
+		),
 	}
-	for name, mockFile := range data {
-		fs.Set(name, mockFile)
+	for name, vfile := range data {
+		// Ignoring pointer to range variable linting error here.
+		// nolint
+		fs.Set(name, &vfile)
 	}
 	return fs
 }
 
-func (fs *mockFileSystem) Set(name string, mockFile MockFile) {
+// Set sets or updates the file at name. If one of the parents of name exists and is not a directory then the error ENOTDIR is returned. If
+// a file already exists at name and it is a directory and vfile is not a directory (or vice versa) then an error is thrown. Otherwise, if a
+// file already exists at name its attributes, injected fault, symlink target or regular file contents are updated with the values from
+// vfile.
+func (fs *InMemoryFileSystem) Set(name string, vfile *InMemoryFile) {
 	var flag os.FileMode
 	switch {
-	case mockFile.Mode.IsDir():
+	case vfile.Mode.IsDir():
 		flag = os.ModeDir
-	case (mockFile.Mode & os.ModeSymlink) != 0:
+	case (vfile.Mode & os.ModeSymlink) != 0:
 		flag = os.ModeSymlink
-	case mockFile.Mode.IsRegular():
+	case vfile.Mode.IsRegular():
 		flag = 0
+	case (vfile.Mode & os.ModeDevice) != 0:
+		flag = os.ModeDevice
 	}
-	if (mockFile.Mode & (os.ModeType &^ flag)) != 0 {
-		panic(errMockBadMode)
+	if (vfile.Mode & (os.ModeType &^ flag)) != 0 {
+		panic(errBadMode)
 	}
-	node, start := fs.find(name)
-	if start == -1 {
-		panic(errMockDirectoryInconsistency)
+	n, nameRem, err := fs.find(name, true, false)
+	if err == syscall.ENOTDIR {
+		panic(errIsDirDisagreement)
 	}
-	if start < len(name) {
-		fs.createChildren(node, name[start:], mockFile)
+	if nameRem != "" {
+		fs.createChildren(n, nameRem, vfile)
 	} else {
-		nodeIsDir := (node.mode & os.ModeDir) != 0
-		mockFileIsDir := (mockFile.Mode & os.ModeDir) != 0
-		if nodeIsDir != mockFileIsDir {
-			panic(errMockDirectoryInconsistency)
+		nodeIsDir := (n.mode & os.ModeDir) != 0
+		vfileIsDir := (vfile.Mode & os.ModeDir) != 0
+		if nodeIsDir != vfileIsDir {
+			panic(errIsDirDisagreement)
 		}
-		node.mode = mockFile.Mode
-		node.err = mockFile.Error
-		if !mockFileIsDir {
-			node.extra = mockFile.Content
+		if !vfileIsDir {
+			n.extra = vfile.Content
 		}
+		n.err = vfile.Error
+		n.errOpen = vfile.OpenError
+		n.errRead = vfile.ReadError
+		n.mode = vfile.Mode
 	}
 }
 
-type mockFileDescriptor struct {
-	node    *mockINode
+type virtualFileDescriptor struct {
+	node    *node
 	readPos int
 }
 
-func (r *mockFileDescriptor) Close() error {
+func (r *virtualFileDescriptor) Close() error {
 	return nil
 }
 
-func (r *mockFileDescriptor) Read(p []byte) (n int, err error) {
-	if !r.node.mode.IsRegular() {
-		err = errMockReadNonRegularFile
+func (r *virtualFileDescriptor) Read(p []byte) (n int, err error) {
+	if !r.node.mode.IsRegular() && (r.node.mode&os.ModeDevice) == 0 {
+		err = errBadMode
 		return
 	}
-	if len(p) == 0 {
+	if r.node.errRead != nil {
+		err = r.node.errRead
 		return
 	}
-	fileContents := r.node.extra.(mockINodeExtraBytes)
-	n = copy(p, fileContents[r.readPos:])
-	r.readPos += n
-	if n == 0 {
-		err = io.EOF
+	if len(p) > 0 {
+		fileContents := r.node.extra.([]byte)
+		n = copy(p, fileContents[r.readPos:])
+		r.readPos += n
+		if n == 0 {
+			err = io.EOF
+		}
 	}
 	return
 }
 
-func (r *mockFileDescriptor) Readdir(n int) ([]os.FileInfo, error) {
+func (r *virtualFileDescriptor) Readdir(n int) ([]os.FileInfo, error) {
 	if !r.node.mode.IsDir() {
 		return nil, syscall.ENOTDIR
 	}
 	if n > 0 {
 		panic(fmt.Errorf("not supported"))
 	}
-	var ret []os.FileInfo
-	for _, item := range r.node.extra.(mockINodeExtraDir) {
-		ret = append(ret, newMockFileInfo(item.node, item.name))
+	if r.node.errRead != nil {
+		return nil, r.node.errRead
 	}
-	return ret, nil
-}
-
-func (fs *mockFileSystem) EvalSymlinks(path string) (string, error) {
-	_, err := fs.findOrError(path)
-	if err != nil {
-		return "", err
+	dir := r.node.extra.([]*node)
+	if len(dir) == 0 {
+		return nil, nil
 	}
-	// Symbolic links are not supported in the mock file system.
-	return path, nil
+	fileInfoSlice := make([]os.FileInfo, len(dir))
+	for i := 0; i < len(dir); i++ {
+		fileInfoSlice[i] = dir[i]
+	}
+	return fileInfoSlice, nil
 }
 
-func (fs *mockFileSystem) Lstat(name string) (os.FileInfo, error) {
-	// Symbolic links are not supported in the mock file system.
-	return fs.Stat(name)
+func trimTrailingSlashes(name string) string {
+	n := len(name)
+	for n > 0 && name[n-1] == '/' {
+		n--
+	}
+	return name[:n]
 }
 
-func (fs *mockFileSystem) Open(name string) (FileDescriptor, error) {
-	node, err := fs.findOrError(name)
+func (fs *InMemoryFileSystem) Abs(name string) (string, error) {
+	if fs.AbsError != nil {
+		return "", fs.AbsError
+	}
+	return fs.abs(name), nil
+}
+
+func (fs *InMemoryFileSystem) Open(name string) (FileDescriptor, error) {
+	node, _, err := fs.find(name, false, true)
 	if err != nil {
 		return nil, err
 	}
-	return &mockFileDescriptor{
+	if node.errOpen != nil {
+		return nil, node.errOpen
+	}
+	return &virtualFileDescriptor{
 		node: node,
 	}, nil
 }
 
-type mockFileInfo struct {
-	mode os.FileMode
-	name string
-	size int64
-}
-
-func (fileInfo *mockFileInfo) IsDir() bool {
-	return fileInfo.mode.IsDir()
-}
-
-func (fileInfo *mockFileInfo) Mode() os.FileMode {
-	return fileInfo.mode
-}
-
-func (fileInfo *mockFileInfo) ModTime() time.Time {
-	return time.Time{}
-}
-
-func (fileInfo *mockFileInfo) Name() string {
-	return fileInfo.name
-}
-
-func (fileInfo *mockFileInfo) Size() int64 {
-	return fileInfo.size
-}
-
-func (fileInfo *mockFileInfo) Sys() interface{} {
-	return nil
-}
-
-func newMockFileInfo(node *mockINode, nameComp string) *mockFileInfo {
-	fileInfo := &mockFileInfo{
-		mode: node.mode,
-		name: nameComp,
-	}
-	if node.mode.IsRegular() {
-		fileInfo.size = int64(len(node.extra.(mockINodeExtraBytes)))
-	}
-	return fileInfo
-}
-
-func (fs *mockFileSystem) Stat(name string) (os.FileInfo, error) {
-	node, err := fs.findOrError(name)
+func (fs *InMemoryFileSystem) Stat(name string) (os.FileInfo, error) {
+	n, _, err := fs.find(name, false, true)
 	if err != nil {
 		return nil, err
 	}
-	i := strings.LastIndexByte(name, '/')
-	return newMockFileInfo(node, name[i+1:]), nil
-}
-
-// IsPathSeparatorWindows returns true if and only if b is the ASCII code of a forward or backward slash.
-func IsPathSeparatorWindows(b byte) bool {
-	return b == '/' || b == '\\'
+	return n, nil
 }

@@ -168,7 +168,7 @@ func parsePortBindings(spec string, portBindings []PortBinding) ([]PortBinding, 
 func parsePortUint(portStr string) (int32, error) {
 	port, err := strconv.ParseUint(portStr, 10, 64)
 	if err != nil {
-		return -1, errors.Wrap(err, fmt.Sprintf("unsupported port format %s", portStr))
+		return -1, errors.Wrapf(err, "unsupported port format %s", portStr)
 	}
 	if port >= 65536 {
 		return -1, fmt.Errorf("port must be < 65536 but got %d", port)
