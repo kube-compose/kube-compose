@@ -129,46 +129,57 @@ func Test_BindMountHostFileToTar_SuccessRegularFile(t *testing.T) {
 	})
 }
 
-func Test_BindMountHostFileToTar_RecoverFromRegularFileError(t *testing.T) {
+func Test_BindMountHostFileToTar_StatError(t *testing.T) {
 	withMockFS(vfs, func() {
 		tw := &mockTarWriter{}
-		isDir, err := bindMountHostFileToTar(tw, "origerr", "renamed2")
-		if err != nil {
-			t.Error(err)
-		} else {
-			if !isDir {
-				t.Fail()
-			}
-			expected := []mockTarWriterEntry{
-				directory("renamed2/"),
-			}
-			if !reflect.DeepEqual(tw.entries, expected) {
-				t.Logf("entries1: %+v\n", tw.entries)
-				t.Logf("entries2: %+v\n", expected)
-				t.Fail()
-			}
+		_, err := bindMountHostFileToTar(tw, "origerr", "renamed2")
+		if err == nil {
+			t.Fail()
 		}
 	})
 }
-func Test_BindMountHostFileToTar_RegularFileTarError(t *testing.T) {
-	withMockFS(vfs, func() {
-		tw := &mockTarWriter{}
-		isDir, err := bindMountHostFileToTar(tw, "origerr", "renamed")
-		if err != nil {
-			t.Error(err)
-		} else {
-			if !isDir {
-				t.Fail()
-			}
-			expected := []mockTarWriterEntry{
-				directory("renamed/"),
-			}
-			if !reflect.DeepEqual(tw.entries, expected) {
-				t.Logf("entries1: %+v\n", tw.entries)
-				t.Logf("entries2: %+v\n", expected)
-				t.Fail()
-			}
+
+func withTarFileInfoHeaderError(err error, symlinkOnly bool, cb func()) {
+	orig := tarFileInfoHeader
+	defer func(){
+		tarFileInfoHeader = orig
+	}()
+	tarFileInfoHeader = func(fileInfo os.FileInfo, link string) (*tar.Header, error) {
+		if (fileInfo.Mode()&os.ModeSymlink) == 0 && symlinkOnly {
+			return tar.FileInfoHeader(fileInfo, link)
 		}
+		return nil, err
+	}
+	cb()
+}
+
+func Test_BindMountHostFileToTar_RegularFileTarHeaderError(t *testing.T) {
+	errExpected := fmt.Errorf("regularFileTarHeaderError")
+	withTarFileInfoHeaderError(errExpected, false, func(){
+		withMockFS(vfs, func() {
+			tw := &mockTarWriter{}
+			_, errActual := bindMountHostFileToTar(tw, "orig", "renamed")
+			if errActual != errExpected {
+				t.Fail()
+			}
+		})
+	})
+}
+
+func Test_BindMountHostFileToTar_DirTarHeaderError(t *testing.T) {
+	errExpected := fmt.Errorf("dirTarHeaderError")
+	withTarFileInfoHeaderError(errExpected, false, func(){
+		withMockFS(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+			"/dir": {
+				Mode: os.ModeDir,
+			},
+		}), func() {
+			tw := &mockTarWriter{}
+			_, errActual := bindMountHostFileToTar(tw, "dir", "renamed")
+			if errActual != errExpected {
+				t.Fail()
+			}
+		})
 	})
 }
 
@@ -229,7 +240,18 @@ func Test_BindMountHostFileToTar_ErrorSymlinkNotWithinBindHostRoot(t *testing.T)
 		}
 	})
 }
-
+func Test_BindMountHostFileToTar_SymlinkTarHeaderError(t *testing.T) {
+	errExpected := fmt.Errorf("symlinkTarHeaderError")
+	withTarFileInfoHeaderError(errExpected, true, func(){
+		withMockFS(vfs, func() {
+			tw := &mockTarWriter{}
+			_, errActual := bindMountHostFileToTar(tw, "dir2", "renamed")
+			if errActual != errExpected {
+				t.Fail()
+			}
+		})
+	})
+}
 func Test_BuildVolumeInitImageGetDockerfile_Success(t *testing.T) {
 	actual := buildVolumeInitImageGetDockerfile([]bool{true, false})
 	expected := []byte(`ARG BASE_IMAGE
