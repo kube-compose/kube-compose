@@ -32,12 +32,11 @@ func getCommand(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	var template *template.Template
+	var tmpl *template.Template
 	if cmd.Flags().Changed("format") {
 		var format string
 		format, _ = cmd.Flags().GetString("format")
-		var err error
-		template, err = template.New("testasdf").Parse(format)
+		tmpl, err = template.New("test").Parse(format)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
@@ -49,8 +48,8 @@ func getCommand(cmd *cobra.Command, args []string) error {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if template != nil {
-		err = template.Execute(os.Stdout, result)
+	if tmpl != nil {
+		err = tmpl.Execute(os.Stdout, result)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
