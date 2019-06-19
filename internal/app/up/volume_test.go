@@ -430,13 +430,13 @@ ENTRYPOINT ["bash", "-c", "cp -ar /app/data/vol1 /mnt/vol1/root && cp -ar /app/d
 
 func Test_ResolveBindVolumeHostPath_AbsError(t *testing.T) {
 	errExpected := fmt.Errorf("resolveBindVolumeHostPathAbsError")
-	vfs := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{})
-	vfs.AbsError = errExpected
+	vfsTest := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{})
+	vfsTest.AbsError = errExpected
 	fsOld := fs.OS
 	defer func() {
 		fs.OS = fsOld
 	}()
-	fs.OS = vfs
+	fs.OS = vfsTest
 
 	_, errActual := resolveBindVolumeHostPath("")
 	if errActual != errExpected {
@@ -445,12 +445,12 @@ func Test_ResolveBindVolumeHostPath_AbsError(t *testing.T) {
 }
 
 func Test_ResolveBindVolumeHostPath_SuccessMkdirAll(t *testing.T) {
-	vfs := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{})
+	vfsTest := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{})
 	fsOld := fs.OS
 	defer func() {
 		fs.OS = fsOld
 	}()
-	fs.OS = vfs
+	fs.OS = vfsTest
 
 	resolved, err := resolveBindVolumeHostPath("/dir1/dir1_1")
 	switch {
@@ -469,7 +469,7 @@ func Test_ResolveBindVolumeHostPath_SuccessMkdirAll(t *testing.T) {
 }
 
 func Test_BuildVolumeInitImageGetBuildContext_Success(t *testing.T) {
-	withMockFS(vfs, func(){
+	withMockFS(vfs, func() {
 		_, err := buildVolumeInitImageGetBuildContext([]string{
 			"orig",
 		})
