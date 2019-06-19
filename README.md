@@ -158,7 +158,7 @@ NOTE1: if a Dockerfile does not have a `USER` instruction, then the user is inhe
 NOTE2: this may seem like a useless feature, since authenticating with a user that has permissions to deploy pods that can run as any user should achieve the same effect, but `docker-compose`'s `user` property cannot be respected by relying on this function.
 
 # Known limitations
-1. The `up` subcommand does not build images and attempts to pull images even if they are already present locally ([#188](https://github.com/kube-compose/kube-compose/issues/188) and [#198](https://github.com/kube-compose/kube-compose/issues/198), respectively).
+1. The `up` subcommand does not an build images of `docker-compose` services ([#188](https://github.com/kube-compose/kube-compose/issues/188)).
 2. If no `-f` and `--file` flags are present then `kube-compose` never looks for a `docker-compose.yml` or `docker-compose.yaml` file in parents of the current working directory ([#151](https://github.com/kube-compose/kube-compose/issues/151)).
 3. `kube-compose` never loads `docker-compose.override.yml` and `docker-compose.override.yaml` files and behaves as if those do not exists ([#124](https://github.com/kube-compose/kube-compose/issues/124)).
 4. When extending a `docker-compose` service using `extends`, only ports and environment are copied from the extended `docker-compose` service ([#48](https://github.com/kube-compose/kube-compose/issues/48)).
