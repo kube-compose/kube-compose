@@ -18,7 +18,6 @@ kube-compose can create and destroy environments in Kubernetes based on docker c
   * [Running containers as specific users](#Running-containers-as-specific-users)
 * [Known limitations](#Known-limitations)
 * [Developer information](#Developer-information)
-* [Why another tool?](#Why-another-tool?)
 
 # Installation
 ## Using Homebrew
@@ -163,7 +162,6 @@ NOTE2: this may seem like a useless feature, since authenticating with a user th
 2. If no `-f` and `--file` flags are present then `kube-compose` never looks for a `docker-compose.yml` or `docker-compose.yaml` file in parents of the current working directory ([#151](https://github.com/kube-compose/kube-compose/issues/151)).
 3. `kube-compose` never loads `docker-compose.override.yml` and `docker-compose.override.yaml` files and behaves as if those do not exists ([#124](https://github.com/kube-compose/kube-compose/issues/124)).
 4. When extending a `docker-compose` service using `extends`, only ports and environment are copied from the extended `docker-compose` service ([#48](https://github.com/kube-compose/kube-compose/issues/48)).
-5. 
 
 # Developer information
 
@@ -203,8 +201,6 @@ Run `kube-compose` with the test [docker-compose.yml](test/docker-compose.yml):
 ```bash
 kube-compose -f test/docker-compose.yml --env-id test123 up
 ```
-
-This writes the created Kubernetes resources to the directory test/output.
 
 To clean up after the test:
 
