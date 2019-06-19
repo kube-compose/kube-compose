@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	// Plugin does not export any functions therefore it is ignored IE. "_"
+	"k8s.io/apimachinery/pkg/util/validation"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -55,9 +56,15 @@ func getEnvIDFlag(cmd *cobra.Command) (string, error) {
 		if !exists {
 			return "", fmt.Errorf("either the flag --env-id or the environment variable %sENVID must be set", envVarPrefix)
 		}
-		return envID, nil
+		if e := validation.IsValidLabelValue(envID); len(e) > 0 {
+			return "", fmt.Errorf("the environment variable %sENVID must be a valid label value: %s", envVarPrefix, e[0])
+		}
+	} else {
+		envID, _ = cmd.Flags().GetString(envIDFlagName)
+		if e := validation.IsValidLabelValue(envID); len(e) > 0 {
+			return "", fmt.Errorf("the --env-id flag must be a valid label value: %s", e[0])
+		}
 	}
-	envID, _ = cmd.Flags().GetString(envIDFlagName)
 	return envID, nil
 }
 
