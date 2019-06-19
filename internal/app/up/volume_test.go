@@ -19,7 +19,7 @@ var vfs *fs.InMemoryFileSystem
 // init here is justified because a common mock file system is used, and we require calling Set to make tests deterministic.
 // nolint
 func init() {
-	vfs = fs.NewInMemoryFileSystem(map[string]fs.InMemoryFile{
+	vfs = fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 		"/orig": {
 			Content: []byte(testFileContent),
 		},
@@ -247,7 +247,7 @@ ENTRYPOINT ["bash", "-c", "cp -ar /app/data/vol1 /mnt/vol1/root && cp -ar /app/d
 
 func Test_ResolveBindVolumeHostPath_AbsError(t *testing.T) {
 	errExpected := fmt.Errorf("resolveBindVolumeHostPathAbsError")
-	vfs := fs.NewInMemoryFileSystem(map[string]fs.InMemoryFile{})
+	vfs := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{})
 	vfs.AbsError = errExpected
 	fsOld := fs.OS
 	defer func() {
@@ -262,7 +262,7 @@ func Test_ResolveBindVolumeHostPath_AbsError(t *testing.T) {
 }
 
 func Test_ResolveBindVolumeHostPath_SuccessMkdirAll(t *testing.T) {
-	vfs := fs.NewInMemoryFileSystem(map[string]fs.InMemoryFile{})
+	vfs := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{})
 	fsOld := fs.OS
 	defer func() {
 		fs.OS = fsOld

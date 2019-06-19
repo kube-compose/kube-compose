@@ -73,7 +73,7 @@ func withMockEtcPasswd(s string, cb func()) {
 	defer func() {
 		fs.OS = original
 	}()
-	fs.OS = fs.NewInMemoryFileSystem(map[string]fs.InMemoryFile{
+	fs.OS = fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 		unix.EtcPasswd: {
 			Content: []byte(s),
 		},

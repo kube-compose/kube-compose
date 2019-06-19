@@ -8,7 +8,7 @@ import (
 
 func Test_Readlink_Success(t *testing.T) {
 	targetExpected := "successtarget"
-	fs := NewInMemoryFileSystem(map[string]InMemoryFile{
+	fs := NewInMemoryUnixFileSystem(map[string]InMemoryFile{
 		"/success": {
 			Mode:    os.ModeSymlink,
 			Content: []byte(targetExpected),
@@ -22,7 +22,7 @@ func Test_Readlink_Success(t *testing.T) {
 	}
 }
 func Test_Readlink_ErrorNotSymlink(t *testing.T) {
-	fs := NewInMemoryFileSystem(map[string]InMemoryFile{
+	fs := NewInMemoryUnixFileSystem(map[string]InMemoryFile{
 		"/errornotsymlink": {},
 	})
 	_, err := fs.Readlink("/errornotsymlink")
@@ -32,7 +32,7 @@ func Test_Readlink_ErrorNotSymlink(t *testing.T) {
 }
 func Test_Readlink_ErrorInjectedFault(t *testing.T) {
 	errExpected := fmt.Errorf("errorInjectedFault")
-	fs := NewInMemoryFileSystem(map[string]InMemoryFile{})
+	fs := NewInMemoryUnixFileSystem(map[string]InMemoryFile{})
 	fs.root.err = errExpected
 	_, errActual := fs.Readlink("")
 	if errActual != errExpected {

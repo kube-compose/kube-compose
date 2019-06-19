@@ -7,7 +7,7 @@ import (
 	"github.com/kube-compose/kube-compose/internal/pkg/fs"
 )
 
-var vfs fs.VirtualFileSystem = fs.NewInMemoryFileSystem(map[string]fs.InMemoryFile{
+var vfs fs.VirtualFileSystem = fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 	EtcPasswd: {
 		Content: []byte("root:x:0:\ndaemon:x:1:1:daemon:/daemonhomelol\nasdf\nuiderr:x::"),
 	},

@@ -88,7 +88,7 @@ var dockerComposeYmlInvalid = "/docker-compose.invalid.yml"
 var dockerComposeYmlInvalidServiceName = "/docker-compose.invalid-service-name.yml"
 var dockerComposeYmlInvalidXKubeCompose = "/docker-compose.invalid-x-kube-compose.yml"
 var dockerComposeYmlValidPushImages = "/docker-compose.valid-push-images.yml"
-var vfs fs.VirtualFileSystem = fs.NewInMemoryFileSystem(map[string]fs.InMemoryFile{
+var vfs fs.VirtualFileSystem = fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 	dockerComposeYmlInvalid: {
 		Content: []byte(`version: 'asdf'`),
 	},

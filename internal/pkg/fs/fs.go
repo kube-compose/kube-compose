@@ -246,8 +246,8 @@ type InMemoryFile struct {
 	Error   error
 }
 
-// NewInMemoryFileSystem creates a mock file system based on the provided data.
-func NewInMemoryFileSystem(data map[string]InMemoryFile) *InMemoryFileSystem {
+// NewInMemoryUnixFileSystem creates a mock file system based on the provided data.
+func NewInMemoryUnixFileSystem(data map[string]InMemoryFile) *InMemoryFileSystem {
 	fs := &InMemoryFileSystem{
 		cwd: "/",
 		root: newDirNode(

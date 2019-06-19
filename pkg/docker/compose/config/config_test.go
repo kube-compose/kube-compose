@@ -25,7 +25,7 @@ const testDockerComposeYmlDependsOnDoesNotExist = "/docker-compose.depends-on-do
 const testDockerComposeYmlDependsOnCycle = "/docker-compose.depends-on-cycle.yml"
 const testDockerComposeYmlDependsOn = "/docker-compose.depends-on.yml"
 
-var mockFS = fs.NewInMemoryFileSystem(map[string]fs.InMemoryFile{
+var mockFS = fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 	testDockerComposeYml: {
 		Content: []byte(`testservice:
   entrypoint: []
@@ -162,7 +162,7 @@ services:
 	},
 })
 
-var mockFileSystemStandardFileError = fs.NewInMemoryFileSystem(map[string]fs.InMemoryFile{
+var mockFileSystemStandardFileError = fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 	"/docker-compose.yml": {
 		Error: errors.New("unknown error 2"),
 	},

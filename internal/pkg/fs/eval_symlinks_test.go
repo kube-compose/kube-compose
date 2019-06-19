@@ -8,7 +8,7 @@ import (
 )
 
 func Test_VirtualFileSystem_EvalSymlinks_AbsRootInjectedFault(t *testing.T) {
-	fs := NewInMemoryFileSystem(map[string]InMemoryFile{})
+	fs := NewInMemoryUnixFileSystem(map[string]InMemoryFile{})
 	errExpected := fmt.Errorf("absRootInjectedFault")
 	fs.root.err = errExpected
 	_, errActual := fs.EvalSymlinks("/")
@@ -18,7 +18,7 @@ func Test_VirtualFileSystem_EvalSymlinks_AbsRootInjectedFault(t *testing.T) {
 }
 
 func Test_VirtualFileSystem_EvalSymlinks_RelCwdInjectedFault(t *testing.T) {
-	fs := NewInMemoryFileSystem(map[string]InMemoryFile{})
+	fs := NewInMemoryUnixFileSystem(map[string]InMemoryFile{})
 	errExpected := fmt.Errorf("relCwdInjectedFault")
 	fs.root.err = errExpected
 	_, errActual := fs.EvalSymlinks("")
@@ -28,7 +28,7 @@ func Test_VirtualFileSystem_EvalSymlinks_RelCwdInjectedFault(t *testing.T) {
 }
 
 func Test_VirtualFileSystem_EvalSymlinks_ENOTDIR(t *testing.T) {
-	fs := NewInMemoryFileSystem(map[string]InMemoryFile{
+	fs := NewInMemoryUnixFileSystem(map[string]InMemoryFile{
 		"notadir": {
 			Content: []byte("notadircontent"),
 		},
@@ -40,7 +40,7 @@ func Test_VirtualFileSystem_EvalSymlinks_ENOTDIR(t *testing.T) {
 }
 
 func Test_VirtualFileSystem_EvalSymlinks_ENOENT(t *testing.T) {
-	fs := NewInMemoryFileSystem(map[string]InMemoryFile{})
+	fs := NewInMemoryUnixFileSystem(map[string]InMemoryFile{})
 	_, err := fs.EvalSymlinks("doesnotexist")
 	if !os.IsNotExist(err) {
 		t.Fail()
@@ -48,7 +48,7 @@ func Test_VirtualFileSystem_EvalSymlinks_ENOENT(t *testing.T) {
 }
 func Test_VirtualFileSystem_EvalSymlinks_NonRootInjectedFault(t *testing.T) {
 	errExpected := fmt.Errorf("nonRootInjectedFault")
-	fs := NewInMemoryFileSystem(map[string]InMemoryFile{
+	fs := NewInMemoryUnixFileSystem(map[string]InMemoryFile{
 		"child": {
 			Error: errExpected,
 		},
@@ -60,7 +60,7 @@ func Test_VirtualFileSystem_EvalSymlinks_NonRootInjectedFault(t *testing.T) {
 }
 
 func Test_VirtualFileSystem_EvalSymlinks_AbsTooManyLinks(t *testing.T) {
-	fs := NewInMemoryFileSystem(map[string]InMemoryFile{
+	fs := NewInMemoryUnixFileSystem(map[string]InMemoryFile{
 		"selflink": {
 			Content: []byte("selflink"),
 			Mode:    os.ModeSymlink,
@@ -73,7 +73,7 @@ func Test_VirtualFileSystem_EvalSymlinks_AbsTooManyLinks(t *testing.T) {
 }
 
 func Test_VirtualFileSystem_EvalSymlinks_Success(t *testing.T) {
-	fs := NewInMemoryFileSystem(map[string]InMemoryFile{
+	fs := NewInMemoryUnixFileSystem(map[string]InMemoryFile{
 		"/dir1/link1": {
 			Content: []byte("/link2"),
 			Mode:    os.ModeSymlink,
