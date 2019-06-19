@@ -8,9 +8,9 @@ import (
 	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/util/validation"
 
 	// Plugin does not export any functions therefore it is ignored IE. "_"
-	"k8s.io/apimachinery/pkg/util/validation"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/tools/clientcmd"
 )

@@ -777,7 +777,7 @@ func TestComposeFileParsedServiceClearRecStack_Success(t *testing.T) {
 }
 
 func TestLoadFileError_Success(t *testing.T) {
-	err := loadFileError("some file", fmt.Errorf("an error occured"))
+	err := loadFileError("some file", fmt.Errorf("an error occurred"))
 	if err == nil {
 		t.Fail()
 	}
