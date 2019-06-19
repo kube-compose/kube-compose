@@ -62,10 +62,15 @@ type mockTarWriterEntry struct {
 }
 
 type mockTarWriter struct {
-	entries []mockTarWriterEntry
+	entries        []mockTarWriterEntry
+	errWrite       error
+	errWriteHeader error
 }
 
 func (m *mockTarWriter) WriteHeader(header *tar.Header) error {
+	if m.errWriteHeader != nil {
+		return m.errWriteHeader
+	}
 	m.entries = append(m.entries, mockTarWriterEntry{
 		h: header,
 	})
@@ -73,6 +78,9 @@ func (m *mockTarWriter) WriteHeader(header *tar.Header) error {
 }
 
 func (m *mockTarWriter) Write(p []byte) (int, error) {
+	if m.errWrite != nil {
+		return 0, m.errWrite
+	}
 	entry := &m.entries[len(m.entries)-1]
 	entry.data = append(entry.data, p...)
 	return len(p), nil
@@ -166,6 +174,20 @@ func Test_BindMountHostFileToTar_RegularFileTarHeaderError(t *testing.T) {
 		})
 	})
 }
+
+func Test_BindMountHostFileToTar_RegularFileWriteTarHeaderError(t *testing.T) {
+	withMockFS(vfs, func() {
+		errExpected := fmt.Errorf("regularFileWriteTarHeaderError")
+		tw := &mockTarWriter{
+			errWriteHeader: errExpected,
+		}
+		_, errActual := bindMountHostFileToTar(tw, "orig", "renamed")
+		if errActual != errExpected {
+			t.Fail()
+		}
+	})
+}
+
 func Test_BindMountHostFileToTar_RegularFileOpenError(t *testing.T) {
 	errExpected := fmt.Errorf("regularFileOpenError")
 	withMockFS(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
@@ -225,6 +247,19 @@ func Test_BindMountHostFileToTar_DirectoryReadError(t *testing.T) {
 	}), func() {
 		tw := &mockTarWriter{}
 		_, errActual := bindMountHostFileToTar(tw, "directoryreaderror", "renamed")
+		if errActual != errExpected {
+			t.Fail()
+		}
+	})
+}
+
+func Test_BindMountHostFileToTar_DirectoryWriteTarHeaderError(t *testing.T) {
+	withMockFS(vfs, func() {
+		errExpected := fmt.Errorf("directoryWriteTarHeaderError")
+		tw := &mockTarWriter{
+			errWriteHeader: errExpected,
+		}
+		_, errActual := bindMountHostFileToTar(tw, "dir", "renamed")
 		if errActual != errExpected {
 			t.Fail()
 		}

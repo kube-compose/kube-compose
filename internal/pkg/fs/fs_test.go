@@ -157,10 +157,11 @@ func Test_VirtualFileSystem_DirectoryInconsistency1(t *testing.T) {
 			Content: []byte("regularfile"),
 		},
 	})
-	fs.Set("/dir", InMemoryFile{
+	fs.Set("/dir", &InMemoryFile{
 		Content: []byte("notafile"),
 	})
 }
+
 func Test_VirtualFileSystem_DirectoryInconsistency2(t *testing.T) {
 	defer func() {
 		err := recover()
@@ -173,7 +174,7 @@ func Test_VirtualFileSystem_DirectoryInconsistency2(t *testing.T) {
 			Content: []byte("regularfile2"),
 		},
 	})
-	fs.Set("/dir/fileforreal2", InMemoryFile{
+	fs.Set("/dir/fileforreal2", &InMemoryFile{
 		Content: []byte("regularfile3"),
 	})
 }
@@ -208,6 +209,7 @@ func Test_VirtualFileDescriptor_Read_EISDIR(t *testing.T) {
 		}
 	}
 }
+
 func Test_VirtualFileDescriptor_Read_ReadError(t *testing.T) {
 	errExpected := fmt.Errorf("readError")
 	fs := NewInMemoryUnixFileSystem(map[string]InMemoryFile{
@@ -246,6 +248,7 @@ func Test_VirtualFileDescriptor_Readdir_ENOTDIR(t *testing.T) {
 		}
 	}
 }
+
 func Test_VirtualFileDescriptor_Readdir_ReadError(t *testing.T) {
 	errExpected := fmt.Errorf("readdirError")
 	fs := NewInMemoryUnixFileSystem(map[string]InMemoryFile{
@@ -347,7 +350,7 @@ func Test_VirtualFileSystem_Set_ReplacesFileContentsCorrectly(t *testing.T) {
 		name: {Content: []byte("filecontentsorig")},
 	})
 	expected := []byte("filecontentsreplaces")
-	fs.Set(name, InMemoryFile{
+	fs.Set(name, &InMemoryFile{
 		Content: expected,
 	})
 	fd, err := fs.Open(name)
