@@ -280,6 +280,8 @@ func (fs *InMemoryFileSystem) Set(name string, vfile *InMemoryFile) {
 		flag = os.ModeSymlink
 	case vfile.Mode.IsRegular():
 		flag = 0
+	case (vfile.Mode & os.ModeDevice) != 0:
+		flag = os.ModeDevice
 	}
 	if (vfile.Mode & (os.ModeType &^ flag)) != 0 {
 		panic(errBadMode)
@@ -316,7 +318,7 @@ func (r *virtualFileDescriptor) Close() error {
 }
 
 func (r *virtualFileDescriptor) Read(p []byte) (n int, err error) {
-	if !r.node.mode.IsRegular() {
+	if !r.node.mode.IsRegular() && (r.node.mode&os.ModeDevice) == 0 {
 		err = errBadMode
 		return
 	}

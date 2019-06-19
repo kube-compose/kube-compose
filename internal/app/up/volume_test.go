@@ -384,6 +384,7 @@ func Test_BindMountHostFileToTar_ErrorSymlinkNotWithinBindHostRoot(t *testing.T)
 		}
 	})
 }
+
 func Test_BindMountHostFileToTar_SymlinkTarHeaderError(t *testing.T) {
 	errExpected := fmt.Errorf("symlinkTarHeaderError")
 	withTarFileInfoHeaderError(errExpected, true, func() {
@@ -396,6 +397,22 @@ func Test_BindMountHostFileToTar_SymlinkTarHeaderError(t *testing.T) {
 		})
 	})
 }
+
+func Test_BindMountHostFileToTar_FileTypeError(t *testing.T) {
+	withMockFS(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+		"/device": {
+			Content: []byte("devicedata"),
+			Mode:    os.ModeDevice,
+		},
+	}), func() {
+		tw := &mockTarWriter{}
+		_, err := bindMountHostFileToTar(tw, "device", "renamed")
+		if err == nil {
+			t.Fail()
+		}
+	})
+}
+
 func Test_BuildVolumeInitImageGetDockerfile_Success(t *testing.T) {
 	actual := buildVolumeInitImageGetDockerfile([]bool{true, false})
 	expected := []byte(`ARG BASE_IMAGE
@@ -449,4 +466,15 @@ func Test_ResolveBindVolumeHostPath_SuccessMkdirAll(t *testing.T) {
 			t.Fail()
 		}
 	}
+}
+
+func Test_BuildVolumeInitImageGetBuildContext_Success(t *testing.T) {
+	withMockFS(vfs, func(){
+		_, err := buildVolumeInitImageGetBuildContext([]string{
+			"orig",
+		})
+		if err != nil {
+			t.Error(err)
+		}
+	})
 }
