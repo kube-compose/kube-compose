@@ -208,6 +208,29 @@ func Test_VirtualFileDescriptor_Read_EISDIR(t *testing.T) {
 		}
 	}
 }
+func Test_VirtualFileDescriptor_Read_ReadError(t *testing.T) {
+	errExpected := fmt.Errorf("readError")
+	fs := NewInMemoryUnixFileSystem(map[string]InMemoryFile{
+		"/readerror": {
+			Content:   []byte("readerrorcontent"),
+			ReadError: errExpected,
+		},
+	})
+	fd, err := fs.Open("/readerror")
+	defer func(){
+		if fd != nil {
+			fd.Close()
+		}
+	}()
+	if err != nil {
+		t.Error(err)
+	}  else {
+		_, errActual := fd.Read([]byte{})
+		if errActual != errExpected {
+			t.Fail()
+		}
+	}
+}
 
 func Test_VirtualFileDescriptor_Readdir_ENOTDIR(t *testing.T) {
 	fs := NewInMemoryUnixFileSystem(map[string]InMemoryFile{
@@ -219,6 +242,29 @@ func Test_VirtualFileDescriptor_Readdir_ENOTDIR(t *testing.T) {
 	} else {
 		_, err = fd.Readdir(0)
 		if err != syscall.ENOTDIR {
+			t.Fail()
+		}
+	}
+}
+func Test_VirtualFileDescriptor_Readdir_ReadError(t *testing.T) {
+	errExpected := fmt.Errorf("readdirError")
+	fs := NewInMemoryUnixFileSystem(map[string]InMemoryFile{
+		"/": {
+			Mode:      os.ModeDir,
+			ReadError: errExpected,
+		},
+	})
+	fd, err := fs.Open("/")
+	defer func(){
+		if fd != nil {
+			fd.Close()
+		}
+	}()
+	if err != nil {
+		t.Error(err)
+	}  else {
+		_, errActual := fd.Readdir(0)
+		if errActual != errExpected {
 			t.Fail()
 		}
 	}

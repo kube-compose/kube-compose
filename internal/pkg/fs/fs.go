@@ -212,6 +212,7 @@ func (fs *InMemoryFileSystem) createChildren(n *node, nameRem string, vfile *InM
 				childN = &node{
 					err:     vfile.Error,
 					errOpen: vfile.OpenError,
+					errRead: vfile.ReadError,
 					mode:    vfile.Mode,
 					name:    nameComp,
 				}
@@ -246,6 +247,7 @@ type InMemoryFile struct {
 	Error     error
 	Mode      os.FileMode
 	OpenError error
+	ReadError error
 }
 
 // NewInMemoryUnixFileSystem creates a mock file system based on the provided data.
@@ -297,6 +299,7 @@ func (fs *InMemoryFileSystem) Set(name string, vfile InMemoryFile) {
 		}
 		n.err = vfile.Error
 		n.errOpen = vfile.OpenError
+		n.errRead = vfile.ReadError
 		n.mode = vfile.Mode
 	}
 }
@@ -313,6 +316,10 @@ func (r *virtualFileDescriptor) Close() error {
 func (r *virtualFileDescriptor) Read(p []byte) (n int, err error) {
 	if !r.node.mode.IsRegular() {
 		err = errBadMode
+		return
+	}
+	if r.node.errRead != nil {
+		err = r.node.errRead
 		return
 	}
 	if len(p) > 0 {
@@ -332,6 +339,9 @@ func (r *virtualFileDescriptor) Readdir(n int) ([]os.FileInfo, error) {
 	}
 	if n > 0 {
 		panic(fmt.Errorf("not supported"))
+	}
+	if r.node.errRead != nil {
+		return nil, r.node.errRead
 	}
 	dir := r.node.extra.([]*node)
 	if len(dir) == 0 {

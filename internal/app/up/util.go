@@ -136,7 +136,7 @@ func copyFileFromContainer(ctx context.Context, dc *dockerClient.Client, contain
 	}
 	err = dockerArchive.CopyTo(readCloser, srcInfo, dstFile)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("error while copying image file %#v to local file %#v", srcFile, dstFile))
+		return errors.Wrapf(err, "error while copying image file %#v to local file %#v", srcFile, dstFile)
 	}
 	return nil
 }

@@ -39,3 +39,18 @@ func Test_Readlink_ErrorInjectedFault(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func Test_Readlink_ErrorRead(t *testing.T) {
+	errExpected := fmt.Errorf("readlinkError")
+	fs := NewInMemoryUnixFileSystem(map[string]InMemoryFile{
+		"readlinkerror": {
+			Content:   []byte("readlinkerror"),
+			Mode:      os.ModeSymlink,
+			ReadError: errExpected,
+		},
+	})
+	_, errActual := fs.Readlink("readlinkerror")
+	if errActual != errExpected {
+		t.Fail()
+	}
+}

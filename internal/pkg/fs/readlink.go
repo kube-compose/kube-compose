@@ -13,5 +13,8 @@ func (fs *InMemoryFileSystem) Readlink(name string) (string, error) {
 	if (n.mode & os.ModeSymlink) == 0 {
 		return "", errBadMode
 	}
+	if n.errRead != nil {
+		return "", n.errRead
+	}
 	return string(n.extra.([]byte)), nil
 }

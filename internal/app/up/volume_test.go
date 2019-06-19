@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/kube-compose/kube-compose/internal/pkg/fs"
+	"github.com/pkg/errors"
 )
 
 var errTest = fmt.Errorf("test error")
@@ -167,19 +168,17 @@ func Test_BindMountHostFileToTar_RegularFileTarHeaderError(t *testing.T) {
 }
 func Test_BindMountHostFileToTar_RegularFileOpenError(t *testing.T) {
 	errExpected := fmt.Errorf("regularFileOpenError")
-	withTarFileInfoHeaderError(errExpected, false, func() {
-		withMockFS(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
-			"/regularfileopenerror": {
-				Content:   []byte("regularfileopenerrorcontent"),
-				OpenError: errExpected,
-			},
-		}), func() {
-			tw := &mockTarWriter{}
-			_, errActual := bindMountHostFileToTar(tw, "regularfileopenerror", "renamed")
-			if errActual != errExpected {
-				t.Fail()
-			}
-		})
+	withMockFS(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+		"/regularfileopenerror": {
+			Content:   []byte("regularfileopenerrorcontent"),
+			OpenError: errExpected,
+		},
+	}), func() {
+		tw := &mockTarWriter{}
+		_, errActual := bindMountHostFileToTar(tw, "regularfileopenerror", "renamed")
+		if errActual != errExpected {
+			t.Fail()
+		}
 	})
 }
 
@@ -202,19 +201,17 @@ func Test_BindMountHostFileToTar_DirTarHeaderError(t *testing.T) {
 
 func Test_BindMountHostFileToTar_DirectoryOpenError(t *testing.T) {
 	errExpected := fmt.Errorf("directoryOpenError")
-	withTarFileInfoHeaderError(errExpected, false, func() {
-		withMockFS(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
-			"/directoryopenerror": {
-				Mode:      os.ModeDir,
-				OpenError: errExpected,
-			},
-		}), func() {
-			tw := &mockTarWriter{}
-			_, errActual := bindMountHostFileToTar(tw, "directoryopenerror", "renamed")
-			if errActual != errExpected {
-				t.Fail()
-			}
-		})
+	withMockFS(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+		"/directoryopenerror": {
+			Mode:      os.ModeDir,
+			OpenError: errExpected,
+		},
+	}), func() {
+		tw := &mockTarWriter{}
+		_, errActual := bindMountHostFileToTar(tw, "directoryopenerror", "renamed")
+		if errActual != errExpected {
+			t.Fail()
+		}
 	})
 }
 
@@ -242,7 +239,7 @@ func Test_BindMountHostFileToTar_SuccessDir(t *testing.T) {
 	})
 }
 
-func Test_BindMountHostFileToTar_SuccessSymlink(t *testing.T) {
+func Test_BindMountHostFileToTar_SuccessSymlink1(t *testing.T) {
 	withMockFS(vfs, func() {
 		tw := &mockTarWriter{}
 		isDir, err := bindMountHostFileToTar(tw, "dir2", "renamed")
@@ -262,6 +259,67 @@ func Test_BindMountHostFileToTar_SuccessSymlink(t *testing.T) {
 				t.Logf("entries2: %+v\n", expected)
 				t.Fail()
 			}
+		}
+	})
+}
+func Test_BindMountHostFileToTar_SuccessSymlink2(t *testing.T) {
+	withMockFS(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+		"selflink": {
+			Content: []byte("selflink"),
+			Mode:    os.ModeSymlink,
+		},
+	}), func() {
+		tw := &mockTarWriter{}
+		isDir, err := bindMountHostFileToTar(tw, "selflink", "renamed")
+		if err != nil {
+			t.Error(err)
+		} else {
+			if isDir {
+				t.Fail()
+			}
+			expected := []mockTarWriterEntry{
+				symlink("renamed", "renamed"),
+			}
+			if !reflect.DeepEqual(tw.entries, expected) {
+				t.Logf("entries1: %+v\n", tw.entries)
+				t.Logf("entries2: %+v\n", expected)
+				t.Fail()
+			}
+		}
+	})
+}
+func Test_BindMountHostFileToTar_SymlinkResolveAbsError(t *testing.T) {
+	vfs := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+		"dir/symlinkresolveabserror1": {
+			Mode:    os.ModeSymlink,
+			Content: []byte("/dir/symlinkresolveabserror2"),
+		},
+	})
+	errExpected := fmt.Errorf("symlinkResolveAbsError")
+	vfs.AbsError = errExpected
+	withMockFS(vfs, func() {
+		tw := &mockTarWriter{}
+		_, errActual := bindMountHostFileToTar(tw, "dir", "renamed")
+		if errors.Cause(errActual) != errExpected {
+			t.Fail()
+		}
+	})
+}
+
+func Test_BindMountHostFileToTar_SymlinkReadlinkError(t *testing.T) {
+	errExpected := fmt.Errorf("symlinkReadlinkError")
+	vfs := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+		"symlinkreadlinkerror": {
+			Mode:      os.ModeSymlink,
+			Content:   []byte("symlinkreadlinkerror"),
+			ReadError: errExpected,
+		},
+	})
+	withMockFS(vfs, func() {
+		tw := &mockTarWriter{}
+		_, errActual := bindMountHostFileToTar(tw, "symlinkreadlinkerror", "renamed")
+		if errors.Cause(errActual) != errExpected {
+			t.Fail()
 		}
 	})
 }

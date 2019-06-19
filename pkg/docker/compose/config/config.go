@@ -100,7 +100,7 @@ type configLoader struct {
 }
 
 func loadFileError(file string, err error) error {
-	return errors.Wrap(err, fmt.Sprintf("error loading file %#v", file))
+	return errors.Wrapf(err, "error loading file %#v", file)
 }
 
 // loadFile loads the specified file. If the file has already been loaded then a cache lookup is performed.

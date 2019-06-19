@@ -135,7 +135,7 @@ func (h *bindMountHostFileToTarHelper) runSymlink(fileInfo os.FileInfo, hostFile
 	// Symbolic link
 	link, err := fs.OS.Readlink(hostFile)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("error while reading link %#v", hostFile))
+		return errors.Wrapf(err, "error while reading link %#v", hostFile)
 	}
 	var linkResolved string
 	linkIsAbsLike := link != "" && (link[0] == '\\' || link[0] == '/')
@@ -147,7 +147,7 @@ func (h *bindMountHostFileToTarHelper) runSymlink(fileInfo os.FileInfo, hostFile
 		// be absolute.
 		linkResolved, err = fs.OS.Abs(link)
 		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("error while converting %#v to an absolute path", link))
+			return errors.Wrapf(err, "error while converting %#v to an absolute path", link)
 		}
 	} else {
 		// Windows: no drive.
