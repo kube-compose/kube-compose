@@ -203,8 +203,6 @@ Run `kube-compose` with the test [docker-compose.yml](test/docker-compose.yml):
 kube-compose -f test/docker-compose.yml --env-id test123 up
 ```
 
-This writes the created Kubernetes resources to the directory test/output.
-
 To clean up after the test:
 
 ```bash
