@@ -52,11 +52,7 @@ func (cfg *Config) FindService(dockerComposeService *dockerComposeConfig.Service
 	return cfg.Services[dockerComposeService]
 }
 
-func New(file *string) (*Config, error) {
-	var files []string
-	if file != nil {
-		files = append(files, *file)
-	}
+func New(files []string) (*Config, error) {
 	cfg := &Config{
 		EnvironmentLabel: "env",
 	}
@@ -91,7 +87,7 @@ func New(file *string) (*Config, error) {
 	}
 	err = mapdecode.Decode(&custom, dcCfg.XProperties, mapdecode.IgnoreUnused(true))
 	if err != nil {
-		return nil, errors.Wrapf(err, "error while parsing x-kube-compose of %#v", *file)
+		return nil, errors.Wrap(err, "error while parsing x-kube-compose")
 	}
 
 	if custom.XKubeCompose.PushImages != nil {
