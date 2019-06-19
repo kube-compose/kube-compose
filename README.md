@@ -163,6 +163,7 @@ NOTE2: this may seem like a useless feature, since authenticating with a user th
 3. `kube-compose` never loads `docker-compose.override.yml` and `docker-compose.override.yaml` files and behaves as if those do not exists ([#124](https://github.com/kube-compose/kube-compose/issues/124)).
 4. When extending a `docker-compose` service using `extends`, only ports and environment are copied from the extended `docker-compose` service ([#48](https://github.com/kube-compose/kube-compose/issues/48)).
 
+
 # Developer information
 
 ## Building
@@ -191,21 +192,15 @@ go test -coverpkg=./... -coverprofile=coverage.out ./...
 go tool cover -html=coverage.out
 ```
 
-
 ## Testing
-
 Use `kubectl` to set the target Kubernetes namespace and the service account of kube-compose.
 
 Run `kube-compose` with the test [docker-compose.yml](test/docker-compose.yml):
-
 ```bash
 kube-compose -f test/docker-compose.yml --env-id test123 up
 ```
 
 To clean up after the test:
-
 ```bash
 kube-compose down
 ```
-
-
