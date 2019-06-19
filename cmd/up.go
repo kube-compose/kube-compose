@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"context"
+	"fmt"
+	"os"
 
 	"github.com/kube-compose/kube-compose/internal/app/up"
 	"github.com/spf13/cobra"
@@ -29,5 +31,10 @@ func upCommand(cmd *cobra.Command, args []string) error {
 	opts.Context = context.Background()
 	opts.Detach, _ = cmd.Flags().GetBool("detach")
 	opts.RunAsUser, _ = cmd.Flags().GetBool("run-as-user")
-	return up.Run(cfg, opts)
+	err = up.Run(cfg, opts)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	return nil
 }

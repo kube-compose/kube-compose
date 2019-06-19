@@ -93,10 +93,12 @@ func getCommandConfig(cmd *cobra.Command, args []string) (*config.Config, error)
 	}
 	cfg, err := config.New(file)
 	if err != nil {
-		return nil, err
+		fmt.Println(err)
+		os.Exit(1)
 	}
 	if err := setFromKubeConfig(cfg); err != nil {
-		return nil, err
+		fmt.Println(err)
+		os.Exit(1)
 	}
 	cfg.EnvironmentID = envID
 	if namespace, exists := getNamespaceFlag(cmd); exists {
