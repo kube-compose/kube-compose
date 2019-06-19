@@ -20,6 +20,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+var tarFileInfoHeader = tar.FileInfoHeader
+
 func buildVolumeInitImageGetDockerfile(isDirSlice []bool) []byte {
 	var b bytes.Buffer
 	b.WriteString(`ARG BASE_IMAGE
@@ -51,8 +53,6 @@ type TarWriter interface {
 
 type bindMountHostFileToTarHelper struct {
 	tw                     TarWriter
-	twMayBeCorrupt         bool
-	twWritten              bool
 	renameTo               string
 	rootHostFile           string
 	rootHostFileVol        string
@@ -60,7 +60,7 @@ type bindMountHostFileToTarHelper struct {
 }
 
 func (h *bindMountHostFileToTarHelper) runRegular(fileInfo os.FileInfo, hostFile, fileNameInTar string) error {
-	header, err := tar.FileInfoHeader(fileInfo, "")
+	header, err := tarFileInfoHeader(fileInfo, "")
 	if err != nil {
 		return err
 	}
@@ -75,9 +75,6 @@ func (h *bindMountHostFileToTarHelper) runRegular(fileInfo os.FileInfo, hostFile
 		return err
 	}
 	_, err = io.Copy(h.tw, fd)
-	if err != nil {
-		h.twMayBeCorrupt = true
-	}
 	return err
 }
 
@@ -87,7 +84,7 @@ func (h *bindMountHostFileToTarHelper) runDirectory(fileInfo os.FileInfo, hostFi
 		return err
 	}
 	defer util.CloseAndLogError(fd)
-	header, err := tar.FileInfoHeader(fileInfo, "")
+	header, err := tarFileInfoHeader(fileInfo, "")
 	if err != nil {
 		return err
 	}
@@ -164,7 +161,7 @@ func (h *bindMountHostFileToTarHelper) runSymlink(fileInfo os.FileInfo, hostFile
 		// Convert the target to a relative path within the tar. This can be done a bit more efficiently since we know the paths are
 		// relative, cleaned and slashed. We assign the error to underscore because it should never happen.
 		linkResolvedInTarRel, _ := filepath.Rel(filepath.Dir(fileNameInTar), linkResolvedInTar)
-		header, err := tar.FileInfoHeader(fileInfo, linkResolvedInTarRel)
+		header, err := tarFileInfoHeader(fileInfo, linkResolvedInTarRel)
 		if err != nil {
 			return err
 		}
@@ -197,12 +194,7 @@ func (h *bindMountHostFileToTarHelper) endHeaderCommon(header *tar.Header) error
 	// For example:
 	// header.Uid = ...
 	// header.Gid = ...
-	err := h.tw.WriteHeader(header)
-	if err != nil {
-		h.twMayBeCorrupt = true
-	}
-	h.twWritten = true
-	return err
+	return h.tw.WriteHeader(header)
 }
 
 func (h *bindMountHostFileToTarHelper) run(hostFile, fileNameInTar string) (isDir bool, err error) {
@@ -210,25 +202,8 @@ func (h *bindMountHostFileToTarHelper) run(hostFile, fileNameInTar string) (isDi
 	if err != nil {
 		return
 	}
+	isDir = fileInfo.IsDir()
 	err = h.runRecursive(fileInfo, hostFile, fileNameInTar)
-	if err == nil {
-		isDir = fileInfo.IsDir()
-		return
-	}
-	if h.twMayBeCorrupt || h.twWritten {
-		return
-	}
-	fmt.Printf("cannot simulate bind volume with host file %#v, interpreting as empty directory: ", hostFile)
-	fmt.Println(err)
-	// Change type to an empty directory
-	header, err := tar.FileInfoHeader(fileInfo, "")
-	if err != nil {
-		return
-	}
-	header.Typeflag = tar.TypeDir
-	header.Name = fileNameInTar + "/"
-	err = h.endHeaderCommon(header)
-	isDir = true
 	return
 }
 
@@ -243,20 +218,6 @@ func bindMountHostFileToTar(tw TarWriter, hostFile, renameTo string) (isDir bool
 	h.rootHostFileWithoutVol = hostFile[len(vol):]
 
 	isDir, err = h.run(hostFile, renameTo)
-	if err != nil {
-		if h.twMayBeCorrupt || h.twWritten {
-			isDir = false
-			return
-		}
-		fmt.Printf("cannot simulate bind volume with host file %#v, interpreting as empty directory: ", hostFile)
-		fmt.Println(err)
-		header := &tar.Header{
-			Name:     renameTo + "/",
-			Typeflag: tar.TypeDir,
-		}
-		err = h.endHeaderCommon(header)
-		isDir = true
-	}
 	return
 }
 
