@@ -260,7 +260,9 @@ func NewInMemoryUnixFileSystem(data map[string]InMemoryFile) *InMemoryFileSystem
 		),
 	}
 	for name, vfile := range data {
-		fs.Set(name, vfile)
+		// Ignoring pointer to range variable linting error here.
+		// nolint
+		fs.Set(name, &vfile)
 	}
 	return fs
 }
@@ -269,7 +271,7 @@ func NewInMemoryUnixFileSystem(data map[string]InMemoryFile) *InMemoryFileSystem
 // a file already exists at name and it is a directory and vfile is not a directory (or vice versa) then an error is thrown. Otherwise, if a
 // file already exists at name its attributes, injected fault, symlink target or regular file contents are updated with the values from
 // vfile.
-func (fs *InMemoryFileSystem) Set(name string, vfile InMemoryFile) {
+func (fs *InMemoryFileSystem) Set(name string, vfile *InMemoryFile) {
 	var flag os.FileMode
 	switch {
 	case vfile.Mode.IsDir():
@@ -287,7 +289,7 @@ func (fs *InMemoryFileSystem) Set(name string, vfile InMemoryFile) {
 		panic(errIsDirDisagreement)
 	}
 	if nameRem != "" {
-		fs.createChildren(n, nameRem, &vfile)
+		fs.createChildren(n, nameRem, vfile)
 	} else {
 		nodeIsDir := (n.mode & os.ModeDir) != 0
 		vfileIsDir := (vfile.Mode & os.ModeDir) != 0

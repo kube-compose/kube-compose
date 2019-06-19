@@ -217,14 +217,14 @@ func Test_VirtualFileDescriptor_Read_ReadError(t *testing.T) {
 		},
 	})
 	fd, err := fs.Open("/readerror")
-	defer func(){
+	defer func() {
 		if fd != nil {
 			fd.Close()
 		}
 	}()
 	if err != nil {
 		t.Error(err)
-	}  else {
+	} else {
 		_, errActual := fd.Read([]byte{})
 		if errActual != errExpected {
 			t.Fail()
@@ -255,14 +255,14 @@ func Test_VirtualFileDescriptor_Readdir_ReadError(t *testing.T) {
 		},
 	})
 	fd, err := fs.Open("/")
-	defer func(){
+	defer func() {
 		if fd != nil {
 			fd.Close()
 		}
 	}()
 	if err != nil {
 		t.Error(err)
-	}  else {
+	} else {
 		_, errActual := fd.Readdir(0)
 		if errActual != errExpected {
 			t.Fail()

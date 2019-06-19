@@ -289,15 +289,15 @@ func Test_BindMountHostFileToTar_SuccessSymlink2(t *testing.T) {
 	})
 }
 func Test_BindMountHostFileToTar_SymlinkResolveAbsError(t *testing.T) {
-	vfs := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+	vfsTest := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 		"dir/symlinkresolveabserror1": {
 			Mode:    os.ModeSymlink,
 			Content: []byte("/dir/symlinkresolveabserror2"),
 		},
 	})
 	errExpected := fmt.Errorf("symlinkResolveAbsError")
-	vfs.AbsError = errExpected
-	withMockFS(vfs, func() {
+	vfsTest.AbsError = errExpected
+	withMockFS(vfsTest, func() {
 		tw := &mockTarWriter{}
 		_, errActual := bindMountHostFileToTar(tw, "dir", "renamed")
 		if errors.Cause(errActual) != errExpected {
@@ -308,14 +308,14 @@ func Test_BindMountHostFileToTar_SymlinkResolveAbsError(t *testing.T) {
 
 func Test_BindMountHostFileToTar_SymlinkReadlinkError(t *testing.T) {
 	errExpected := fmt.Errorf("symlinkReadlinkError")
-	vfs := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+	vfsTest := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 		"symlinkreadlinkerror": {
 			Mode:      os.ModeSymlink,
 			Content:   []byte("symlinkreadlinkerror"),
 			ReadError: errExpected,
 		},
 	})
-	withMockFS(vfs, func() {
+	withMockFS(vfsTest, func() {
 		tw := &mockTarWriter{}
 		_, errActual := bindMountHostFileToTar(tw, "symlinkreadlinkerror", "renamed")
 		if errors.Cause(errActual) != errExpected {

@@ -13,7 +13,7 @@ type node struct {
 	// if errOpen != nil then errOpen is returned when this file is opened.
 	errOpen error
 	// if errRead != nil then errRead is returned when Readlink is called on this file, or Readdir or Read are called on a FileDescriptor
-	// of this file. 
+	// of this file.
 	errRead error
 	// Either []byte or []*node, depending on the type of this node.
 	extra interface{}
