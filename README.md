@@ -18,7 +18,6 @@ kube-compose can create and destroy environments in Kubernetes based on docker c
   * [Running containers as specific users](#Running-containers-as-specific-users)
 * [Known limitations](#Known-limitations)
 * [Developer information](#Developer-information)
-* [Why another tool?](#Why-another-tool?)
 
 # Installation
 ## Using Homebrew
