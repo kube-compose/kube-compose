@@ -93,11 +93,11 @@ func getCommandConfig(cmd *cobra.Command, args []string) (*config.Config, error)
 	}
 	cfg, err := config.New(file)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	if err := setFromKubeConfig(cfg); err != nil {
-		fmt.Println(err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	cfg.EnvironmentID = envID
@@ -112,7 +112,8 @@ func getCommandConfig(cmd *cobra.Command, args []string) (*config.Config, error)
 		for _, arg := range args {
 			service := cfg.FindServiceByName(arg)
 			if service == nil {
-				return nil, fmt.Errorf("no service named %#v does exists", arg)
+				fmt.Fprintf(os.Stderr, "no service named %#v exists\n", arg)
+				os.Exit(1)
 			}
 			cfg.AddToFilter(service)
 		}

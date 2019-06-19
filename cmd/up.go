@@ -33,7 +33,7 @@ func upCommand(cmd *cobra.Command, args []string) error {
 	opts.RunAsUser, _ = cmd.Flags().GetBool("run-as-user")
 	err = up.Run(cfg, opts)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	return nil

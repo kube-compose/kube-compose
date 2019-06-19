@@ -26,7 +26,7 @@ func downCommand(cmd *cobra.Command, args []string) error {
 	}
 	err = down.Run(cfg)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	return nil

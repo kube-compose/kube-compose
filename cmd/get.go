@@ -32,32 +32,27 @@ func getCommand(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	var format string
+	var template *template.Template
 	if cmd.Flags().Changed("format") {
-		format, err = cmd.Flags().GetString("format")
+		var format string
+		format, _ = cmd.Flags().GetString("format")
+		var err error
+		template, err = template.New("testasdf").Parse(format)
 		if err != nil {
-			return err
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
 		}
 	}
 	service := cfg.FindServiceByName(args[0])
-	if service == nil {
-		fmt.Printf("no service named %#v exists\n", service)
-		os.Exit(1)
-	}
 	result, err := details.GetServiceDetails(cfg, service)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if format != "" {
-		tmpl, err := template.New(args[0]).Parse(format)
+	if template != nil {
+		err = template.Execute(os.Stdout, result)
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-		err = tmpl.Execute(os.Stdout, result)
-		if err != nil {
-			fmt.Println(err)
+			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
 	} else {
