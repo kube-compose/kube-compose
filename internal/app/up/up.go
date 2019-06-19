@@ -229,13 +229,13 @@ func (u *upRunner) getAppVolumeInitImage(a *app) error {
 		return err
 	}
 	a.volumeInitImage.sourceImageID = r.imageID
-	a.volumeInitImage.podImage, err = u.pushImage(a.volumeInitImage.sourceImageID, a.composeService.NameEscaped+"-init",
+	a.volumeInitImage.podImage, err = u.pushImage(a.volumeInitImage.sourceImageID, a.composeService.NameEscaped, "volumeinit",
 		"volume init image", a)
 	return err
 }
 
-func (u *upRunner) pushImage(sourceImageID, name, imageDescr string, a *app) (podImage string, err error) {
-	imagePush := fmt.Sprintf("%s/%s/%s:latest", u.cfg.PushImages.DockerRegistry, u.cfg.Namespace, name)
+func (u *upRunner) pushImage(sourceImageID, name, tag, imageDescr string, a *app) (podImage string, err error) {
+	imagePush := fmt.Sprintf("%s/%s/%s:%s", u.cfg.PushImages.DockerRegistry, u.cfg.Namespace, name, tag)
 	err = u.dockerClient.ImageTag(u.opts.Context, sourceImageID, imagePush)
 	if err != nil {
 		return
@@ -313,7 +313,7 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 func (u *upRunner) getAppImageEnsureCorrectPodImage(a *app, sourceImageRef dockerRef.Reference, sourceImage string) error {
 	if u.cfg.PushImages != nil {
 		var err error
-		a.imageInfo.podImage, err = u.pushImage(a.imageInfo.sourceImageID, a.composeService.NameEscaped, "image", a)
+		a.imageInfo.podImage, err = u.pushImage(a.imageInfo.sourceImageID, a.composeService.NameEscaped, "latest", "image", a)
 		if err != nil {
 			return err
 		}
