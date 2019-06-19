@@ -814,7 +814,7 @@ func parsePodStatus(pod *v1.Pod) (podStatus, error) {
 
 func parsePodStatusTerminatedContainer(podName, containerName string, t *v1.ContainerStateTerminated) (podStatus, error) {
 	if t.Reason != "Completed" {
-		return podStatusOther, fmt.Errorf("aborting because container %s of pod %s terminated (code=%d,signal=%d,reason=%s): %s",
+		return podStatusOther, fmt.Errorf("aborting because container %s of pod %s terminated abnormally (code=%d,signal=%d,reason=%s): %s",
 			containerName,
 			podName,
 			t.ExitCode,
@@ -894,7 +894,7 @@ func (u *upRunner) createPodsIfNeeded() error {
 					createPod = false
 				}
 			} else {
-				if app2.maxObservedPodStatus != podStatusStarted {
+				if app2.maxObservedPodStatus != podStatusStarted && app2.maxObservedPodStatus != podStatusReady {
 					createPod = false
 				}
 			}
