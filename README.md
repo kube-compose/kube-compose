@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.com/kube-compose/kube-compose.svg?branch=master)](https://travis-ci.com/kube-compose/kube-compose)
 [![License](https://img.shields.io/badge/license-Apache_v2.0-blue.svg)](https://github.com/kube-compose/kube-compose/blob/master/LICENSE.md)
-[![Coverage Status](https://coveralls.io/repos/github/kube-compose/kube-compose/badge.svg?branch=master&r=4)](https://coveralls.io/github/kube-compose/kube-compose?branch=master?r=4)
+[![Coverage Status](https://coveralls.io/repos/github/kube-compose/kube-compose/badge.svg?branch=master&r=5)](https://coveralls.io/github/kube-compose/kube-compose?branch=master?r=5)
 
 # kube-compose
 
