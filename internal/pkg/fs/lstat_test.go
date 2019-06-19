@@ -35,7 +35,7 @@ func Test_Lstat_InjectedFault2(t *testing.T) {
 			Mode:  os.ModeDir,
 		},
 	})
-	fs.Set("/dir/file", InMemoryFile{})
+	fs.Set("/dir/file", &InMemoryFile{})
 	_, errActual := fs.Lstat("/dir/file")
 	if errActual != errExpected {
 		t.Fail()

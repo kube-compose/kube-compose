@@ -28,20 +28,20 @@ func init() {
 			Error: errTest,
 		},
 	})
-	vfs.Set("/dir/file1", fs.InMemoryFile{
+	vfs.Set("/dir/file1", &fs.InMemoryFile{
 		Content: []byte(testFileContent),
 	})
-	vfs.Set("/dir/file2", fs.InMemoryFile{
+	vfs.Set("/dir/file2", &fs.InMemoryFile{
 		Content: []byte(testFileContent),
 	})
-	vfs.Set("/dir2/file", fs.InMemoryFile{
+	vfs.Set("/dir2/file", &fs.InMemoryFile{
 		Content: []byte(testFileContent),
 	})
-	vfs.Set("/dir2/symlink", fs.InMemoryFile{
+	vfs.Set("/dir2/symlink", &fs.InMemoryFile{
 		Content: []byte("file"),
 		Mode:    os.ModeSymlink,
 	})
-	vfs.Set("/dir3/symlink", fs.InMemoryFile{
+	vfs.Set("/dir3/symlink", &fs.InMemoryFile{
 		Content: []byte("/dir2"),
 		Mode:    os.ModeSymlink,
 	})
@@ -209,6 +209,22 @@ func Test_BindMountHostFileToTar_DirectoryOpenError(t *testing.T) {
 	}), func() {
 		tw := &mockTarWriter{}
 		_, errActual := bindMountHostFileToTar(tw, "directoryopenerror", "renamed")
+		if errActual != errExpected {
+			t.Fail()
+		}
+	})
+}
+
+func Test_BindMountHostFileToTar_DirectoryReadError(t *testing.T) {
+	errExpected := fmt.Errorf("directoryReadError")
+	withMockFS(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+		"/directoryreaderror": {
+			Mode:      os.ModeDir,
+			ReadError: errExpected,
+		},
+	}), func() {
+		tw := &mockTarWriter{}
+		_, errActual := bindMountHostFileToTar(tw, "directoryreaderror", "renamed")
 		if errActual != errExpected {
 			t.Fail()
 		}
