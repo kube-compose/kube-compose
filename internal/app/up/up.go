@@ -867,7 +867,7 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 	return nil
 }
 
-func (u *upRunner) streamPodLogs(pod *v1.Pod, completedChannel chan interface{}, getPodLogOptions *v1.PodLogOptions, app *app) {
+func (u *upRunner) streamPodLogs(pod *v1.Pod, completedChannel chan interface{}, getPodLogOptions *v1.PodLogOptions, a *app) {
 	getLogsRequest := u.k8sPodClient.GetLogs(pod.ObjectMeta.Name, getPodLogOptions)
 	var bodyReader io.ReadCloser
 	bodyReader, err := getLogsRequest.Stream()
@@ -877,7 +877,7 @@ func (u *upRunner) streamPodLogs(pod *v1.Pod, completedChannel chan interface{},
 	defer util.CloseAndLogError(bodyReader)
 	scanner := bufio.NewScanner(bodyReader)
 	for scanner.Scan() {
-		fmt.Printf("%-*s| %s\n", u.maxServiceNameLength+3, cmdColor.Colorize(app.name, app.color), scanner.Text())
+		fmt.Printf("%-*s| %s\n", u.maxServiceNameLength+3, cmdColor.Colorize(a.name(), a.color), scanner.Text())
 	}
 	if err = scanner.Err(); err != nil {
 		fmt.Println(err)
