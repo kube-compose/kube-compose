@@ -7,9 +7,12 @@ import (
 )
 
 const (
-	fileFlagName      = "file"
-	namespaceFlagName = "namespace"
-	envIDFlagName     = "env-id"
+	envVarPrefix        = "KUBECOMPOSE_"
+	fileFlagName        = "file"
+	namespaceFlagName   = "namespace"
+	namespaceEnvVarName = envVarPrefix + "NAMESPACE"
+	envIDFlagName       = "env-id"
+	envIDEnvVarName     = envVarPrefix + "ENVID"
 )
 
 func Execute() error {
