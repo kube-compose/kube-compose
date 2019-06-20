@@ -16,7 +16,7 @@ kube-compose can create and destroy environments in Kubernetes based on docker c
   * [Volumes](#Volumes)
     * [Limitations](#Limitations)
   * [Running containers as specific users](#Running-containers-as-specific-users)
-  * [Getting dynamic hostnames](#Getting-dynamic-hostnames)
+  * [Dynamic test configuration](#Dynamic-test-configuration)
 * [Known limitations](#Known-limitations)
 * [Developer information](#Developer-information)
 
@@ -158,7 +158,7 @@ NOTE1: if a Dockerfile does not have a `USER` instruction, then the user is inhe
 
 NOTE2: this may seem like a useless feature, since authenticating with a user that has permissions to deploy pods that can run as any user should achieve the same effect, but `docker-compose`'s `user` property cannot be respected by relying on this function.
 
-## Getting dynamic hostnames
+## Dynamic test configuration
 When running tests against a dynamic environment, the test configuration will need to be generated. Suppose for example that a `docker-compose` service named `my-service` has been deployed to a Kubernetes namespace named `mynamespace`, and the environment id was set to `myenv`. Then the command...
 ```bash
 kube-compose -e'myenv' get 'my-service' -o'{{.Hostname}}'
