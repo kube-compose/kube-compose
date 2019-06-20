@@ -39,7 +39,9 @@ brew upgrade kube-compose
 Download the binary from https://github.com/kube-compose/kube-compose/releases, ensure it has execute permissions and place it on your `PATH`.
 
 # Getting Started
-`kube-compose` targets a Kubernetes namespace, and will need a running Kubernetes cluster and [a kube config file](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/). If you do not have a running Kubernetes cluster, consider running one locally using [Minikube](https://kubernetes.io/docs/setup/minikube/).
+`kube-compose` targets a Kubernetes namespace, and will need a running Kubernetes cluster and [a kube config file](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/). If you do not have a running Kubernetes cluster, consider running one locally using:
+1. Docker Desktop
+2. [Minikube](https://kubernetes.io/docs/setup/minikube/)
 
 `kube-compose` loads Kubernetes configuration the same way `kubectl` does, and it is recommended you use `kubectl` to manage Kubernetes configuration.
 
