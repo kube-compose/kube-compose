@@ -15,8 +15,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-const envVarPrefix = "KUBECOMPOSE_"
-
 var envGetter = os.LookupEnv
 
 func setFromKubeConfig(cfg *config.Config) error {
@@ -52,12 +50,12 @@ func getEnvIDFlag(cmd *cobra.Command) (string, error) {
 	var envID string
 	var exists bool
 	if !cmd.Flags().Changed(envIDFlagName) {
-		envID, exists = envGetter(envVarPrefix + "ENVID")
+		envID, exists = envGetter(envIDEnvVarName)
 		if !exists {
-			return "", fmt.Errorf("either the flag --env-id or the environment variable %sENVID must be set", envVarPrefix)
+			return "", fmt.Errorf("either the flag --env-id or the environment variable %s must be set", envIDEnvVarName)
 		}
 		if e := validation.IsValidLabelValue(envID); len(e) > 0 {
-			return "", fmt.Errorf("the environment variable %sENVID must be a valid label value: %s", envVarPrefix, e[0])
+			return "", fmt.Errorf("the environment variable %s must be a valid label value: %s", envIDEnvVarName, e[0])
 		}
 	} else {
 		envID, _ = cmd.Flags().GetString(envIDFlagName)
@@ -72,7 +70,7 @@ func getNamespaceFlag(cmd *cobra.Command) (string, bool) {
 	var namespace string
 	var exists bool
 	if !cmd.Flags().Changed(namespaceFlagName) {
-		namespace, exists = envGetter(envVarPrefix + "NAMESPACE")
+		namespace, exists = envGetter(namespaceEnvVarName)
 		if !exists {
 			return "", false
 		}
