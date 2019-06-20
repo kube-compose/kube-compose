@@ -16,6 +16,7 @@ kube-compose can create and destroy environments in Kubernetes based on docker c
   * [Volumes](#Volumes)
     * [Limitations](#Limitations)
   * [Running containers as specific users](#Running-containers-as-specific-users)
+  * [Getting dynamic hostnames](#Getting-dynamic-hostnames)
 * [Known limitations](#Known-limitations)
 * [Developer information](#Developer-information)
 
@@ -44,13 +45,13 @@ Download the binary from https://github.com/kube-compose/kube-compose/releases, 
 
 To run `kube-compose` with [the test docker-compose.yml](test/docker-compose.yml):
 ```bash
-kube-compose -f 'test/docker-compose.yml' -e 'myuniquelabel' up
+kube-compose -f'test/docker-compose.yml' -e'myuniquelabel' up
 ```
 The `-e` flag sets a unique identifier that is used to isolate [labels and selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) and ensure names are unique when deploying to shared namespaces. This is ideal for CI, because there may be many jobs and test environments running at the same time. The above command will also attach to any pods created, so ctrl+c can be used to interrupt the process and return control the the terminal.
 
 Similar to `docker-compose`, an environment can be stopped and destroyed using the `down` command: 
 ```bash
-kube-compose -f 'test/docker-compose.yml' -e 'myuniquelabel' down
+kube-compose -f'test/docker-compose.yml' -e'myuniquelabel' down
 ```
 
 The CLI of `kube-compose` mirrors `docker-compose` as much as possible, but has some differences. To avoid repeating the `-e` flag you can use the envirnoment variable `KUBECOMPOSE_ENVID`. The above example can also be written as:
@@ -156,6 +157,18 @@ This will set each pod's `runAsUser` (and `runAsGroup`) based on the [`user` pro
 NOTE1: if a Dockerfile does not have a `USER` instruction, then the user is inherited from the base image. This makes it very easy to run images as root.
 
 NOTE2: this may seem like a useless feature, since authenticating with a user that has permissions to deploy pods that can run as any user should achieve the same effect, but `docker-compose`'s `user` property cannot be respected by relying on this function.
+
+## Getting dynamic hostnames
+When running tests against a dynamic environment, the test configuration will need to be generated. Suppose for example that a `docker-compose` service named `my-service` has been deployed to a Kubernetes namespace named `mynamespace`, and the environment id was set to `myenv`. Then the command...
+```bash
+kube-compose -e'myenv' get 'my-service' -o'{{.Hostname}}'
+```
+...will output...
+```bash
+my-service-myenv.mynamespace.svc.cluster.local
+```
+
+The `get` subcommand of `kube-compose` allows simple Shell scripts to generate dynamic test configuration.
 
 # Known limitations
 1. The `up` subcommand does not an build images of `docker-compose` services ([#188](https://github.com/kube-compose/kube-compose/issues/188)).

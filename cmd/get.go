@@ -18,7 +18,7 @@ func newGetCli() *cobra.Command {
 		Long:  "Print a detailed description of the selected resources, including related resources such as hostname or host IP.",
 		RunE:  getCommand,
 	}
-	getCmd.PersistentFlags().StringP("format", "", "", "Return specified format")
+	getCmd.PersistentFlags().StringP("output", "o", "", "Go template string")
 	return getCmd
 }
 
@@ -33,31 +33,31 @@ func getCommand(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	var tmpl *template.Template
-	if cmd.Flags().Changed("format") {
-		var format string
-		format, _ = cmd.Flags().GetString("format")
-		tmpl, err = template.New("test").Parse(format)
+	if cmd.Flags().Changed("output") {
+		var output string
+		output, _ = cmd.Flags().GetString("output")
+		tmpl, err = template.New("test").Parse(output)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
 	}
 	service := cfg.FindServiceByName(args[0])
-	result, err := details.GetServiceDetails(cfg, service)
+	d, err := details.GetServiceDetails(cfg, service)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	if tmpl != nil {
-		err = tmpl.Execute(os.Stdout, result)
+		err = tmpl.Execute(os.Stdout, d)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
 	} else {
 		output := util.FormatTable([][]string{
-			{"NAME", "NAMESPACE", "HOSTNAME", "CLUSTER-IP"},
-			{result.Service, result.Namespace, result.Hostname, result.ClusterIP},
+			{"NAME", "HOSTNAME", "CLUSTER-IP"},
+			{d.Name, d.Hostname, d.ClusterIP},
 		})
 		fmt.Print(output)
 	}
