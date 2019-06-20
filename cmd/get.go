@@ -43,13 +43,13 @@ func getCommand(cmd *cobra.Command, args []string) error {
 		}
 	}
 	service := cfg.FindServiceByName(args[0])
-	details, err := details.GetServiceDetails(cfg, service)
+	d, err := details.GetServiceDetails(cfg, service)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	if tmpl != nil {
-		err = tmpl.Execute(os.Stdout, details)
+		err = tmpl.Execute(os.Stdout, d)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
@@ -57,7 +57,7 @@ func getCommand(cmd *cobra.Command, args []string) error {
 	} else {
 		output := util.FormatTable([][]string{
 			{"NAME", "HOSTNAME", "CLUSTER-IP"},
-			{details.Name, details.Hostname, details.ClusterIP},
+			{d.Name, d.Hostname, d.ClusterIP},
 		})
 		fmt.Print(output)
 	}
