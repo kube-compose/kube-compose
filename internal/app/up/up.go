@@ -334,17 +334,19 @@ func (u *upRunner) getAppImageInfoEnsureSourceImageID(sourceImage string, source
 	// We need the image locally always, so we can parse its healthcheck
 	sourceImageNamed, sourceImageIsNamed := sourceImageRef.(dockerRef.Named)
 	a.imageInfo.sourceImageID = resolveLocalImageID(sourceImageRef, localImageIDSet, u.localImagesCache.images)
-	if !sourceImageIsNamed {
-		return fmt.Errorf("could not find image %#v locally, and building images is not supported", sourceImage)
-	}
-	digest, err := pullImageWithLogging(u.opts.Context, u.dockerClient, a.name(), sourceImageRef.String())
-	if err != nil {
-		return err
-	}
-	a.imageInfo.sourceImageID, a.imageInfo.podImage, err = resolveLocalImageAfterPull(
-		u.opts.Context, u.dockerClient, sourceImageNamed, digest)
-	if err != nil {
-		return err
+	if a.imageInfo.sourceImageID == "" {
+		if !sourceImageIsNamed {
+			return fmt.Errorf("could not find image %#v locally, and building images is not supported", sourceImage)
+		}
+		digest, err := pullImageWithLogging(u.opts.Context, u.dockerClient, a.name(), sourceImageRef.String())
+		if err != nil {
+			return err
+		}
+		a.imageInfo.sourceImageID, a.imageInfo.podImage, err = resolveLocalImageAfterPull(
+			u.opts.Context, u.dockerClient, sourceImageNamed, digest)
+		if err != nil {
+			return err
+		}
 	}
 	if a.imageInfo.sourceImageID == "" {
 		return fmt.Errorf("could get ID of image %#v, this is either a bug or images were removed by an external process (please try again)",
@@ -865,7 +867,7 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 	return nil
 }
 
-func (u *upRunner) streamPodLogs(pod *v1.Pod, completedChannel chan interface{}, getPodLogOptions *v1.PodLogOptions, app *app) {
+func (u *upRunner) streamPodLogs(pod *v1.Pod, completedChannel chan interface{}, getPodLogOptions *v1.PodLogOptions, a *app) {
 	getLogsRequest := u.k8sPodClient.GetLogs(pod.ObjectMeta.Name, getPodLogOptions)
 	var bodyReader io.ReadCloser
 	bodyReader, err := getLogsRequest.Stream()
@@ -875,7 +877,7 @@ func (u *upRunner) streamPodLogs(pod *v1.Pod, completedChannel chan interface{},
 	defer util.CloseAndLogError(bodyReader)
 	scanner := bufio.NewScanner(bodyReader)
 	for scanner.Scan() {
-		fmt.Printf("%-*s| %s\n", u.maxServiceNameLength+3, cmdColor.Colorize(app.name, app.color), scanner.Text())
+		fmt.Printf("%-*s| %s\n", u.maxServiceNameLength+3, cmdColor.Colorize(a.name(), a.color), scanner.Text())
 	}
 	if err = scanner.Err(); err != nil {
 		fmt.Println(err)

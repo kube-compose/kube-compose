@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/kube-compose/kube-compose/internal/app/down"
 	"github.com/spf13/cobra"
 )
@@ -21,5 +24,10 @@ func downCommand(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	return down.Run(cfg)
+	err = down.Run(cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	return nil
 }

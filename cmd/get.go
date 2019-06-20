@@ -18,48 +18,46 @@ func newGetCli() *cobra.Command {
 		Long:  "Print a detailed description of the selected resources, including related resources such as hostname or host IP.",
 		RunE:  getCommand,
 	}
-	getCmd.PersistentFlags().StringP("format", "", "", "Return specified format")
+	getCmd.PersistentFlags().StringP("output", "o", "", "Go template string")
 	return getCmd
 }
 
 // TODO: If no service is specified then it should iterate through all services in the docker-compose
 // https://github.com/kube-compose/kube-compose/issues/126
 func getCommand(cmd *cobra.Command, args []string) error {
-	if len(args) == 0 {
-		return fmt.Errorf("no args provided")
+	if len(args) != 1 {
+		return fmt.Errorf("exactly one positional argument is required")
 	}
 	cfg, err := getCommandConfig(cmd, args)
 	if err != nil {
 		return err
 	}
-	var format string
-	if cmd.Flags().Changed("format") {
-		format, err = cmd.Flags().GetString("format")
+	var tmpl *template.Template
+	if cmd.Flags().Changed("output") {
+		var output string
+		output, _ = cmd.Flags().GetString("output")
+		tmpl, err = template.New("test").Parse(output)
 		if err != nil {
-			return err
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
 		}
 	}
 	service := cfg.FindServiceByName(args[0])
-	if service == nil {
-		return fmt.Errorf("no service named %#v exists", args[0])
-	}
-	result, err := details.GetServiceDetails(cfg, service)
+	d, err := details.GetServiceDetails(cfg, service)
 	if err != nil {
-		return err
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
-	if format != "" {
-		tmpl, err := template.New(args[0]).Parse(format)
+	if tmpl != nil {
+		err = tmpl.Execute(os.Stdout, d)
 		if err != nil {
-			return err
-		}
-		err = tmpl.Execute(os.Stdout, result)
-		if err != nil {
-			return err
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
 		}
 	} else {
 		output := util.FormatTable([][]string{
-			{"NAME", "NAMESPACE", "HOSTNAME", "CLUSTER-IP"},
-			{result.Service, result.Namespace, result.Hostname, result.ClusterIP},
+			{"NAME", "HOSTNAME", "CLUSTER-IP"},
+			{d.Name, d.Hostname, d.ClusterIP},
 		})
 		fmt.Print(output)
 	}

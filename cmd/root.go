@@ -7,9 +7,12 @@ import (
 )
 
 const (
-	fileFlagName      = "file"
-	namespaceFlagName = "namespace"
-	envIDFlagName     = "env-id"
+	envVarPrefix        = "KUBECOMPOSE_"
+	fileFlagName        = "file"
+	namespaceFlagName   = "namespace"
+	namespaceEnvVarName = envVarPrefix + "NAMESPACE"
+	envIDFlagName       = "env-id"
+	envIDEnvVarName     = envVarPrefix + "ENVID"
 )
 
 func Execute() error {
@@ -17,7 +20,7 @@ func Execute() error {
 		Use:     "kube-compose",
 		Short:   "k8s",
 		Long:    "Environments on k8s made easy",
-		Version: "0.5.1",
+		Version: "0.5.2",
 	}
 	rootCmd.AddCommand(newDownCli(), newUpCli(), newGetCli())
 	setRootCommandFlags(rootCmd)

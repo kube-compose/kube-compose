@@ -14,8 +14,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-const envVarPrefix = "KUBECOMPOSE_"
-
 var envGetter = os.LookupEnv
 
 func setFromKubeConfig(cfg *config.Config) error {
@@ -50,12 +48,12 @@ func getEnvIDFlag(cmd *cobra.Command) (string, error) {
 	var envID string
 	var exists bool
 	if !cmd.Flags().Changed(envIDFlagName) {
-		envID, exists = envGetter(envVarPrefix + "ENVID")
+		envID, exists = envGetter(envIDEnvVarName)
 		if !exists {
-			return "", fmt.Errorf("either the flag --env-id or the environment variable %sENVID must be set", envVarPrefix)
+			return "", fmt.Errorf("either the flag --env-id or the environment variable %s must be set", envIDEnvVarName)
 		}
 		if e := validation.IsValidLabelValue(envID); len(e) > 0 {
-			return "", fmt.Errorf("the environment variable %sENVID must be a valid label value: %s", envVarPrefix, e[0])
+			return "", fmt.Errorf("the environment variable %s must be a valid label value: %s", envIDEnvVarName, e[0])
 		}
 	} else {
 		envID, _ = cmd.Flags().GetString(envIDFlagName)
@@ -70,7 +68,7 @@ func getNamespaceFlag(cmd *cobra.Command) (string, bool) {
 	var namespace string
 	var exists bool
 	if !cmd.Flags().Changed(namespaceFlagName) {
-		namespace, exists = envGetter(envVarPrefix + "NAMESPACE")
+		namespace, exists = envGetter(namespaceEnvVarName)
 		if !exists {
 			return "", false
 		}
@@ -91,10 +89,12 @@ func getCommandConfig(cmd *cobra.Command, args []string) (*config.Config, error)
 	}
 	cfg, err := config.New(files)
 	if err != nil {
-		return nil, err
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 	if err := setFromKubeConfig(cfg); err != nil {
-		return nil, err
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 	cfg.EnvironmentID = envID
 	if namespace, exists := getNamespaceFlag(cmd); exists {
@@ -108,7 +108,8 @@ func getCommandConfig(cmd *cobra.Command, args []string) (*config.Config, error)
 		for _, arg := range args {
 			service := cfg.FindServiceByName(arg)
 			if service == nil {
-				return nil, fmt.Errorf("no service named %#v does exists", arg)
+				fmt.Fprintf(os.Stderr, "no service named %#v exists\n", arg)
+				os.Exit(1)
 			}
 			cfg.AddToFilter(service)
 		}
