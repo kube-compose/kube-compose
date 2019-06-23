@@ -166,11 +166,13 @@ func TestNew_ValidPushImages(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		} else {
-			expected := &PushImagesConfig{
-				DockerRegistry: "my-docker-registry.example.com",
+			expected := ClusterImageStorage{
+				DockerRegistry: &DockerRegistryClusterImageStorage{
+					Host: "my-docker-registry.example.com",
+				},
 			}
-			if !reflect.DeepEqual(c.PushImages, expected) {
-				t.Logf("pushImages1: %+v\n", c.PushImages)
+			if !reflect.DeepEqual(c.ClusterImageStorage, expected) {
+				t.Logf("pushImages1: %+v\n", c.ClusterImageStorage)
 				t.Logf("pushImages2: %+v\n", expected)
 				t.Fail()
 			}

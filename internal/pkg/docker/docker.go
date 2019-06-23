@@ -10,6 +10,13 @@ import (
 	"github.com/kube-compose/kube-compose/internal/pkg/util"
 )
 
+// Defaults useful when constructing fully qualified image refs.
+// Sourced from https://github.com/moby/moby/blob/master/vendor/github.com/docker/distribution/reference/normalize.go#L14
+const (
+	DefaultDomain    = "docker.io"
+	OfficialRepoName = "library"
+)
+
 func EncodeRegistryAuth(username, password string) string {
 	authConfig := dockerTypes.AuthConfig{
 		Username: username,

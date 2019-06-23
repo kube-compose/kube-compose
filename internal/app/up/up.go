@@ -31,13 +31,14 @@ import (
 var colorSupported = []cmdColor.Color{409600, 147456, 344064, 81920, 212992, 278528, 475136}
 
 type appImageInfo struct {
-	err              error
-	imageHealthcheck *dockerComposeConfig.Healthcheck
-	once             *sync.Once
-	podImage         string
-	sourceImageID    string
-	cmd              []string
-	user             *docker.Userinfo
+	err                error
+	imageHealthcheck   *dockerComposeConfig.Healthcheck
+	once               *sync.Once
+	podImage           string
+	podImagePullPolicy v1.PullPolicy
+	sourceImageID      string
+	cmd                []string
+	user               *docker.Userinfo
 }
 
 type appVolume struct {
@@ -47,10 +48,11 @@ type appVolume struct {
 }
 
 type appVolumesInitImage struct {
-	err           error
-	podImage      string
-	sourceImageID string
-	once          *sync.Once
+	err                error
+	podImage           string
+	podImagePullPolicy v1.PullPolicy
+	sourceImageID      string
+	once               *sync.Once
 }
 
 type app struct {
@@ -99,6 +101,7 @@ type upRunner struct {
 	localImagesCache      localImagesCache
 	maxServiceNameLength  int
 	opts                  *Options
+	totalVolumeCount      int
 }
 
 func (u *upRunner) initKubernetesClientset() error {
@@ -132,39 +135,38 @@ func (u *upRunner) initAppsToBeStarted() {
 	}
 }
 
+func (u *upRunner) initVolumeInfoWarnOnce(s string) {
+	if u.totalVolumeCount == 1 {
+		fmt.Println(s)
+	}
+}
+
 func (u *upRunner) initVolumeInfo() {
-	totalVolumeCount := 0
 	for a := range u.appsToBeStarted {
 		for _, serviceVolume := range a.composeService.DockerComposeService.Volumes {
 			appVolume := initVolumeInfoGetAppVolume(a, serviceVolume)
 			if appVolume == nil {
 				continue
 			}
-			totalVolumeCount++
-			if totalVolumeCount > 1 {
+			u.totalVolumeCount++
+			if u.totalVolumeCount == 2 {
 				fmt.Printf("WARNING: the docker compose configuration potentially has a volume that is projected into the file system f1" +
 					" and f2 of containers c1 and c2, respectively, but currently changes in f1 will not be reflected in f2 (see " +
 					"https://github.com/kube-compose/kube-compose#limitations)\n")
 			}
-			if totalVolumeCount == 1 {
-				fmt.Printf("WARNING: the docker compose configuration has one or more bind volumes, but the current implementation " +
-					"cannot reflect changes on the host file system in containers (and vice versa, see " +
-					"https://github.com/kube-compose/kube-compose#limitations)\n")
-			}
+			u.initVolumeInfoWarnOnce("WARNING: the docker compose configuration has one or more bind volumes, but the current implementation " +
+				"cannot reflect changes on the host file system in containers (and vice versa, see " +
+				"https://github.com/kube-compose/kube-compose#limitations)")
 			flag := false
-			if u.cfg.PushImages == nil {
-				if totalVolumeCount == 1 {
-					fmt.Printf("WARNING: the docker compose configuration has one or more bind volumes, but they have been disabled " +
-						"because the configuration to push images is missing (see https://github.com/kube-compose/kube-compose#volumes)\n")
-				}
+			if u.cfg.ClusterImageStorage.Docker == nil && u.cfg.ClusterImageStorage.DockerRegistry == nil {
+				u.initVolumeInfoWarnOnce("WARNING: the docker compose configuration has one or more bind volumes, but they have been disabled " +
+					"because the configuration to push images is missing (see https://github.com/kube-compose/kube-compose#volumes)")
 				flag = true
 			}
 			if u.cfg.VolumeInitBaseImage == nil {
-				if totalVolumeCount == 1 {
-					fmt.Printf("WARNING: the docker compose configuration has one or more bind volumes, but they have been disabled " +
-						"because the base image of volume init containers is not configured (see " +
-						"https://github.com/kube-compose/kube-compose#volumes)\n")
-				}
+				u.initVolumeInfoWarnOnce("WARNING: the docker compose configuration has one or more bind volumes, but they have been disabled " +
+					"because the base image of volume init containers is not configured (see " +
+					"https://github.com/kube-compose/kube-compose#volumes)")
 				flag = true
 			}
 			if flag {
@@ -233,13 +235,28 @@ func (u *upRunner) getAppVolumeInitImage(a *app) error {
 		return err
 	}
 	a.volumeInitImage.sourceImageID = r.imageID
-	a.volumeInitImage.podImage, err = u.pushImage(a.volumeInitImage.sourceImageID, a.composeService.NameEscaped, "volumeinit",
-		"volume init image", a)
-	return err
+	tag := u.cfg.EnvironmentID + "-volumeinit"
+	if u.cfg.ClusterImageStorage.Docker != nil {
+		imageRef := fmt.Sprintf("%s/%s/%s:%s", docker.DefaultDomain, docker.OfficialRepoName, a.composeService.NameEscaped, tag)
+		err = u.dockerClient.ImageTag(u.opts.Context, a.volumeInitImage.sourceImageID, imageRef)
+		if err != nil {
+			return err
+		}
+		a.volumeInitImage.podImage = imageRef
+		a.volumeInitImage.podImagePullPolicy = v1.PullNever
+	} else {
+		a.volumeInitImage.podImage, err = u.pushImage(a.volumeInitImage.sourceImageID, a.composeService.NameEscaped,
+			u.cfg.EnvironmentID+"-volumeinit", "volume init image", a)
+		if err != nil {
+			return err
+		}
+		a.volumeInitImage.podImagePullPolicy = v1.PullAlways
+	}
+	return nil
 }
 
 func (u *upRunner) pushImage(sourceImageID, name, tag, imageDescr string, a *app) (podImage string, err error) {
-	imagePush := fmt.Sprintf("%s/%s/%s:%s", u.cfg.PushImages.DockerRegistry, u.cfg.Namespace, name, tag)
+	imagePush := fmt.Sprintf("%s/%s/%s:%s", u.cfg.ClusterImageStorage.DockerRegistry.Host, u.cfg.Namespace, name, tag)
 	err = u.dockerClient.ImageTag(u.opts.Context, sourceImageID, imagePush)
 	if err != nil {
 		return
@@ -315,13 +332,24 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 }
 
 func (u *upRunner) getAppImageEnsureCorrectPodImage(a *app, sourceImageRef dockerRef.Reference, sourceImage string) error {
-	if u.cfg.PushImages != nil {
-		var err error
-		a.imageInfo.podImage, err = u.pushImage(a.imageInfo.sourceImageID, a.composeService.NameEscaped, "latest", "image", a)
+	tag := u.cfg.EnvironmentID + "-main"
+	switch {
+	case u.cfg.ClusterImageStorage.Docker != nil:
+		imageRef := fmt.Sprintf("%s/%s/%s:%s", docker.DefaultDomain, docker.OfficialRepoName, a.composeService.NameEscaped, tag)
+		err := u.dockerClient.ImageTag(u.opts.Context, a.imageInfo.sourceImageID, imageRef)
 		if err != nil {
 			return err
 		}
-	} else if a.imageInfo.podImage == "" {
+		a.imageInfo.podImage = imageRef
+		a.imageInfo.podImagePullPolicy = v1.PullNever
+	case u.cfg.ClusterImageStorage.DockerRegistry != nil:
+		var err error
+		a.imageInfo.podImage, err = u.pushImage(a.imageInfo.sourceImageID, a.composeService.NameEscaped, tag, "image", a)
+		if err != nil {
+			return err
+		}
+		a.imageInfo.podImagePullPolicy = v1.PullAlways
+	case a.imageInfo.podImage == "":
 		_, sourceImageIsNamed := sourceImageRef.(dockerRef.Named)
 		if !sourceImageIsNamed {
 			// TODO https://github.com/kube-compose/kube-compose/issues/6
@@ -703,9 +731,10 @@ func (u *upRunner) createPodVolumes(a *app, pod *v1.Pod) error {
 		})
 	}
 	initContainer := v1.Container{
-		Name:         a.composeService.NameEscaped + "-init",
-		Image:        a.volumeInitImage.podImage,
-		VolumeMounts: initVolumeMounts,
+		Name:            a.composeService.NameEscaped + "-init",
+		Image:           a.volumeInitImage.podImage,
+		ImagePullPolicy: a.volumeInitImage.podImagePullPolicy,
+		VolumeMounts:    initVolumeMounts,
 	}
 	pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
 	pod.Spec.Containers[0].VolumeMounts = volumeMounts
@@ -753,7 +782,7 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 				{
 					Env:             envVars,
 					Image:           app.imageInfo.podImage,
-					ImagePullPolicy: v1.PullAlways,
+					ImagePullPolicy: app.imageInfo.podImagePullPolicy,
 					Name:            app.composeService.NameEscaped,
 					Ports:           containerPorts,
 					ReadinessProbe:  readinessProbe,
