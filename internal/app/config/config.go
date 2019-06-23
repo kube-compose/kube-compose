@@ -11,8 +11,8 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-type PushImagesConfig struct {
-	DockerRegistry string `mapdecode:"docker_registry"`
+type DockerRegistryClusterImageStorage struct {
+	Host string
 }
 
 type Service struct {
@@ -21,6 +21,11 @@ type Service struct {
 	Name                 string
 	NameEscaped          string
 	Ports                []Port
+}
+
+type ClusterImageStorage struct {
+	Docker         *struct{}
+	DockerRegistry *DockerRegistryClusterImageStorage
 }
 
 type Config struct {
@@ -32,7 +37,7 @@ type Config struct {
 	EnvironmentLabel    string
 	KubeConfig          *rest.Config
 	Namespace           string
-	PushImages          *PushImagesConfig
+	ClusterImageStorage ClusterImageStorage
 	VolumeInitBaseImage *string
 
 	Services map[*dockerComposeConfig.Service]*Service
@@ -79,23 +84,69 @@ func New(files []string) (*Config, error) {
 		}
 		cfg.Services[dcService] = service
 	}
+	err = loadXKubeCompose(cfg, dcCfg.XProperties)
+	if err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
+type clusterImageStorage struct {
+	Type string  `mapdecode:"type"`
+	Host *string `mapdecode:"host"`
+}
+
+func loadXKubeCompose(cfg *Config, xProperties dockerComposeConfig.XProperties) error {
 	var custom struct {
 		XKubeCompose struct {
-			PushImages          *PushImagesConfig `mapdecode:"push_images"`
-			VolumeInitBaseImage *string           `mapdecode:"volume_init_base_image"`
+			ClusterImageStorage *clusterImageStorage `mapdecode:"cluster_image_storage"`
+			PushImages          *struct {
+				DockerRegistry string `mapdecode:"docker_registry"`
+			} `mapdecode:"push_images"`
+			VolumeInitBaseImage *string `mapdecode:"volume_init_base_image"`
 		} `mapdecode:"x-kube-compose"`
 	}
-	err = mapdecode.Decode(&custom, dcCfg.XProperties, mapdecode.IgnoreUnused(true))
+	err := mapdecode.Decode(&custom, xProperties, mapdecode.IgnoreUnused(true))
 	if err != nil {
-		return nil, errors.Wrap(err, "error while parsing x-kube-compose")
+		return errors.Wrap(err, "error while parsing \"x-kube-compose\" of a docker compose file")
 	}
-
-	if custom.XKubeCompose.PushImages != nil {
-		cfg.PushImages = custom.XKubeCompose.PushImages
+	if custom.XKubeCompose.ClusterImageStorage != nil {
+		if custom.XKubeCompose.PushImages != nil {
+			return fmt.Errorf("a docker compose file cannot set both \"x-kube-compose\".\"push_images\" and \"x-kube-compose\"." +
+				"\"cluster_image_storage\"")
+		}
+		err = loadClusterImageStorage(cfg, custom.XKubeCompose.ClusterImageStorage)
+		if err != nil {
+			return err
+		}
+	} else if custom.XKubeCompose.PushImages != nil {
+		fmt.Println("WARNING: a docker compose file has set \"x-kube-compose\".\"push_images\", but this functionality is deprecated. " +
+			"See https://github.com/kube-compose/kube-compose.")
+		cfg.ClusterImageStorage.DockerRegistry = &DockerRegistryClusterImageStorage{
+			Host: custom.XKubeCompose.PushImages.DockerRegistry,
+		}
 	}
 	cfg.VolumeInitBaseImage = custom.XKubeCompose.VolumeInitBaseImage
+	return nil
+}
 
-	return cfg, nil
+func loadClusterImageStorage(cfg *Config, v *clusterImageStorage) error {
+	switch v.Type {
+	case "docker":
+		cfg.ClusterImageStorage.Docker = &struct{}{}
+	case "docker_registry":
+		if v.Host == nil {
+			return fmt.Errorf("a docker compose file is missing a required value at \"x-kube-compose\".\"cluster_image_storage\"." +
+				"\"host\"")
+		}
+		cfg.ClusterImageStorage.DockerRegistry = &DockerRegistryClusterImageStorage{
+			Host: *v.Host,
+		}
+	default:
+		return fmt.Errorf("a docker compose file has an invalid value at \"x-kube-compose\".\"cluster_image_storage\".\"type\": " +
+			"value must be one of \"docker\" and \"docker_registry\"")
+	}
+	return nil
 }
 
 // AddService adds a service to this configuration.

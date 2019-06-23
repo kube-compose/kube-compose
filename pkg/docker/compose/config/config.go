@@ -51,6 +51,7 @@ type Service struct {
 	HealthcheckDisabled bool
 	Image               string
 	Ports               []PortBinding
+	Privileged          bool
 	User                *string
 	Volumes             []ServiceVolume
 	WorkingDir          string
@@ -430,6 +431,7 @@ func (c *configLoader) parseComposeFileService(resolvedFile string, cfService *c
 	service := &Service{
 		Command:    cfService.Command.Values,
 		Image:      cfService.Image,
+		Privileged: cfService.Privileged,
 		User:       cfService.User,
 		Volumes:    cfService.Volumes,
 		WorkingDir: cfService.WorkingDir,
