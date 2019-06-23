@@ -50,7 +50,7 @@ To run `kube-compose` with [the test docker-compose.yml](test/docker-compose.yml
 ```bash
 kube-compose -f'test/docker-compose.yml' -e'myuniquelabel' up
 ```
-The `-e` flag sets a unique identifier that is used to isolate [labels and selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) and ensure names are unique when deploying to shared namespaces. This is ideal for CI, because there may be many jobs and test environments running at the same time. The above command will also attach to any pods created, so ctrl+c can be used to interrupt the process and return control the the terminal.
+The `-e` flag sets a unique identifier that is used to isolate [labels and selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) and ensure names are unique when deploying to shared namespaces. This is ideal for CI, because there may be many jobs and test environments running at the same time. The above command will also attach to any pods created, so ctrl+c can be used to interrupt the process and return control to the terminal.
 
 Similar to `docker-compose`, an environment can be stopped and destroyed using the `down` command: 
 ```bash
