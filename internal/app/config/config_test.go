@@ -127,6 +127,15 @@ func withMockFS(cb func()) {
 	cb()
 }
 
+func withMockFS2(vfsMock fs.VirtualFileSystem, cb func()) {
+	orig := fs.OS
+	defer func() {
+		fs.OS = orig
+	}()
+	fs.OS = vfsMock
+	cb()
+}
+
 func TestNew_Invalid(t *testing.T) {
 	withMockFS(func() {
 		_, err := New(util.NewString(dockerComposeYmlInvalid))
@@ -176,6 +185,115 @@ func TestNew_ValidPushImages(t *testing.T) {
 				t.Logf("pushImages2: %+v\n", expected)
 				t.Fail()
 			}
+		}
+	})
+}
+
+func TestNew_ClusterImageStorage_DockerSuccess(t *testing.T) {
+	file := "/file"
+	withMockFS2(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+		file: {
+			Content: []byte(`version: '2.4'
+x-kube-compose:
+  cluster_image_storage:
+    type: docker
+`),
+		},
+	}), func() {
+		c, err := New(&file)
+		if err != nil {
+			t.Error(err)
+		} else {
+			expected := ClusterImageStorage{
+				Docker: &struct{}{},
+			}
+			if !reflect.DeepEqual(c.ClusterImageStorage, expected) {
+				t.Fail()
+			}
+		}
+	})
+}
+
+func TestNew_ClusterImageStorage_InvalidType(t *testing.T) {
+	file := "/file"
+	withMockFS2(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+		file: {
+			Content: []byte(`version: '2.4'
+x-kube-compose:
+  cluster_image_storage:
+    type: invalid
+`),
+		},
+	}), func() {
+		_, err := New(&file)
+		if err == nil {
+			t.Fail()
+		}
+	})
+}
+
+func TestNew_ClusterImageStorage_DockerRegistryMissingHost(t *testing.T) {
+	file := "/file"
+	withMockFS2(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+		file: {
+			Content: []byte(`version: '2.4'
+x-kube-compose:
+  cluster_image_storage:
+    type: docker_registry
+`),
+		},
+	}), func() {
+		_, err := New(&file)
+		if err == nil {
+			t.Fail()
+		}
+	})
+}
+
+func TestNew_ClusterImageStorage_DockerRegistrySuccess(t *testing.T) {
+	file := "/file"
+	withMockFS2(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+		file: {
+			Content: []byte(`version: '2.4'
+x-kube-compose:
+  cluster_image_storage:
+    type: docker_registry
+    host: docker-registry-default.openshift-cluster.example.com
+`),
+		},
+	}), func() {
+		c, err := New(&file)
+		if err != nil {
+			t.Error(err)
+		} else {
+			expected := ClusterImageStorage{
+				DockerRegistry: &DockerRegistryClusterImageStorage{
+					Host: "docker-registry-default.openshift-cluster.example.com",
+				},
+			}
+			if !reflect.DeepEqual(c.ClusterImageStorage, expected) {
+				t.Fail()
+			}
+		}
+	})
+}
+
+func TestNew_ClusterImageStorage_PushImagesAlsoSpecified(t *testing.T) {
+	file := "/file"
+	withMockFS2(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+		file: {
+			Content: []byte(`version: '2.4'
+x-kube-compose:
+  cluster_image_storage:
+	type: docker
+  push_images:
+    docker_registry: docker-registry-default.openshift-cluster.example.com
+`),
+		},
+	}), func() {
+		_, err := New(&file)
+		if err == nil {
+			t.Fail()
 		}
 	})
 }
