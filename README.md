@@ -80,7 +80,7 @@ We will see several examples that support common CI use cases, in particular the
 4. Stop environmnent
 
 ## Waiting for and ordering startup
-When performing system testing in CI, waiting until the application and stubs are ready is common. `kube-compose` supports ordered startup and can wait for the environment to be ready through [depends_on](https://docs.docker.com/compose/compose-file/compose-file-v2/#depends_on) with `condition: service_healthy` and healthchecks. This approach is powerful, because it does not require writing complicated startup scripts for neither ordering nor waiting. NOTE: version 3 docker compose files do not support `depends_on` conditions anymore (see https://docs.docker.com/compose/startup-order/).
+When performing system testing in CI, waiting until the application and stubs are ready is common. `kube-compose` supports ordered startup and can wait for the environment to be ready through [depends_on](https://docs.docker.com/compose/compose-file/compose-file-v2/#depends_on) with `condition: service_healthy` and healthchecks. This approach is powerful, because it does not require writing complicated startup scripts. NOTE: version 3 docker compose files do not support `depends_on` conditions anymore (see https://docs.docker.com/compose/startup-order/).
 
 For example, if `docker-compose.yml` is...
 ```yaml
@@ -103,7 +103,7 @@ services:
 ```bash
 kube-compose up -d 'helper'
 ```
-...will create the environment and wait for it to have fully started. The service `helper` is used to to make sure that `web` is healthy as soon as `kube-compose` returns, so that we can immediately use the environment (e.g. to running system testing).
+...will create the environment and wait for it to have fully started. The service `helper` is used to to make sure that `web` is healthy as soon as `kube-compose` returns, so that we can immediately use the environment (e.g. to run system testing).
 
 NOTE: in the background `kube-compose` converts [Docker healthchecks](https://docs.docker.com/engine/reference/builder/#healthcheck) to [readiness probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/) and will only start service `web` when the pod of `db` is ready, and will only start `helper` when the pod of `web` is ready. The pod of `helper` exits immediately, but this pattern is very powerful. 
 
@@ -115,7 +115,7 @@ NOTE: in the background `kube-compose` converts [Docker healthchecks](https://do
 1. Running the helper image as an [initContainer](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/) that initialises an [emptyDir](https://kubernetes.io/docs/concepts/storage/volumes/) volume; -and
 1. Mounting the emptyDir volume into the application container as per the configuration of the bind mounted volume.
 
-Simulation of bind mount volumes can be demonstrated with the following `docker-compose.yml`:
+Simulation of bind mounted volumes can be seen in action by running the `up` command with the following docker compose YAML:
 ```yaml
 version: '2.4'
 services:
@@ -136,25 +136,25 @@ x-kube-compose:
     host: 'docker-registry.apps.openshift-cluster.example.com'
   volume_init_base_image: 'ubuntu:latest'
 ```
-When `kube-compose up` is run with the above `docker-compose.yml` a pod is created that prints the contents of `docker-compose.yml`.
+The pod created by the example prints the contents of the docker compose YAML.
 
 ### x-kube-compose configuration
-Because `kube-compose` builds and runs helper images, both a base image and a location to store helper images need to be configured. The base image must have `bash` and `cp` installed (see `volume_init_base_image`). The location to store the helper images can be a docker registry, or a docker daemon. The docker daemon enables support for [Docker Dekstop's Kubernetes cluster](https://docs.docker.com/docker-for-mac/kubernetes/). 
+Because `kube-compose` builds and runs helper images, both a base image and a image storage location need to be configured. The base image must have `bash` and `cp` installed (see `volume_init_base_image`). The image storage location can be a docker registry or a docker daemon. The latter can be used to test locally with [Docker Dekstop's cluster](https://docs.docker.com/docker-for-mac/kubernetes/).
 
-Currently `kube-compose` can only push to docker registries that are configured like OpenShift's default docker registry. In particular, `kube-compose` makes the following assumptions when the image storage type is `docker_registry`:
+Currently `kube-compose` can only push to docker registries that are configured like OpenShift's default docker registry. In particular, `kube-compose` makes the following assumptions when the image storage location is a docker registry:
 1. Within the cluster the hostname of the docker registry is assumed to be `docker-registry.default.svc:5000`.
-2. The kube configuration is assumed to have bearer token credentials, that are supplied as the password to the docker registry (the username will be `unused`).
-3. The reference of the image to be pushed has the form `<registry>/<project>/<imagestream>:latest`, [as required by OpenShift](https://blog.openshift.com/remotely-push-pull-container-images-openshift/).
+1. The kube configuration is assumed to have bearer token credentials, that are supplied as the password to the docker registry (the username will be `unused`), or the docker registry is unauthenticated.
+1. References to pushed images have the form `<registry>/<project>/<imagestream>:latest`, [as required by OpenShift](https://blog.openshift.com/remotely-push-pull-container-images-openshift/).
 
 ### Limitations
-1. Only bind mounted volumes are simulated.
-2. If a docker compose service makes changes in a mount of the bind mounted volume then those changes will not be reflected in the host file system, and vice versa.
-4. If docker compose services `s1` and `s2` have mounts `m1` and `m2`, respectively, and `m1` and `m2` mount overlapping portions of the host file system, then changes in `m1` will not be reflected in `m2` (if `c1=c2` then this can be implemented easily with the current implementation by mounting one volume multiple times).
+1. Volumes that are not bind mounted volumes are ignored.
+1. If a docker compose service makes changes in a mount of a bind mounted volume then those changes will not be reflected in the host file system, and vice versa.
+1. If docker compose services `s1` and `s2` have mounts `m1` and `m2`, respectively, and `m1` and `m2` mount overlapping portions of the host file system, then changes in `m1` will not be reflected in `m2` (if `c1=c2` then this can be implemented easily with the current implementation by mounting one volume multiple times).
 
 The third limitation implies that sharing volumes between two docker compose services is not supported, even though this could be implemented through persistent volumes.
 
 ## Running containers as specific users
-Often the images and stubs run in CI cannot be easily modified because they are provided by a third party, and a pod security policy makes it that some images will not run as the correct user. `kube-compose` allows you to use the `--run-as-user`:
+Images and stubs run in CI often cannot be easily modified because they are provided by a third party, and the cluster's pod security policy can deny images from being run with the correct user. For this reason, `kube-compose` allows you to use the `--run-as-user` flag:
 ```bash
 kube-compose up --run-as-user
 ```
@@ -162,7 +162,7 @@ This will set each pod's `runAsUser` (and `runAsGroup`) based on the [`user` pro
 
 NOTE1: if a Dockerfile does not have a `USER` instruction, then the user is inherited from the base image. This makes it very easy to run images as root.
 
-NOTE2: this may seem like a useless feature, since deploying with a user that can deploy pods running as any user should achieve the same effect, but `docker-compose`'s `user` property cannot be respected by relying on this function.
+NOTE2: this may seem like a useless feature, since the deployer can have permissions to create pods running as any user. But the `user` property of a `docker-compose` service would not be respected in this case.
 
 ## Dynamic test configuration
 When running tests against a dynamic environment, the test configuration will need to be generated. Suppose for example that a `docker-compose` service named `my-service` has been deployed to a Kubernetes namespace named `mynamespace`, and the environment id was set to `myenv`. Then the command...
@@ -174,14 +174,14 @@ kube-compose -e'myenv' get 'my-service' -o'{{.Hostname}}'
 my-service-myenv.mynamespace.svc.cluster.local
 ```
 
-The `get` subcommand of `kube-compose` allows simple Shell scripts to generate dynamic test configuration.
+The `get` subcommand of `kube-compose` allows dynamic test configuration to be generated through simple Shell scripts.
 
 # Known limitations
 1. The `up` subcommand does not an build images of `docker-compose` services ([#188](https://github.com/kube-compose/kube-compose/issues/188)).
-2. If no `-f` and `--file` flags are present then `kube-compose` never looks for a `docker-compose.yml` or `docker-compose.yaml` file in parents of the current working directory ([#151](https://github.com/kube-compose/kube-compose/issues/151)).
-3. `kube-compose` never loads `docker-compose.override.yml` and `docker-compose.override.yaml` files and behaves as if those do not exists ([#124](https://github.com/kube-compose/kube-compose/issues/124)).
-4. When extending a `docker-compose` service using `extends`, only ports and environment are copied from the extended `docker-compose` service ([#48](https://github.com/kube-compose/kube-compose/issues/48)).
-
+1. If no `-f` and `--file` flags are present then `kube-compose` never looks for a `docker-compose.yml` or `docker-compose.yaml` file in parents of the current working directory ([#151](https://github.com/kube-compose/kube-compose/issues/151)).
+1. `kube-compose` never loads `docker-compose.override.yml` and `docker-compose.override.yaml` files and behaves as if those do not exists ([#124](https://github.com/kube-compose/kube-compose/issues/124)).
+1. When extending a `docker-compose` service using `extends`, only ports and environment are copied from the extended `docker-compose` service ([#48](https://github.com/kube-compose/kube-compose/issues/48)).
+1. See [volume limitations](#Limitations).
 
 # Developer information
 
