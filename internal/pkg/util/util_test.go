@@ -143,3 +143,10 @@ func TestFloatPointersPointToSameValue_OneNil(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func Test_NewBool_Success(t *testing.T) {
+	vp := NewBool(true)
+	if vp == nil || !*vp {
+		t.Fail()
+	}
+}

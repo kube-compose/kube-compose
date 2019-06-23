@@ -651,13 +651,17 @@ func (a *app) GetArgsAndCommand(c *v1.Container) error {
 	return nil
 }
 
-func (u *upRunner) createPodSecurityContext(a *app) *v1.PodSecurityContext {
-	if u.opts.RunAsUser {
-		securityContext := &v1.PodSecurityContext{
-			RunAsUser: a.imageInfo.user.UID,
+func (u *upRunner) createSecurityContext(a *app) *v1.SecurityContext {
+	if u.opts.RunAsUser || a.composeService.DockerComposeService.Privileged {
+		securityContext := &v1.SecurityContext{}
+		if u.opts.RunAsUser {
+			securityContext.RunAsUser = a.imageInfo.user.UID
+			if a.imageInfo.user.GID != nil {
+				securityContext.RunAsGroup = a.imageInfo.user.GID
+			}
 		}
-		if a.imageInfo.user.GID != nil {
-			securityContext.RunAsGroup = a.imageInfo.user.GID
+		if a.composeService.DockerComposeService.Privileged {
+			securityContext.Privileged = util.NewBool(true)
 		}
 		return securityContext
 	}
@@ -749,12 +753,12 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 					Name:            app.composeService.NameEscaped,
 					Ports:           containerPorts,
 					ReadinessProbe:  readinessProbe,
+					SecurityContext: u.createSecurityContext(app),
 					WorkingDir:      app.composeService.DockerComposeService.WorkingDir,
 				},
 			},
-			HostAliases:     hostAliases,
-			RestartPolicy:   getRestartPolicyforService(app),
-			SecurityContext: u.createPodSecurityContext(app),
+			HostAliases:   hostAliases,
+			RestartPolicy: getRestartPolicyforService(app),
 		},
 	}
 	err = app.GetArgsAndCommand(&pod.Spec.Containers[0])

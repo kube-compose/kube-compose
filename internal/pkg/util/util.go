@@ -41,7 +41,14 @@ func FloatPointersPointToSameValue(f1, f2 *float64) bool {
 	return *f1 == *f2 || (math.IsNaN(*f1) && math.IsNaN(*f2))
 }
 
-// NewString allocates a string and assigns it value v.
+// NewBool allocates a bool and initializes it to v.
+func NewBool(v bool) *bool {
+	vp := new(bool)
+	*vp = v
+	return vp
+}
+
+// NewString allocates a string and initializes it to v.
 func NewString(v string) *string {
 	vp := new(string)
 	*vp = v
