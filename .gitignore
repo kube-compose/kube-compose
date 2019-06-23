@@ -2,3 +2,4 @@ test/output
 coverage*
 kube-compose
 .vscode
+example
