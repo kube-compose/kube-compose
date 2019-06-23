@@ -1,0 +1,21 @@
+version: '2.3'
+services:
+  dind:
+    image: docker:18.09-dind
+    privileged: true
+  inception:
+    image: ubuntu:latest
+    command:
+    - bash
+    - -c
+    - |+
+      ls -la /usr/local/bin
+      kube-compose -f /root/docker-compose.yml up
+    env:
+    - DOCKER_HOST=tcp://dind:2375
+    - KUBECOMPOSE_ENVID=${KUBECOMPOSE_ENVID}1
+    volumes:
+    - ./kube-compose.linux:/usr/local/bin/kube-compose
+    - ./docker-compose.yml:/root/docker-compose.yml
+x-kube-compose:
+  volume_init_base_image: 'ubuntu:latest'

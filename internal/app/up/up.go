@@ -153,14 +153,18 @@ func (u *upRunner) initVolumeInfo() {
 			}
 			flag := false
 			if u.cfg.PushImages == nil {
-				fmt.Printf("WARNING: the docker compose configuration has one or more bind volumes, but they have been disabled because " +
-					"the configuration to push images is missing (see https://github.com/kube-compose/kube-compose#volumes)\n")
+				if totalVolumeCount == 1 {
+					fmt.Printf("WARNING: the docker compose configuration has one or more bind volumes, but they have been disabled " +
+						"because the configuration to push images is missing (see https://github.com/kube-compose/kube-compose#volumes)\n")
+				}
 				flag = true
 			}
 			if u.cfg.VolumeInitBaseImage == nil {
-				fmt.Printf("WARNING: the docker compose configuration has one or more bind volumes, but they have been disabled because " +
-					"the base image of volume init containers is not configured (see https://github.com/kube-compose/kube-compose#volumes)" +
-					"\n")
+				if totalVolumeCount == 1 {
+					fmt.Printf("WARNING: the docker compose configuration has one or more bind volumes, but they have been disabled " +
+						"because the base image of volume init containers is not configured (see " +
+						"https://github.com/kube-compose/kube-compose#volumes)\n")
+				}
 				flag = true
 			}
 			if flag {
