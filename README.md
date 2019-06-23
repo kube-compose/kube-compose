@@ -141,7 +141,7 @@ When `kube-compose up` is run with the above `docker-compose.yml` a pod is creat
 ### x-kube-compose configuration
 Because `kube-compose` builds and runs helper images, both a base image and a location to store helper images need to be configured. The base image must have `bash` and `cp` installed (see `volume_init_base_image`). The location to store the helper images can be a docker registry, or a docker daemon. The docker daemon enables support for [Docker Dekstop's Kubernetes cluster](https://docs.docker.com/docker-for-mac/kubernetes/). 
 
-Currently `kube-compose` can only push to docker registries that are configured like OpenShift's default docker registry. In particular, `kube-compose` makes the following assumptions:
+Currently `kube-compose` can only push to docker registries that are configured like OpenShift's default docker registry. In particular, `kube-compose` makes the following assumptions when the image storage type is `docker_registry`:
 1. Within the cluster the hostname of the docker registry is assumed to be `docker-registry.default.svc:5000`.
 2. The kube configuration is assumed to have bearer token credentials, that are supplied as the password to the docker registry (the username will be `unused`).
 3. The reference of the image to be pushed has the form `<registry>/<project>/<imagestream>:latest`, [as required by OpenShift](https://blog.openshift.com/remotely-push-pull-container-images-openshift/).
