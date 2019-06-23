@@ -14,6 +14,7 @@ kube-compose can create and destroy environments in Kubernetes based on docker c
 * [Examples](#Examples)
   * [Waiting for and ordering startup](#Waiting-for-and-ordering-startup)
   * [Volumes](#Volumes)
+    * [x-kube-compose configuration](#x-kube-compose-configuration)
     * [Limitations](#Limitations)
   * [Running containers as specific users](#Running-containers-as-specific-users)
   * [Dynamic test configuration](#Dynamic-test-configuration)
@@ -111,16 +112,10 @@ NOTE: in the background `kube-compose` converts [Docker healthchecks](https://do
 
 `kube-compose` implements this by:
 1. Building a helper image with the relevant host files;
-2. Pushing the helper image to a registry;
-3. Running the helper image as an [initContainer](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/) that initialises an [emptyDir](https://kubernetes.io/docs/concepts/storage/volumes/) volume; -and
-4. Mounting the emptyDir volume into the application container as per the configuration of the bind mounted volume.
+1. Running the helper image as an [initContainer](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/) that initialises an [emptyDir](https://kubernetes.io/docs/concepts/storage/volumes/) volume; -and
+1. Mounting the emptyDir volume into the application container as per the configuration of the bind mounted volume.
 
-NOTE: because `kube-compose` builds and pushes helper images, both a base image and docker registry need to be configured. The base image must have `bash` and `cp` installed (see `volume_init_base_image`). Currently `kube-compose` can only push to docker registries that are configured like OpenShift's default docker registry. In particular, `kube-compose` makes the following assumptions:
-1. Within the cluster the hostname of the docker registry is assumed to be `docker-registry.default.svc:5000`.
-2. The kube configuration is assumed to have bearer token credentials, that are supplied as the password to the docker registry (the username will be `unused`).
-3. The reference of the image to be pushed has the form `<registry>/<project>/<imagestream>:latest`, [as required by OpenShift](https://blog.openshift.com/remotely-push-pull-container-images-openshift/).
-
-Nevertheless, simulation of bind mount volumes can be demonstrated with the following `docker-compose.yml`:
+Simulation of bind mount volumes can be demonstrated with the following `docker-compose.yml`:
 ```yaml
 version: '2.4'
 services:
@@ -135,11 +130,21 @@ services:
     volume:
     - './docker-compose.yml:/mnt/inception:ro'
 x-kube-compose:
-  push_images:
-    docker_registry: 'docker-registry.apps.openshift-cluster.example.com'
+  cluster_image_storage:
+    # Change to type: 'docker' when using Docker Desktop's cluster
+    type: 'docker_registry'
+    host: 'docker-registry.apps.openshift-cluster.example.com'
   volume_init_base_image: 'ubuntu:latest'
 ```
 When `kube-compose up` is run with the above `docker-compose.yml` a pod is created that prints the contents of `docker-compose.yml`.
+
+### x-kube-compose configuration
+Because `kube-compose` builds and runs helper images, both a base image and a location to store helper images need to be configured. The base image must have `bash` and `cp` installed (see `volume_init_base_image`). The location to store the helper images can be a docker registry, or a docker daemon. The docker daemon enables support for [Docker Dekstop's Kubernetes cluster](https://docs.docker.com/docker-for-mac/kubernetes/). 
+
+Currently `kube-compose` can only push to docker registries that are configured like OpenShift's default docker registry. In particular, `kube-compose` makes the following assumptions:
+1. Within the cluster the hostname of the docker registry is assumed to be `docker-registry.default.svc:5000`.
+2. The kube configuration is assumed to have bearer token credentials, that are supplied as the password to the docker registry (the username will be `unused`).
+3. The reference of the image to be pushed has the form `<registry>/<project>/<imagestream>:latest`, [as required by OpenShift](https://blog.openshift.com/remotely-push-pull-container-images-openshift/).
 
 ### Limitations
 1. Only bind mounted volumes are simulated.
@@ -147,7 +152,6 @@ When `kube-compose up` is run with the above `docker-compose.yml` a pod is creat
 4. If docker compose services `s1` and `s2` have mounts `m1` and `m2`, respectively, and `m1` and `m2` mount overlapping portions of the host file system, then changes in `m1` will not be reflected in `m2` (if `c1=c2` then this can be implemented easily with the current implementation by mounting one volume multiple times).
 
 The third limitation implies that sharing volumes between two docker compose services is not supported, even though this could be implemented through persistent volumes.
-
 
 ## Running containers as specific users
 Often the images and stubs run in CI cannot be easily modified because they are provided by a third party, and a pod security policy makes it that some images will not run as the correct user. `kube-compose` allows you to use the `--run-as-user`:
@@ -158,7 +162,7 @@ This will set each pod's `runAsUser` (and `runAsGroup`) based on the [`user` pro
 
 NOTE1: if a Dockerfile does not have a `USER` instruction, then the user is inherited from the base image. This makes it very easy to run images as root.
 
-NOTE2: this may seem like a useless feature, since authenticating with a user that has permissions to deploy pods that can run as any user should achieve the same effect, but `docker-compose`'s `user` property cannot be respected by relying on this function.
+NOTE2: this may seem like a useless feature, since deploying with a user that can deploy pods running as any user should achieve the same effect, but `docker-compose`'s `user` property cannot be respected by relying on this function.
 
 ## Dynamic test configuration
 When running tests against a dynamic environment, the test configuration will need to be generated. Suppose for example that a `docker-compose` service named `my-service` has been deployed to a Kubernetes namespace named `mynamespace`, and the environment id was set to `myenv`. Then the command...
