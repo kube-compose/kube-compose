@@ -190,7 +190,7 @@ func TestNew_ValidPushImages(t *testing.T) {
 }
 
 func TestNew_ClusterImageStorage_DockerSuccess(t *testing.T) {
-	file := "/file"
+	file := "/dockersuccess"
 	withMockFS2(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 		file: {
 			Content: []byte(`version: '2.4'
@@ -215,7 +215,7 @@ x-kube-compose:
 }
 
 func TestNew_ClusterImageStorage_InvalidType(t *testing.T) {
-	file := "/file"
+	file := "/invalidtype"
 	withMockFS2(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 		file: {
 			Content: []byte(`version: '2.4'
@@ -233,7 +233,7 @@ x-kube-compose:
 }
 
 func TestNew_ClusterImageStorage_DockerRegistryMissingHost(t *testing.T) {
-	file := "/file"
+	file := "/dockerregistrymissinghost"
 	withMockFS2(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 		file: {
 			Content: []byte(`version: '2.4'
@@ -251,7 +251,7 @@ x-kube-compose:
 }
 
 func TestNew_ClusterImageStorage_DockerRegistrySuccess(t *testing.T) {
-	file := "/file"
+	file := "/dockerregistrysuccess"
 	withMockFS2(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 		file: {
 			Content: []byte(`version: '2.4'
@@ -279,7 +279,7 @@ x-kube-compose:
 }
 
 func TestNew_ClusterImageStorage_PushImagesAlsoSpecified(t *testing.T) {
-	file := "/file"
+	file := "/pushimagesalsospecified"
 	withMockFS2(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 		file: {
 			Content: []byte(`version: '2.4'
