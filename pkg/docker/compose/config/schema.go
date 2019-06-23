@@ -253,6 +253,7 @@ type composeFileService struct {
 	Healthcheck *ServiceHealthcheck  `mapdecode:"healthcheck"`
 	Image       string               `mapdecode:"image"`
 	Ports       []port               `mapdecode:"ports"`
+	Privileged  bool                 `mapdecode:"privileged"`
 	User        *string              `mapdecode:"user"`
 	Volumes     []ServiceVolume      `mapdecode:"volumes"`
 	WorkingDir  string               `mapdecode:"working_dir"`
