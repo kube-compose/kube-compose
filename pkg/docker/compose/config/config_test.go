@@ -267,9 +267,9 @@ func TestConfigLoaderLoadFile_Success(t *testing.T) {
 				"testservice": {
 					dependsOn: map[string]ServiceHealthiness{},
 					service: &Service{
-						Command:           []string{"bash", "-c", "echo 'Hello World!'"},
-						EntrypointPresent: true,
-						Image:             "ubuntu:latest",
+						Command:    []string{"bash", "-c", "echo 'Hello World!'"},
+						Entrypoint: []string{},
+						Image:      "ubuntu:latest",
 						Volumes: []ServiceVolume{
 							{
 								Short: &PathMapping{
@@ -298,7 +298,7 @@ func assertComposeFileServicesEqual(t *testing.T, services1, services2 map[strin
 		if service2 == nil {
 			t.Fail()
 		} else {
-			if len(service1.dependsOn) > 0 || len(service2.dependsOn) > 0 {
+			if service1.dependsOn != nil || service2.dependsOn != nil {
 				panic("services must not have depends on")
 			}
 			if service1.extends != nil || service2.extends != nil {
@@ -413,9 +413,9 @@ func assertServicesEqualContinued(t *testing.T, service1, service2 *Service, ign
 		t.Logf("env2: %+v\n", service2.Environment)
 		t.Fail()
 	}
-	if service1.EntrypointPresent != service2.EntrypointPresent {
+	if (service1.Entrypoint == nil) != (service2.Entrypoint == nil) {
 		t.Fail()
-	} else if service1.EntrypointPresent && !areStringSlicesEqual(service1.Entrypoint, service2.Entrypoint) {
+	} else if service1.Entrypoint != nil && !areStringSlicesEqual(service1.Entrypoint, service2.Entrypoint) {
 		t.Logf("entrypoint1: %+v\n", service1.Entrypoint)
 		t.Logf("entrypoint2: %+v\n", service2.Entrypoint)
 		t.Fail()
@@ -801,7 +801,7 @@ func TestParseComposeFileService_InvalidPortsError(t *testing.T) {
 func TestParseComposeFileService_InvalidHealthcheckError(t *testing.T) {
 	c := newTestConfigLoader(nil)
 	cfService := &composeFileService{
-		Healthcheck: &ServiceHealthcheck{
+		Healthcheck: &composeFileHealthcheck{
 			Timeout: util.NewString("henkie"),
 		},
 	}

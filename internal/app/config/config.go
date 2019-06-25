@@ -160,7 +160,7 @@ func (cfg *Config) AddService(name string, dockerComposeService *dockerComposeCo
 			panic("a service with name already exists")
 		}
 	} else {
-		if len(dockerComposeService.DependsOn) > 0 {
+		if dockerComposeService.DependsOn != nil {
 			panic("cannot add dockerComposeService that has dependencies")
 		}
 		service1 = &Service{

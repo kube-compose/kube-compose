@@ -32,20 +32,21 @@ type XProperties map[string]interface{}
 // It represents one ore more docker compose files that have been merged together using logic close to docker compose.
 // Similarly, extends will have been processed as well (see https://docs.docker.com/compose/compose-file/compose-file-v2/#extends).
 type CanonicalDockerComposeConfig struct {
-	Services    map[string]*Service
-	XProperties XProperties
+	Services map[string]*Service
+	// For each docker compose file that was merged together, the root level x- properties as a generic map.
+	// Givens elements e_i and e_j of the slice, with indices i and j, respectively, such that i > j, XProperties e_i have a higher priority
+	// than XProperties e_j. Intuitively, elements later in the list take precedence over those earlier in the list.
+	// The user of this package can choose to implement merging of XProperties as appropriate.
+	XProperties []XProperties
 }
 
 // Service is the final representation of a docker-compose service, after all docker compose files have been merged. Service
 // is a smaller piece of CanonicalDockerComposeConfig.
 type Service struct {
-	Command    []string
-	DependsOn  map[*Service]ServiceHealthiness
-	Entrypoint []string
-
-	// docker-compose distinguishes between an empty Entrypoint and an absent Entrypoint.
-	// TODO https://github.com/kube-compose/kube-compose/issues/157 remove this field
-	EntrypointPresent   bool
+	// When adding a field here, please update merge.go with the logic required to merge these fields.
+	Command             []string
+	DependsOn           map[*Service]ServiceHealthiness
+	Entrypoint          []string
 	Environment         map[string]string
 	Healthcheck         *Healthcheck
 	HealthcheckDisabled bool
@@ -59,14 +60,18 @@ type Service struct {
 }
 
 // composeFileParsedService is a helper struct that is a smaller piece of composeFileParsed.
+// TODO https://github.com/kube-compose/kube-compose/issues/211 merge with composeFileService struct
 type composeFileParsedService struct {
-	service   *Service
-	dependsOn map[string]ServiceHealthiness
-	extends   *extends
-
-	// Helper data used to detect cycles during process of extends and depends_on.
-	recStack bool
-	visited  bool
+	dependsOn   map[string]ServiceHealthiness
+	extends     *extends
+	image       *string
+	healthcheck *composeFileHealthcheck
+	privileged  *bool
+	recStack    bool // Helper data used to detect cycles during process of extends and depends_on.
+	restart     *string
+	service     *Service
+	visited     bool // Helper data used to detect cycles during process of extends and depends_on.
+	workingDir  *string
 }
 
 // A helper for defer
@@ -76,6 +81,7 @@ func (c *composeFileParsedService) clearRecStack() {
 
 // composeFileParsed is an intermediate representation of a docker compose file used during loading
 // of the docker compose configuration.
+// TODO https://github.com/kube-compose/kube-compose/issues/211 merge with composeFile struct
 type composeFileParsed struct {
 	services map[string]*composeFileParsedService
 	version  *version.Version
@@ -240,7 +246,7 @@ func (c *configLoader) processExtends(name string, cfServiceParsed *composeFileP
 	if err != nil {
 		return err
 	}
-	merge(cfServiceParsed, cfExtendedServiceParsed)
+	merge(cfServiceParsed, cfExtendedServiceParsed, false)
 	return nil
 }
 
@@ -320,10 +326,13 @@ func New(files []string) (*CanonicalDockerComposeConfig, error) {
 	}
 
 	if len(resolvedFiles) > 1 {
-		// TODO https://github.com/kube-compose/kube-compose/issues/121 merge files together
-		// This should be a matter of calling merge repeatedly.
-		return nil, fmt.Errorf("sorry, merging multiple docker compose files is not supported")
+		merged := map[string]*composeFileParsedService{}
+		for i := len(resolvedFiles) - 1; i >= 0; i-- {
+			cfParsed := c.loadResolvedFileCache[resolvedFiles[i]].parsed
+			mergeServices(merged, cfParsed.services)
+		}
 	}
+
 	cfParsed := c.loadResolvedFileCache[resolvedFiles[0]].parsed
 	for name, cfServiceParsed := range cfParsed.services {
 		err := c.processExtends(name, cfServiceParsed, cfParsed)
@@ -342,9 +351,31 @@ func New(files []string) (*CanonicalDockerComposeConfig, error) {
 	configCanonical := &CanonicalDockerComposeConfig{}
 	configCanonical.Services = map[string]*Service{}
 	for name, cfServiceParsed := range cfParsed.services {
+
+		// Healthchecks are processed after merging.
+		healthcheck, healthcheckDisabled, err := ParseHealthcheck(cfServiceParsed.healthcheck)
+		if err != nil {
+			return nil, err
+		}
+		cfServiceParsed.service.Healthcheck = healthcheck
+		cfServiceParsed.service.HealthcheckDisabled = healthcheckDisabled
+
+		if cfServiceParsed.image != nil {
+			cfServiceParsed.service.Image = *cfServiceParsed.image
+		}
+		if cfServiceParsed.privileged != nil {
+			cfServiceParsed.service.Privileged = *cfServiceParsed.privileged
+		}
+		if cfServiceParsed.restart != nil {
+			cfServiceParsed.service.Restart = *cfServiceParsed.restart
+		}
+		if cfServiceParsed.workingDir != nil {
+			cfServiceParsed.service.WorkingDir = *cfServiceParsed.workingDir
+		}
+
 		configCanonical.Services[name] = cfServiceParsed.service
 	}
-	configCanonical.XProperties = cfParsed.xProperties
+	configCanonical.XProperties = []XProperties{cfParsed.xProperties}
 	return configCanonical, nil
 }
 
@@ -370,14 +401,16 @@ func getXProperties(gm interface{}) XProperties {
 func resolveDependsOn(cfParsed *composeFileParsed) error {
 	for name1, cfServiceParsed := range cfParsed.services {
 		service := cfServiceParsed.service
-		service.DependsOn = map[*Service]ServiceHealthiness{}
-		for name2, serviceHealthiness := range cfServiceParsed.dependsOn {
-			resolvedDependsOn := cfParsed.services[name2]
-			if resolvedDependsOn == nil {
-				return fmt.Errorf("service %s refers to a non-existing service in its depends_on: %s",
-					name1, name2)
+		if cfServiceParsed.dependsOn != nil {
+			service.DependsOn = map[*Service]ServiceHealthiness{}
+			for name2, serviceHealthiness := range cfServiceParsed.dependsOn {
+				resolvedDependsOn := cfParsed.services[name2]
+				if resolvedDependsOn == nil {
+					return fmt.Errorf("service %s refers to a non-existing service in its depends_on: %s",
+						name1, name2)
+				}
+				service.DependsOn[resolvedDependsOn.service] = serviceHealthiness
 			}
-			service.DependsOn[resolvedDependsOn.service] = serviceHealthiness
 		}
 	}
 	for name, cfServiceParsed := range cfParsed.services {
@@ -430,36 +463,25 @@ func (c *configLoader) parseComposeFile(cf *composeFile, cfParsed *composeFilePa
 func (c *configLoader) parseComposeFileService(resolvedFile string, cfService *composeFileService) (*composeFileParsedService, error) {
 	service := &Service{
 		Command:    cfService.Command.Values,
-		Image:      cfService.Image,
-		Privileged: cfService.Privileged,
+		Entrypoint: cfService.Entrypoint.Values,
 		User:       cfService.User,
 		Volumes:    cfService.Volumes,
-		WorkingDir: cfService.WorkingDir,
-		Restart:    cfService.Restart,
 	}
 	composeFileParsedService := &composeFileParsedService{
-		service: service,
-		extends: cfService.Extends,
-	}
-	if cfService.Entrypoint != nil {
-		service.Entrypoint = cfService.Entrypoint.Values
-		service.EntrypointPresent = true
-	}
-	if cfService.DependsOn != nil {
-		composeFileParsedService.dependsOn = cfService.DependsOn.Values
+		dependsOn:   cfService.DependsOn.Values,
+		extends:     cfService.Extends,
+		healthcheck: cfService.Healthcheck,
+		image:       cfService.Image,
+		privileged:  cfService.Privileged,
+		restart:     cfService.Restart,
+		service:     service,
+		workingDir:  cfService.WorkingDir,
 	}
 	ports, err := parsePorts(cfService.Ports)
 	if err != nil {
 		return nil, err
 	}
 	service.Ports = ports
-
-	healthcheck, healthcheckDisabled, err := ParseHealthcheck(cfService.Healthcheck)
-	if err != nil {
-		return nil, err
-	}
-	service.Healthcheck = healthcheck
-	service.HealthcheckDisabled = healthcheckDisabled
 
 	environment, err := c.parseEnvironment(cfService.Environment.Values)
 	if err != nil {

@@ -101,7 +101,7 @@ func TestMerge_Basic(t *testing.T) {
 		},
 	}
 
-	merge(serviceA, serviceB)
+	merge(serviceA, serviceB, false)
 	if !reflect.DeepEqual(serviceA, expected) {
 		t.Fail()
 	}

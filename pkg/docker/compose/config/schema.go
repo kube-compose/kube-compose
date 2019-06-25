@@ -47,16 +47,18 @@ func (t *HealthcheckTest) Decode(into mapdecode.Into) error {
 	return nil
 }
 
-type ServiceHealthcheck struct {
-	Disable  bool            `mapdecode:"disable"`
-	Interval *string         `mapdecode:"interval"`
-	Retries  *uint           `mapdecode:"retries"`
-	Test     HealthcheckTest `mapdecode:"test"`
-	Timeout  *string         `mapdecode:"timeout"`
+type composeFileHealthcheck struct {
+	Disable  *bool   `mapdecode:"disable"`
+	Interval *string `mapdecode:"interval"`
+	Retries  *uint   `mapdecode:"retries"`
+	// Test.Values is nil if and only if the field "test" is not present in the map.
+	// If the field "test" is present and is an empty slice, then Test.Values will not be nil.
+	Test    HealthcheckTest `mapdecode:"test"`
+	Timeout *string         `mapdecode:"timeout"`
 	// start_period is only available in docker-compose 2.3 or higher
 }
 
-func (h *ServiceHealthcheck) GetTest() []string {
+func (h *composeFileHealthcheck) GetTest() []string {
 	return h.Test.Values
 }
 
@@ -237,30 +239,23 @@ func (sv *ServiceVolume) Decode(into mapdecode.Into) error {
 }
 
 type composeFileService struct {
-	Build *struct {
-		Context    string `mapdecode:"context"`
-		Dockerfile string `mapdecode:"dockerfile"`
-	} `mapdecode:"build"`
 	// TODO https://github.com/kube-compose/kube-compose/issues/153 interpret string command/entrypoint correctly
 	Command   stringOrStringSlice `mapdecode:"command"`
-	DependsOn *dependsOn          `mapdecode:"depends_on"`
+	DependsOn dependsOn           `mapdecode:"depends_on"`
 	// TODO https://github.com/kube-compose/kube-compose/issues/153 interpret string command/entrypoint correctly
-	// TODO https://github.com/kube-compose/kube-compose/issues/157 just use []string instead of *[]string to distinguish between empty slice
-	// and absent slice.
-	Entrypoint  *stringOrStringSlice `mapdecode:"entrypoint"`
-	Environment environment          `mapdecode:"environment"`
-	Extends     *extends             `mapdecode:"extends"`
-	Healthcheck *ServiceHealthcheck  `mapdecode:"healthcheck"`
-	Image       string               `mapdecode:"image"`
-	Ports       []port               `mapdecode:"ports"`
-	Privileged  bool                 `mapdecode:"privileged"`
-	User        *string              `mapdecode:"user"`
-	Volumes     []ServiceVolume      `mapdecode:"volumes"`
-	WorkingDir  string               `mapdecode:"working_dir"`
-	Restart     string               `mapdecode:"restart"`
+	Entrypoint  stringOrStringSlice     `mapdecode:"entrypoint"`
+	Environment environment             `mapdecode:"environment"`
+	Extends     *extends                `mapdecode:"extends"`
+	Healthcheck *composeFileHealthcheck `mapdecode:"healthcheck"`
+	Image       *string                 `mapdecode:"image"`
+	Ports       []port                  `mapdecode:"ports"`
+	Privileged  *bool                   `mapdecode:"privileged"`
+	User        *string                 `mapdecode:"user"`
+	Volumes     []ServiceVolume         `mapdecode:"volumes"`
+	WorkingDir  *string                 `mapdecode:"working_dir"`
+	Restart     *string                 `mapdecode:"restart"`
 }
 
 type composeFile struct {
 	Services map[string]*composeFileService `mapdecode:"services"`
-	Volumes  map[string]interface{}         `mapdecode:"volumes"`
 }
