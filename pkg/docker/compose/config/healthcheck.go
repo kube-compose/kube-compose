@@ -25,7 +25,7 @@ type Healthcheck struct {
 	Timeout     time.Duration
 }
 
-func ParseHealthcheck(healthcheckYAML *composeFileHealthcheck) (*Healthcheck, bool, error) {
+func ParseHealthcheck(healthcheckYAML *healthcheckInternal) (*Healthcheck, bool, error) {
 	if healthcheckYAML == nil {
 		return nil, false, nil
 	}

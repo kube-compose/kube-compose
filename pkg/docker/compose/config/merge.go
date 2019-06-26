@@ -19,17 +19,16 @@ func addVolume(volumes []ServiceVolume, volume1 ServiceVolume) []ServiceVolume {
 	return append(volumes, volume1)
 }
 
-func merge(into, from *composeFileParsedService, mergeExtends bool) {
+func merge(into, from *serviceInternal, mergeExtends bool) {
 	// Rules here are based on https://docs.docker.com/compose/extends/#adding-and-overriding-configuration
-	into.service.Environment = mergeStringMaps(into.service.Environment, from.service.Environment)
-	into.service.Ports = mergePortBindings(into.service.Ports, from.service.Ports)
-
-	into.dependsOn = mergeDependsOnMaps(into.dependsOn, from.dependsOn)
-	into.service.Volumes = mergeVolumes(into.service.Volumes, from.service.Volumes)
+	into.dependsOn.Values = mergeDependsOnMaps(into.dependsOn.Values, from.dependsOn.Values)
+	into.environmentParsed = mergeStringMaps(into.environmentParsed, from.environmentParsed)
 	into.healthcheck = mergeHealthchecks(into.healthcheck, from.healthcheck)
+	into.portsParsed = mergePortBindings(into.portsParsed, from.portsParsed)
+	into.volumes = mergeVolumes(into.volumes, from.volumes)
 
-	if into.service.Entrypoint == nil {
-		into.service.Entrypoint = from.service.Entrypoint
+	if into.entrypoint.Values == nil {
+		into.entrypoint.Values = from.entrypoint.Values
 	}
 	if into.image == nil {
 		into.image = from.image
@@ -40,8 +39,8 @@ func merge(into, from *composeFileParsedService, mergeExtends bool) {
 	if into.restart == nil {
 		into.restart = from.restart
 	}
-	if into.service.User == nil {
-		into.service.User = from.service.User
+	if into.user == nil {
+		into.user = from.user
 	}
 	if mergeExtends && into.extends == nil {
 		into.extends = from.extends
@@ -60,7 +59,7 @@ func mergeDependsOnMaps(into, from map[string]ServiceHealthiness) map[string]Ser
 	return into
 }
 
-func mergeHealthchecks(into, from *composeFileHealthcheck) *composeFileHealthcheck {
+func mergeHealthchecks(into, from *healthcheckInternal) *healthcheckInternal {
 	if into == nil {
 		return from
 	}
@@ -77,7 +76,7 @@ func mergeHealthchecks(into, from *composeFileHealthcheck) *composeFileHealthche
 		into.Retries = from.Retries
 	}
 	// Test.Values is nil if and only if the field is not set. We need to know whether the field is set to correctly merge. See also
-	// composeFileHealthcheck.
+	// healthcheckInternal.
 	if into.Test.Values == nil {
 		into.Test.Values = from.Test.Values
 	}
@@ -97,8 +96,28 @@ func mergePortBindings(into, from []PortBinding) []PortBinding {
 	return into
 }
 
-func mergeServices(into, from map[string]*composeFileParsedService) {
-
+// This merge function is used when merging files together.
+// from is never mutated, any any non-frozen/mutable value in from is guaranteed to be copied.
+// This is an important correctness property, because from is a pointer to the cache of a docker
+// compose file. If from were to be mutated then an extends would inherit from an intermediate result instead of the original docker compose
+// file.
+func mergeServices(into, from map[string]*serviceInternal) {
+	for name, fromService := range from {
+		intoService := into[name]
+		if intoService == nil {
+			intoService = &serviceInternal{
+				dependsOn: dependsOn{
+					Values: map[string]ServiceHealthiness{},
+				},
+				environmentParsed: map[string]string{},
+				healthcheck:       &healthcheckInternal{},
+				portsParsed:       []PortBinding{},
+				volumes:           []ServiceVolume{},
+			}
+			into[name] = intoService
+		}
+		merge(intoService, fromService, true)
+	}
 }
 
 func mergeStringMaps(into, from map[string]string) map[string]string {

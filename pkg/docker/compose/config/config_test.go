@@ -253,7 +253,7 @@ func TestConfigLoaderParseEnvironment_InvalidName(t *testing.T) {
 func TestConfigLoaderLoadFile_Success(t *testing.T) {
 	withMockFS(func() {
 		c := newTestConfigLoader(nil)
-		cfParsed, err := c.loadFile(testDockerComposeYml)
+		dcFile, err := c.loadFile(testDockerComposeYml)
 		if err != nil {
 			t.Error(err)
 		} else {
@@ -263,33 +263,37 @@ func TestConfigLoaderLoadFile_Success(t *testing.T) {
 			if len(cfParsed.xProperties) != 0 {
 				t.Fail()
 			}
-			expected := map[string]*composeFileParsedService{
+			expected := map[string]*serviceInternal{
 				"testservice": {
-					dependsOn: map[string]ServiceHealthiness{},
-					service: &Service{
-						Command:    []string{"bash", "-c", "echo 'Hello World!'"},
-						Entrypoint: []string{},
-						Image:      "ubuntu:latest",
-						Volumes: []ServiceVolume{
-							{
-								Short: &PathMapping{
-									ContainerPath: "bb",
-									HasHostPath:   true,
-									HasMode:       true,
-									HostPath:      "aa",
-									Mode:          "cc",
-								},
+					command: stringOrStringSlice{
+						Values: []string{"bash", "-c", "echo 'Hello World!'"},
+					},
+					dependsOn: dependsOn{
+						Values: map[string]ServiceHealthiness{},
+					},
+					entrypoint: stringOrStringSlice{
+						Values: []string{},
+					},
+					image: util.NewString("ubuntu:latest"),
+					volumes: []ServiceVolume{
+						{
+							Short: &PathMapping{
+								ContainerPath: "bb",
+								HasHostPath:   true,
+								HasMode:       true,
+								HostPath:      "aa",
+								Mode:          "cc",
 							},
 						},
 					},
 				},
 			}
-			assertComposeFileServicesEqual(t, cfParsed.services, expected)
+			assertComposeFileServicesEqual(t, dcFile.services, expected)
 		}
 	})
 }
 
-func assertComposeFileServicesEqual(t *testing.T, services1, services2 map[string]*composeFileParsedService) {
+func assertComposeFileServicesEqual(t *testing.T, services1, services2 map[string]*Service) {
 	if len(services1) != len(services2) {
 		t.Fail()
 	}
@@ -298,13 +302,10 @@ func assertComposeFileServicesEqual(t *testing.T, services1, services2 map[strin
 		if service2 == nil {
 			t.Fail()
 		} else {
-			if service1.dependsOn != nil || service2.dependsOn != nil {
+			if service1.DependsOn != nil || service2.DependsOn != nil {
 				panic("services must not have depends on")
 			}
-			if service1.extends != nil || service2.extends != nil {
-				panic("services must not have extends")
-			}
-			assertServicesEqual(t, service1.service, service2.service, true)
+			assertServicesEqual(t, service1, service2, true)
 		}
 	}
 }
@@ -768,7 +769,7 @@ func TestGetVersion_Success(t *testing.T) {
 }
 
 func TestComposeFileParsedServiceClearRecStack_Success(t *testing.T) {
-	s := &composeFileParsedService{}
+	s := &serviceInternal{}
 	s.recStack = true
 	s.clearRecStack()
 	if s.recStack {
@@ -783,40 +784,52 @@ func TestLoadFileError_Success(t *testing.T) {
 	}
 }
 
-func TestParseComposeFileService_InvalidPortsError(t *testing.T) {
+func Test_ConfigLoader_ParseDockerComposeFileService_InvalidPortsError(t *testing.T) {
 	c := newTestConfigLoader(nil)
-	cfService := &composeFileService{
-		Ports: []port{
-			{
-				Value: "asdf",
+
+	dcFile := &dockerComposeFile{
+		services: map[string]*serviceInternal{
+			"service1": {
+				ports: []port{
+					{
+						Value: "asdf",
+					},
+				},
 			},
 		},
 	}
-	_, err := c.parseComposeFileService("", cfService)
+	s := dcFile.services["service1"]
+	err := c.parseDockerComposeFileService(dcFile, s)
 	if err == nil {
 		t.Fail()
 	}
 }
 
-func TestParseComposeFileService_InvalidHealthcheckError(t *testing.T) {
+func Test_ConfigLoader_ParseDockerComposeFileService_InvalidHealthcheckError(t *testing.T) {
 	c := newTestConfigLoader(nil)
-	cfService := &composeFileService{
-		Healthcheck: &composeFileHealthcheck{
-			Timeout: util.NewString("henkie"),
+
+	dcFile := &dockerComposeFile{
+		services: map[string]*serviceInternal{
+			"service1": {
+				healthcheck: &healthcheckInternal{
+					Timeout: util.NewString("henkie"),
+				},
+			},
 		},
 	}
-	_, err := c.parseComposeFileService("", cfService)
+	s := dcFile.services["service1"]
+	err := c.parseDockerComposeFileService(dcFile, s)
 	if err == nil {
 		t.Fail()
 	}
 }
 
-func TestParseComposeFile_InvalidEnvironmentError(t *testing.T) {
+func Test_ConfigLoader_ParseDockerComposeFile_InvalidEnvironmentError(t *testing.T) {
 	c := newTestConfigLoader(nil)
-	cf := &composeFile{
-		Services: map[string]*composeFileService{
+	dcFile := &dockerComposeFile{
+		services: map[string]*serviceInternal{
 			"service1": {
-				Environment: environment{
+				environment: environment{
 					Values: []environmentNameValuePair{
 						{
 							Name: "",
@@ -826,8 +839,7 @@ func TestParseComposeFile_InvalidEnvironmentError(t *testing.T) {
 			},
 		},
 	}
-	cfParsed := &composeFileParsed{}
-	err := c.parseComposeFile(cf, cfParsed)
+	err := c.parseDockerComposeFile(dcFile)
 	if err == nil {
 		t.Fail()
 	} else {

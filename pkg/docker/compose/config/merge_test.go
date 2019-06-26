@@ -80,21 +80,21 @@ func TestMergeStringMaps_Empty(t *testing.T) {
 }
 
 func TestMerge_Basic(t *testing.T) {
-	serviceA := &composeFileParsedService{
+	serviceA := &serviceInternal{
 		service: &Service{
 			Environment: map[string]string{"a": "b"},
 			Ports:       []PortBinding{{80, 80, 80, "tcp", ""}},
 		},
 	}
 
-	serviceB := &composeFileParsedService{
+	serviceB := &serviceInternal{
 		service: &Service{
 			Environment: map[string]string{"b": "c"},
 			Ports:       []PortBinding{{8000, 8000, 8000, "tcp", ""}},
 		},
 	}
 
-	expected := &composeFileParsedService{
+	expected := &serviceInternal{
 		service: &Service{
 			Environment: map[string]string{"a": "b", "b": "c"},
 			Ports:       []PortBinding{{80, 80, 80, "tcp", ""}, {8000, 8000, 8000, "tcp", ""}},
