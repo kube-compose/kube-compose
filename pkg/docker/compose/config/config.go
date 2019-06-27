@@ -277,6 +277,7 @@ func (c *configLoader) resolveExtends(
 		if err != nil {
 			return nil, err
 		}
+		// TODO https://github.com/kube-compose/kube-compose/issues/212 fail if there is a version mismatch
 		s2 = dcFile.services[s1.extends.Service]
 		if s2 == nil {
 			return nil, extendsNotFoundError(name, resolvedFile, s1.extends.Service, dcFile.resolvedFile)
@@ -354,6 +355,7 @@ func New(files []string) (*CanonicalDockerComposeConfig, error) {
 	var resolvedFile string
 	var xProperties []XProperties
 	if len(resolvedFiles) > 1 {
+		// TODO https://github.com/kube-compose/kube-compose/issues/213 error when trying to merge different versions
 		// This if is not only an optimiziation (to avoid copying when there's only one service).
 		// resolvedFile is "" in this case, which means that we can mention "merged docker compose files" instead of a specific file.
 		services = map[string]*serviceInternal{}
