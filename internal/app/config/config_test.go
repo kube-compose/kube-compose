@@ -135,7 +135,7 @@ func withMockFS2(vfsMock fs.VirtualFileSystem, cb func()) {
 	cb()
 }
 
-func TestNew_Invalid(t *testing.T) {
+func Test_New_Invalid(t *testing.T) {
 	withMockFS(func() {
 		_, err := New([]string{dockerComposeYmlInvalid})
 		if err == nil {
@@ -146,7 +146,7 @@ func TestNew_Invalid(t *testing.T) {
 	})
 }
 
-func TestNew_InvalidServiceName(t *testing.T) {
+func Test_New_InvalidServiceName(t *testing.T) {
 	withMockFS(func() {
 		_, err := New([]string{dockerComposeYmlInvalidServiceName})
 		if err == nil {
@@ -157,7 +157,7 @@ func TestNew_InvalidServiceName(t *testing.T) {
 	})
 }
 
-func TestNew_InvalidXKubeCompose(t *testing.T) {
+func Test_New_InvalidXKubeCompose(t *testing.T) {
 	withMockFS(func() {
 		_, err := New([]string{dockerComposeYmlInvalidXKubeCompose})
 		if err == nil {
@@ -168,7 +168,7 @@ func TestNew_InvalidXKubeCompose(t *testing.T) {
 	})
 }
 
-func TestNew_ValidPushImages(t *testing.T) {
+func Test_New_ValidPushImages(t *testing.T) {
 	withMockFS(func() {
 		c, err := New([]string{dockerComposeYmlValidPushImages})
 		if err != nil {
@@ -188,7 +188,7 @@ func TestNew_ValidPushImages(t *testing.T) {
 	})
 }
 
-func TestNew_ClusterImageStorage_DockerSuccess(t *testing.T) {
+func Test_New_ClusterImageStorageDockerSuccess(t *testing.T) {
 	file := "/dockersuccess"
 	withMockFS2(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 		file: {
@@ -213,7 +213,7 @@ x-kube-compose:
 	})
 }
 
-func TestNew_ClusterImageStorage_InvalidType(t *testing.T) {
+func Test_New_ClusterImageStorageInvalidType(t *testing.T) {
 	file := "/invalidtype"
 	withMockFS2(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 		file: {
@@ -231,7 +231,7 @@ x-kube-compose:
 	})
 }
 
-func TestNew_ClusterImageStorage_DockerRegistryMissingHost(t *testing.T) {
+func Test_New_ClusterImageStorageDockerRegistryMissingHost(t *testing.T) {
 	file := "/dockerregistrymissinghost"
 	withMockFS2(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 		file: {
@@ -249,7 +249,7 @@ x-kube-compose:
 	})
 }
 
-func TestNew_ClusterImageStorage_DockerRegistrySuccess(t *testing.T) {
+func Test_New_ClusterImageStorageDockerRegistrySuccess(t *testing.T) {
 	file := "/dockerregistrysuccess"
 	withMockFS2(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 		file: {
@@ -277,7 +277,7 @@ x-kube-compose:
 	})
 }
 
-func TestNew_ClusterImageStorage_PushImagesAlsoSpecified(t *testing.T) {
+func Test_New_ClusterImageStoragePushImagesAlsoSpecified(t *testing.T) {
 	file := "/pushimagesalsospecified"
 	withMockFS2(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 		file: {

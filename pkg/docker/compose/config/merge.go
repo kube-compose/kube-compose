@@ -22,29 +22,29 @@ func addVolume(volumes []ServiceVolume, volume1 ServiceVolume) []ServiceVolume {
 
 func merge(into, from *serviceInternal, mergeExtends bool) {
 	// Rules here are based on https://docs.docker.com/compose/extends/#adding-and-overriding-configuration
-	into.dependsOn.Values = mergeDependsOnMaps(into.dependsOn.Values, from.dependsOn.Values)
+	into.DependsOn.Values = mergeDependsOnMaps(into.DependsOn.Values, from.DependsOn.Values)
 	into.environmentParsed = mergeStringMaps(into.environmentParsed, from.environmentParsed)
-	into.healthcheck = mergeHealthchecks(into.healthcheck, from.healthcheck)
+	into.Healthcheck = mergeHealthchecks(into.Healthcheck, from.Healthcheck)
 	into.portsParsed = mergePortBindings(into.portsParsed, from.portsParsed)
-	into.volumes = mergeVolumes(into.volumes, from.volumes)
+	into.Volumes = mergeVolumes(into.Volumes, from.Volumes)
 
-	if into.entrypoint.Values == nil {
-		into.entrypoint.Values = from.entrypoint.Values
+	if into.Entrypoint.Values == nil {
+		into.Entrypoint.Values = from.Entrypoint.Values
 	}
-	if into.image == nil {
-		into.image = from.image
+	if into.Image == nil {
+		into.Image = from.Image
 	}
-	if into.privileged == nil {
-		into.privileged = from.privileged
+	if into.Privileged == nil {
+		into.Privileged = from.Privileged
 	}
-	if into.restart == nil {
-		into.restart = from.restart
+	if into.Restart == nil {
+		into.Restart = from.Restart
 	}
-	if into.user == nil {
-		into.user = from.user
+	if into.User == nil {
+		into.User = from.User
 	}
-	if mergeExtends && into.extends == nil {
-		into.extends = from.extends
+	if mergeExtends && into.Extends == nil {
+		into.Extends = from.Extends
 	}
 }
 
@@ -107,14 +107,14 @@ func mergeServices(into, from map[string]*serviceInternal) {
 		intoService := into[name]
 		if intoService == nil {
 			intoService = &serviceInternal{
-				dependsOn: dependsOn{
+				DependsOn: dependsOn{
 					Values: map[string]ServiceHealthiness{},
 				},
 				environmentParsed: map[string]string{},
-				healthcheck:       &healthcheckInternal{},
+				Healthcheck:       &healthcheckInternal{},
 				name:              name,
 				portsParsed:       []PortBinding{},
-				volumes:           []ServiceVolume{},
+				Volumes:           []ServiceVolume{},
 			}
 			into[name] = intoService
 		}

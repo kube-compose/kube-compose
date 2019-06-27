@@ -265,17 +265,14 @@ func Test_ConfigLoader_LoadFile_Success(t *testing.T) {
 			}
 			expected := map[string]*serviceInternal{
 				"testservice": {
-					command: stringOrStringSlice{
+					Command: stringOrStringSlice{
 						Values: []string{"bash", "-c", "echo 'Hello World!'"},
 					},
-					dependsOn: dependsOn{
-						Values: map[string]ServiceHealthiness{},
-					},
-					entrypoint: stringOrStringSlice{
+					Entrypoint: stringOrStringSlice{
 						Values: []string{},
 					},
-					image: util.NewString("ubuntu:latest"),
-					volumes: []ServiceVolume{
+					Image: util.NewString("ubuntu:latest"),
+					Volumes: []ServiceVolume{
 						{
 							Short: &PathMapping{
 								ContainerPath: "bb",
@@ -288,7 +285,7 @@ func Test_ConfigLoader_LoadFile_Success(t *testing.T) {
 					},
 				},
 			}
-			assertServiceInternalMapsEqual(t, dcFile.services, expected)
+			assertServiceInternalMapsEqual(t, dcFile.Services, expected)
 		}
 	})
 }
@@ -316,15 +313,15 @@ func assertServiceInternalMapsEqual(t *testing.T, m1, m2 map[string]*serviceInte
 }
 
 func assertServiceInternalEqual(t *testing.T, s1, s2 *serviceInternal) {
-	if !areStringSlicesEqual(s1.command.Values, s2.command.Values) {
+	if !areStringSlicesEqual(s1.Command.Values, s2.Command.Values) {
 		t.Fail()
 		return
 	}
-	if !areDependsOnMapsEqual(s1.dependsOn.Values, s2.dependsOn.Values) {
+	if !areDependsOnMapsEqual(s1.DependsOn.Values, s2.DependsOn.Values) {
 		t.Fail()
 		return
 	}
-	if !areStringSlicesEqual(s1.entrypoint.Values, s2.entrypoint.Values) {
+	if !areStringSlicesEqual(s1.Entrypoint.Values, s2.Entrypoint.Values) {
 		t.Fail()
 		return
 	}
@@ -332,11 +329,11 @@ func assertServiceInternalEqual(t *testing.T, s1, s2 *serviceInternal) {
 		t.Fail()
 		return
 	}
-	if (s1.extends == nil) != (s2.extends == nil) || s1.extends != nil && *s1.extends != *s2.extends {
+	if !areExtendsEqual(s1.Extends, s2.Extends) {
 		t.Fail()
 		return
 	}
-	if s1.healthcheck != nil || s2.healthcheck != nil {
+	if s1.Healthcheck != nil || s2.Healthcheck != nil {
 		t.Logf("comparing healthchecks is not supported")
 		t.Fail()
 		return
@@ -344,9 +341,21 @@ func assertServiceInternalEqual(t *testing.T, s1, s2 *serviceInternal) {
 	assertServiceInternalEqualContinued(t, s1, s2)
 }
 
-func assertServiceInternalEqualContinued(t *testing.T, s1, s2 *serviceInternal) {
+func areExtendsEqual(e1, e2 *extends) bool {
+	if (e1 == nil) != (e2 == nil) {
+		return false
+	}
+	if e1 == nil {
+		return true
+	}
+	if e1.Service != e2.Service {
+		return false
+	}
+	return areStringPointersEqual(e1.File, e2.File)
+}
 
-	if !areStringPointersEqual(s1.image, s2.image) {
+func assertServiceInternalEqualContinued(t *testing.T, s1, s2 *serviceInternal) {
+	if !areStringPointersEqual(s1.Image, s2.Image) {
 		t.Fail()
 		return
 	}
@@ -354,23 +363,23 @@ func assertServiceInternalEqualContinued(t *testing.T, s1, s2 *serviceInternal) 
 		t.Fail()
 		return
 	}
-	if !areBoolPointersEqual(s1.privileged, s2.privileged) {
+	if !areBoolPointersEqual(s1.Privileged, s2.Privileged) {
 		t.Fail()
 		return
 	}
-	if !areStringPointersEqual(s1.restart, s2.restart) {
+	if !areStringPointersEqual(s1.Restart, s2.Restart) {
 		t.Fail()
 		return
 	}
-	if !areStringPointersEqual(s1.user, s2.user) {
+	if !areStringPointersEqual(s1.User, s2.User) {
 		t.Fail()
 		return
 	}
-	if !areServiceVolumesEqual(s1.volumes, s2.volumes) {
+	if !areServiceVolumesEqual(s1.Volumes, s2.Volumes) {
 		t.Fail()
 		return
 	}
-	if !areStringPointersEqual(s1.workingDir, s2.workingDir) {
+	if !areStringPointersEqual(s1.WorkingDir, s2.WorkingDir) {
 		t.Fail()
 		return
 	}
@@ -400,8 +409,53 @@ func assertServiceMapsEqual(t *testing.T, services1, services2 map[string]*Servi
 			t.Fail()
 		} else {
 			assertServicesEqual(t, service1, service2)
+			assertAreDependsOnEqual(t, name, services1, services2)
 		}
 	}
+}
+
+func assertAreDependsOnEqual(t *testing.T, name string, services1, services2 map[string]*Service) {
+	dependsOn1 := services1[name].DependsOn
+	dependsOn2 := services2[name].DependsOn
+	if (dependsOn1 == nil) != (dependsOn2 == nil) {
+		t.Fail()
+		return
+	}
+	if dependsOn2 == nil {
+		return
+	}
+	if len(dependsOn1) != len(dependsOn2) {
+		t.Fail()
+		return
+	}
+	names := reverseMap(services1)
+	for service1, healthiness1 := range dependsOn1 {
+		name, ok := names[service1]
+		if !ok {
+			panic("dependsOn refers to a service that is not in services")
+		}
+		service2 := services2[name]
+		if service2 == nil {
+			t.Fail()
+			return
+		}
+		healthiness2, ok := dependsOn2[service2]
+		if !ok || healthiness1 != healthiness2 {
+			t.Fail()
+			return
+		}
+	}
+}
+
+func reverseMap(services map[string]*Service) map[*Service]string {
+	ret := map[*Service]string{}
+	for name, service := range services {
+		if _, ok := ret[service]; ok {
+			panic("services is invalid")
+		}
+		ret[service] = name
+	}
+	return ret
 }
 
 func areDependsOnMapsEqual(m1, m2 map[string]ServiceHealthiness) bool {
@@ -494,9 +548,6 @@ func assertServicesEqualContinued(t *testing.T, service1, service2 *Service) {
 		t.Logf("volumes1: %+v\n", service1.Volumes)
 		t.Logf("volumes2: %+v\n", service2.Volumes)
 		t.Fail()
-	}
-	if service1.DependsOn != nil || service2.DependsOn != nil {
-		panic("services must not have depends on")
 	}
 }
 
@@ -870,9 +921,9 @@ func Test_ConfigLoader_ParseDockerComposeFileService_InvalidPortsError(t *testin
 	c := newTestConfigLoader(nil)
 
 	dcFile := &dockerComposeFile{
-		services: map[string]*serviceInternal{
+		Services: map[string]*serviceInternal{
 			"service1": {
-				ports: []port{
+				Ports: []port{
 					{
 						Value: "asdf",
 					},
@@ -880,7 +931,7 @@ func Test_ConfigLoader_ParseDockerComposeFileService_InvalidPortsError(t *testin
 			},
 		},
 	}
-	s := dcFile.services["service1"]
+	s := dcFile.Services["service1"]
 	err := c.parseDockerComposeFileService(dcFile, s)
 	if err == nil {
 		t.Fail()
@@ -891,15 +942,15 @@ func Test_ConfigLoader_ParseDockerComposeFileService_InvalidHealthcheckError(t *
 	c := newTestConfigLoader(nil)
 
 	dcFile := &dockerComposeFile{
-		services: map[string]*serviceInternal{
+		Services: map[string]*serviceInternal{
 			"service1": {
-				healthcheck: &healthcheckInternal{
+				Healthcheck: &healthcheckInternal{
 					Timeout: util.NewString("henkie"),
 				},
 			},
 		},
 	}
-	s := dcFile.services["service1"]
+	s := dcFile.Services["service1"]
 	err := c.parseDockerComposeFileService(dcFile, s)
 	if err == nil {
 		t.Fail()
@@ -909,9 +960,9 @@ func Test_ConfigLoader_ParseDockerComposeFileService_InvalidHealthcheckError(t *
 func Test_ConfigLoader_ParseDockerComposeFile_InvalidEnvironmentError(t *testing.T) {
 	c := newTestConfigLoader(nil)
 	dcFile := &dockerComposeFile{
-		services: map[string]*serviceInternal{
+		Services: map[string]*serviceInternal{
 			"service1": {
-				environment: environment{
+				Environment: environment{
 					Values: []environmentNameValuePair{
 						{
 							Name: "",

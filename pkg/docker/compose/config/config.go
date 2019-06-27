@@ -44,7 +44,8 @@ type CanonicalDockerComposeConfig struct {
 // is a smaller piece of CanonicalDockerComposeConfig.
 type Service struct {
 	// When adding a field here, please update merge.go with the logic required to merge these fields.
-	Command             []string
+	Command []string
+	// TODO https://github.com/kube-compose/kube-compose/issues/214 consider simplifying to map[string]ServiceHealthiness
 	DependsOn           map[*Service]ServiceHealthiness
 	Entrypoint          []string
 	Environment         map[string]string
@@ -63,30 +64,30 @@ type Service struct {
 // TODO https://github.com/kube-compose/kube-compose/issues/211 merge with composeFileService struct
 type serviceInternal struct {
 	// TODO https://github.com/kube-compose/kube-compose/issues/153 interpret string command/entrypoint correctly
-	command   stringOrStringSlice `mapdecode:"command"`
-	dependsOn dependsOn           `mapdecode:"command"`
+	Command   stringOrStringSlice `mapdecode:"command"`
+	DependsOn dependsOn           `mapdecode:"depends_on"`
 	// TODO https://github.com/kube-compose/kube-compose/issues/153 interpret string command/entrypoint correctly
-	entrypoint        stringOrStringSlice `mapdecode:"entrypoint"`
-	environment       environment         `mapdecode:"environment"`
+	Entrypoint        stringOrStringSlice `mapdecode:"entrypoint"`
+	Environment       environment         `mapdecode:"environment"`
 	environmentParsed map[string]string
-	extends           *extends `mapdecode:"extends"`
+	Extends           *extends `mapdecode:"extends"`
 	// The final docker compose service in CanonicalDockerComposeConfig (only set if this is not an intermediate result).
 	finalService *Service
-	healthcheck  *healthcheckInternal `mapdecode:"healthcheck"`
-	image        *string              `mapdecode:"image"`
+	Healthcheck  *healthcheckInternal `mapdecode:"healthcheck"`
+	Image        *string              `mapdecode:"image"`
 	// Convenient copy of the name so that we do not have to pass names around to preserve context.
 	name        string
-	ports       []port `mapdecode:"extends"`
+	Ports       []port `mapdecode:"ports"`
 	portsParsed []PortBinding
-	privileged  *bool `mapdecode:"privileged"`
+	Privileged  *bool `mapdecode:"privileged"`
 	// Helper data used to detect cycles during process of extends and depends_on.
 	recStack bool
-	restart  *string `mapdecode:"restart"`
-	user     *string `mapdecode:"user"`
+	Restart  *string `mapdecode:"restart"`
+	User     *string `mapdecode:"user"`
 	// Helper data used to detect cycles during process of extends and depends_on.
 	visited    bool
-	volumes    []ServiceVolume `mapdecode:"volumes"`
-	workingDir *string         `mapdecode:"working_dir"`
+	Volumes    []ServiceVolume `mapdecode:"volumes"`
+	WorkingDir *string         `mapdecode:"working_dir"`
 }
 
 // A helper for defer
@@ -98,7 +99,7 @@ func (c *serviceInternal) clearRecStack() {
 // of the docker compose configuration.
 // TODO https://github.com/kube-compose/kube-compose/issues/211 merge with composeFile struct
 type dockerComposeFile struct {
-	services map[string]*serviceInternal `mapdecode:"services"`
+	Services map[string]*serviceInternal `mapdecode:"services"`
 	version  *version.Version
 	// Extension fields at the root of the compose file represented by this struct.
 	xProperties XProperties
@@ -213,9 +214,8 @@ func (c *configLoader) loadResolvedFileCore(resolvedFile string, dcFile *dockerC
 			"services": dataMap,
 		}
 	}
-
 	// mapdecode based on docker compose file schema
-	err = mapdecode.Decode(&dcFile, dataMap, mapdecode.IgnoreUnused(true))
+	err = mapdecode.Decode(dcFile, dataMap, mapdecode.IgnoreUnused(true))
 	if err != nil {
 		return err
 	}
@@ -255,7 +255,7 @@ func (c *configLoader) processExtends(
 		return nil
 	}
 	s.visited = true
-	if s.extends == nil {
+	if s.Extends == nil {
 		return nil
 	}
 	s.recStack = true
@@ -278,27 +278,27 @@ func (c *configLoader) resolveExtends(
 	dcFile *dockerComposeFile) (*serviceInternal, error) {
 	var sExtended *serviceInternal
 	var dcFileExtended *dockerComposeFile
-	if s.extends.File != nil {
+	if s.Extends.File != nil {
 		var err error
-		dcFileExtended, err = c.loadFile(*s.extends.File)
+		dcFileExtended, err = c.loadFile(*s.Extends.File)
 		if err != nil {
 			return nil, err
 		}
 		// TODO https://github.com/kube-compose/kube-compose/issues/212 fail if there is a version mismatch
-		sExtended = dcFile.services[s.extends.Service]
+		sExtended = dcFile.Services[s.Extends.Service]
 		if sExtended == nil {
-			return nil, extendsNotFoundError(s.name, dcFile.resolvedFile, s.extends.Service, dcFileExtended.resolvedFile)
+			return nil, extendsNotFoundError(s.name, dcFile.resolvedFile, s.Extends.Service, dcFileExtended.resolvedFile)
 		}
 	} else {
 		dcFileExtended = dcFile
-		sExtended = dcFile.services[s.extends.Service]
+		sExtended = dcFile.Services[s.Extends.Service]
 		if sExtended == nil {
-			return nil, extendsNotFoundError(s.name, dcFile.resolvedFile, s.extends.Service, dcFileExtended.resolvedFile)
+			return nil, extendsNotFoundError(s.name, dcFile.resolvedFile, s.Extends.Service, dcFileExtended.resolvedFile)
 		}
 	}
-	if sExtended.dependsOn.Values != nil {
+	if sExtended.DependsOn.Values != nil {
 		return nil, fmt.Errorf("cannot extend service %s: services with 'depends_on' cannot be extended",
-			s.extends.Service,
+			s.Extends.Service,
 		)
 	}
 	// TODO https://github.com/kube-compose/kube-compose/issues/122 perform full validation of extended service
@@ -358,13 +358,13 @@ func New(files []string) (*CanonicalDockerComposeConfig, error) {
 		resolvedFiles = append(resolvedFiles, dcFile.resolvedFile)
 	}
 	dcFileMerged, xProperties := c.merge(resolvedFiles)
-	for _, s := range dcFileMerged.services {
+	for _, s := range dcFileMerged.Services {
 		err := c.processExtends(s, dcFileMerged)
 		if err != nil {
 			return nil, err
 		}
 	}
-	err := resolveDependsOn(dcFileMerged.services)
+	err := resolveDependsOn(dcFileMerged.Services)
 	if err != nil {
 		return nil, err
 	}
@@ -372,7 +372,7 @@ func New(files []string) (*CanonicalDockerComposeConfig, error) {
 	// TODO https://github.com/kube-compose/kube-compose/issues/166 error on duplicate mount points
 	configCanonical := &CanonicalDockerComposeConfig{}
 	configCanonical.Services = map[string]*Service{}
-	for name, s := range dcFileMerged.services {
+	for name, s := range dcFileMerged.Services {
 		err = finalizeService(s)
 		if err != nil {
 			return nil, err
@@ -391,12 +391,12 @@ func (c *configLoader) merge(resolvedFiles []string) (dcFileMerged *dockerCompos
 		// messages.
 		dcFile := c.loadResolvedFileCache[resolvedFiles[0]].parsed
 		dcFileMerged = &dockerComposeFile{
-			services: map[string]*serviceInternal{},
+			Services: map[string]*serviceInternal{},
 			version:  dcFile.version,
 		}
 		for i := len(resolvedFiles) - 1; i >= 0; i-- {
 			dcFile := c.loadResolvedFileCache[resolvedFiles[0]].parsed
-			mergeServices(dcFileMerged.services, dcFile.services)
+			mergeServices(dcFileMerged.Services, dcFile.Services)
 			if dcFile.xProperties != nil {
 				xProperties = append(xProperties, dcFile.xProperties)
 			}
@@ -412,25 +412,27 @@ func (c *configLoader) merge(resolvedFiles []string) (dcFileMerged *dockerCompos
 }
 
 func finalizeService(s *serviceInternal) error {
+	
+
 	// Healthchecks are processed after merging.
-	healthcheck, healthcheckDisabled, err := ParseHealthcheck(s.healthcheck)
+	healthcheck, healthcheckDisabled, err := ParseHealthcheck(s.Healthcheck)
 	if err != nil {
 		return err
 	}
 	s.finalService.Healthcheck = healthcheck
 	s.finalService.HealthcheckDisabled = healthcheckDisabled
 
-	if s.image != nil {
-		s.finalService.Image = *s.image
+	if s.Image != nil {
+		s.finalService.Image = *s.Image
 	}
-	if s.privileged != nil {
-		s.finalService.Privileged = *s.privileged
+	if s.Privileged != nil {
+		s.finalService.Privileged = *s.Privileged
 	}
-	if s.restart != nil {
-		s.finalService.Restart = *s.restart
+	if s.Restart != nil {
+		s.finalService.Restart = *s.Restart
 	}
-	if s.workingDir != nil {
-		s.finalService.WorkingDir = *s.workingDir
+	if s.WorkingDir != nil {
+		s.finalService.WorkingDir = *s.WorkingDir
 	}
 	return nil
 }
@@ -457,9 +459,9 @@ func getXProperties(gm interface{}) XProperties {
 func resolveDependsOn(services map[string]*serviceInternal) error {
 	for name1, s1 := range services {
 		s1.finalService = &Service{}
-		if s1.dependsOn.Values != nil {
+		if s1.DependsOn.Values != nil {
 			s1.finalService.DependsOn = map[*Service]ServiceHealthiness{}
-			for name2, serviceHealthiness := range s1.dependsOn.Values {
+			for name2, serviceHealthiness := range s1.DependsOn.Values {
 				s2 := services[name2]
 				if s2 == nil {
 					return fmt.Errorf("service %s refers to a non-existing service in its depends_on: %s",
@@ -469,13 +471,13 @@ func resolveDependsOn(services map[string]*serviceInternal) error {
 			}
 		}
 	}
-	for name1, s1 := range services {
+	for _, s1 := range services {
 		// Reset the visited marker on each service. This is a precondition of ensureNoDependsOnCycle.
 		for _, s2 := range services {
 			s2.visited = false
 		}
 		// Run the cycle detection algorithm...
-		err := ensureNoDependsOnCycle(name1, s1, services)
+		err := ensureNoDependsOnCycle(s1, services)
 		if err != nil {
 			return err
 		}
@@ -484,20 +486,20 @@ func resolveDependsOn(services map[string]*serviceInternal) error {
 }
 
 // https://www.geeksforgeeks.org/detect-cycle-in-a-graph/
-func ensureNoDependsOnCycle(name1 string, s1 *serviceInternal, services map[string]*serviceInternal) error {
+func ensureNoDependsOnCycle(s1 *serviceInternal, services map[string]*serviceInternal) error {
 	s1.visited = true
 	s1.recStack = true
 	defer s1.clearRecStack()
-	for name2 := range s1.dependsOn.Values {
-		s2 := services[name2]
+	for name := range s1.DependsOn.Values {
+		s2 := services[name]
 		if !s2.visited {
-			err := ensureNoDependsOnCycle(name2, s2, services)
+			err := ensureNoDependsOnCycle(s2, services)
 			if err != nil {
 				return err
 			}
 		} else if s2.recStack {
 			return fmt.Errorf("a service %s depends on a service %s, but this means there is a cycle in the depends_on relationship",
-				name1, name2)
+				s1.name, name)
 		}
 	}
 	return nil
@@ -505,7 +507,7 @@ func ensureNoDependsOnCycle(name1 string, s1 *serviceInternal, services map[stri
 
 // https://github.com/docker/compose/blob/master/compose/config/config_schema_v2.1.json
 func (c *configLoader) parseDockerComposeFile(dcFile *dockerComposeFile) error {
-	for _, s := range dcFile.services {
+	for _, s := range dcFile.Services {
 		err := c.parseDockerComposeFileService(dcFile, s)
 		if err != nil {
 			return err
@@ -516,21 +518,21 @@ func (c *configLoader) parseDockerComposeFile(dcFile *dockerComposeFile) error {
 
 func (c *configLoader) parseDockerComposeFileService(dcFile *dockerComposeFile, s *serviceInternal) error {
 	var err error
-	s.portsParsed, err = parsePorts(s.ports)
+	s.portsParsed, err = parsePorts(s.Ports)
 	if err != nil {
 		return err
 	}
 
-	s.environmentParsed, err = c.parseEnvironment(s.environment.Values)
+	s.environmentParsed, err = c.parseEnvironment(s.Environment.Values)
 	if err != nil {
 		return err
 	}
 	// TODO https://github.com/kube-compose/kube-compose/issues/163 only resolve volume paths if volume_driver is not set.
-	for i := 0; i < len(s.volumes); i++ {
-		resolveBindMountVolumeHostPath(dcFile.resolvedFile, &s.volumes[i])
+	for i := 0; i < len(s.Volumes); i++ {
+		resolveBindMountVolumeHostPath(dcFile.resolvedFile, &s.Volumes[i])
 	}
-	if s.extends != nil && s.extends.File != nil {
-		*s.extends.File = expandPath(dcFile.resolvedFile, *s.extends.File)
+	if s.Extends != nil && s.Extends.File != nil {
+		*s.Extends.File = expandPath(dcFile.resolvedFile, *s.Extends.File)
 	}
 	return nil
 }
