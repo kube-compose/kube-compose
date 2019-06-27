@@ -96,37 +96,39 @@ type clusterImageStorage struct {
 	Host *string `mapdecode:"host"`
 }
 
-func loadXKubeCompose(cfg *Config, xProperties dockerComposeConfig.XProperties) error {
-	var custom struct {
-		XKubeCompose struct {
-			ClusterImageStorage *clusterImageStorage `mapdecode:"cluster_image_storage"`
-			PushImages          *struct {
-				DockerRegistry string `mapdecode:"docker_registry"`
-			} `mapdecode:"push_images"`
-			VolumeInitBaseImage *string `mapdecode:"volume_init_base_image"`
-		} `mapdecode:"x-kube-compose"`
-	}
-	err := mapdecode.Decode(&custom, xProperties, mapdecode.IgnoreUnused(true))
-	if err != nil {
-		return errors.Wrap(err, "error while parsing \"x-kube-compose\" of a docker compose file")
-	}
-	if custom.XKubeCompose.ClusterImageStorage != nil {
-		if custom.XKubeCompose.PushImages != nil {
-			return fmt.Errorf("a docker compose file cannot set both \"x-kube-compose\".\"push_images\" and \"x-kube-compose\"." +
-				"\"cluster_image_storage\"")
+func loadXKubeCompose(cfg *Config, xPropertiesSlice []dockerComposeConfig.XProperties) error {
+	for _, xProperties := range xPropertiesSlice {
+		var custom struct {
+			XKubeCompose struct {
+				ClusterImageStorage *clusterImageStorage `mapdecode:"cluster_image_storage"`
+				PushImages          *struct {
+					DockerRegistry string `mapdecode:"docker_registry"`
+				} `mapdecode:"push_images"`
+				VolumeInitBaseImage *string `mapdecode:"volume_init_base_image"`
+			} `mapdecode:"x-kube-compose"`
 		}
-		err = loadClusterImageStorage(cfg, custom.XKubeCompose.ClusterImageStorage)
+		err := mapdecode.Decode(&custom, xProperties, mapdecode.IgnoreUnused(true))
 		if err != nil {
-			return err
+			return errors.Wrap(err, "error while parsing \"x-kube-compose\" of a docker compose file")
 		}
-	} else if custom.XKubeCompose.PushImages != nil {
-		fmt.Println("WARNING: a docker compose file has set \"x-kube-compose\".\"push_images\", but this functionality is deprecated. " +
-			"See https://github.com/kube-compose/kube-compose.")
-		cfg.ClusterImageStorage.DockerRegistry = &DockerRegistryClusterImageStorage{
-			Host: custom.XKubeCompose.PushImages.DockerRegistry,
+		if custom.XKubeCompose.ClusterImageStorage != nil {
+			if custom.XKubeCompose.PushImages != nil {
+				return fmt.Errorf("a docker compose file cannot set both \"x-kube-compose\".\"push_images\" and \"x-kube-compose\"." +
+					"\"cluster_image_storage\"")
+			}
+			err = loadClusterImageStorage(cfg, custom.XKubeCompose.ClusterImageStorage)
+			if err != nil {
+				return err
+			}
+		} else if custom.XKubeCompose.PushImages != nil {
+			fmt.Println("WARNING: a docker compose file has set \"x-kube-compose\".\"push_images\", but this functionality is deprecated. " +
+				"See https://github.com/kube-compose/kube-compose.")
+			cfg.ClusterImageStorage.DockerRegistry = &DockerRegistryClusterImageStorage{
+				Host: custom.XKubeCompose.PushImages.DockerRegistry,
+			}
 		}
+		cfg.VolumeInitBaseImage = custom.XKubeCompose.VolumeInitBaseImage
 	}
-	cfg.VolumeInitBaseImage = custom.XKubeCompose.VolumeInitBaseImage
 	return nil
 }
 

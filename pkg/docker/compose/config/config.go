@@ -74,15 +74,19 @@ type serviceInternal struct {
 	finalService *Service
 	healthcheck  *healthcheckInternal `mapdecode:"healthcheck"`
 	image        *string              `mapdecode:"image"`
-	ports        []port               `mapdecode:"extends"`
-	portsParsed  []PortBinding
-	privileged   *bool           `mapdecode:"privileged"`
-	recStack     bool            // Helper data used to detect cycles during process of extends and depends_on.
-	restart      *string         `mapdecode:"restart"`
-	user         *string         `mapdecode:"user"`
-	visited      bool            // Helper data used to detect cycles during process of extends and depends_on.
-	volumes      []ServiceVolume `mapdecode:"volumes"`
-	workingDir   *string         `mapdecode:"working_dir"`
+	// Convenient copy of the name so that we do not have to pass names around to preserve context.
+	name        string
+	ports       []port `mapdecode:"extends"`
+	portsParsed []PortBinding
+	privileged  *bool `mapdecode:"privileged"`
+	// Helper data used to detect cycles during process of extends and depends_on.
+	recStack bool
+	restart  *string `mapdecode:"restart"`
+	user     *string `mapdecode:"user"`
+	// Helper data used to detect cycles during process of extends and depends_on.
+	visited    bool
+	volumes    []ServiceVolume `mapdecode:"volumes"`
+	workingDir *string         `mapdecode:"working_dir"`
 }
 
 // A helper for defer
@@ -234,31 +238,33 @@ func (c *configLoader) loadStandardFile() (*dockerComposeFile, error) {
 	return nil, loadFileError(file, err)
 }
 
-// processExtends process the extends field of a docker compose service. That is: given a docker compose service X named name,
+// processExtends process the extends field of a docker compose service. That is: given a docker compose service X,
 // if X extends another service Y then processExtends copies inherited configuration Y into the representation of X.
-func (c *configLoader) processExtends(name string, s1 *serviceInternal, services map[string]*serviceInternal, resolvedFile string) error {
-	if s1.visited {
-		if s1.recStack {
-			if resolvedFile != "" {
+func (c *configLoader) processExtends(
+	s *serviceInternal,
+	dcFile *dockerComposeFile) error {
+	if s.visited {
+		if s.recStack {
+			if dcFile.resolvedFile != "" {
 				return fmt.Errorf("cannot extend service %s of file %#v because this would cause an infinite loop. Please ensure your "+
-					"docker compose services do not have a cyclical extends relationship", name, resolvedFile)
+					"docker compose services do not have a cyclical extends relationship", s.name, dcFile.resolvedFile)
 			}
 			return fmt.Errorf("cannot extend service %s (of the merged docker compose file) because this would cause an infinite loop. "+
-				"Please ensure your docker compose services do not have a cyclical extends relationship", name)
+				"Please ensure your docker compose services do not have a cyclical extends relationship", s.name)
 		}
 		return nil
 	}
-	s1.visited = true
-	if s1.extends == nil {
+	s.visited = true
+	if s.extends == nil {
 		return nil
 	}
-	s1.recStack = true
-	defer s1.clearRecStack()
-	s2, err := c.resolveExtends(name, s1, services, resolvedFile)
+	s.recStack = true
+	defer s.clearRecStack()
+	sExtended, err := c.resolveExtends(s, dcFile)
 	if err != nil {
 		return err
 	}
-	merge(s1, s2, false)
+	merge(s, sExtended, false)
 	return nil
 }
 
@@ -268,39 +274,39 @@ func (c *configLoader) processExtends(name string, s1 *serviceInternal, services
 // 1. the representation of Y has been loaded; -and
 // 2. processExtends has been called on Y.
 func (c *configLoader) resolveExtends(
-	name string,
-	s1 *serviceInternal,
-	services map[string]*serviceInternal, resolvedFile string) (*serviceInternal, error) {
-	var s2 *serviceInternal
-	if s1.extends.File != nil {
-		dcFile, err := c.loadFile(*s1.extends.File)
+	s *serviceInternal,
+	dcFile *dockerComposeFile) (*serviceInternal, error) {
+	var sExtended *serviceInternal
+	var dcFileExtended *dockerComposeFile
+	if s.extends.File != nil {
+		var err error
+		dcFileExtended, err = c.loadFile(*s.extends.File)
 		if err != nil {
 			return nil, err
 		}
 		// TODO https://github.com/kube-compose/kube-compose/issues/212 fail if there is a version mismatch
-		s2 = dcFile.services[s1.extends.Service]
-		if s2 == nil {
-			return nil, extendsNotFoundError(name, resolvedFile, s1.extends.Service, dcFile.resolvedFile)
+		sExtended = dcFile.services[s.extends.Service]
+		if sExtended == nil {
+			return nil, extendsNotFoundError(s.name, dcFile.resolvedFile, s.extends.Service, dcFileExtended.resolvedFile)
 		}
-		services = dcFile.services
-		resolvedFile = dcFile.resolvedFile
 	} else {
-		s2 = services[s1.extends.Service]
-		if s2 == nil {
-			return nil, extendsNotFoundError(name, resolvedFile, s1.extends.Service, resolvedFile)
+		dcFileExtended = dcFile
+		sExtended = dcFile.services[s.extends.Service]
+		if sExtended == nil {
+			return nil, extendsNotFoundError(s.name, dcFile.resolvedFile, s.extends.Service, dcFileExtended.resolvedFile)
 		}
 	}
-	if s2.dependsOn.Values != nil {
+	if sExtended.dependsOn.Values != nil {
 		return nil, fmt.Errorf("cannot extend service %s: services with 'depends_on' cannot be extended",
-			s1.extends.Service,
+			s.extends.Service,
 		)
 	}
 	// TODO https://github.com/kube-compose/kube-compose/issues/122 perform full validation of extended service
-	err := c.processExtends(s1.extends.Service, s2, services, resolvedFile)
+	err := c.processExtends(sExtended, dcFileExtended)
 	if err != nil {
 		return nil, err
 	}
-	return s2, nil
+	return sExtended, nil
 }
 
 func extendsNotFoundError(name1, file1, name2, file2 string) error {
@@ -351,42 +357,22 @@ func New(files []string) (*CanonicalDockerComposeConfig, error) {
 		}
 		resolvedFiles = append(resolvedFiles, dcFile.resolvedFile)
 	}
-	var services map[string]*serviceInternal
-	var resolvedFile string
-	var xProperties []XProperties
-	if len(resolvedFiles) > 1 {
-		// TODO https://github.com/kube-compose/kube-compose/issues/213 error when trying to merge different versions
-		// This if is not only an optimiziation (to avoid copying when there's only one service).
-		// resolvedFile is "" in this case, which means that we can mention "merged docker compose files" instead of a specific file.
-		services = map[string]*serviceInternal{}
-		for i := len(resolvedFiles) - 1; i >= 0; i-- {
-			dcFile := c.loadResolvedFileCache[resolvedFiles[i]].parsed
-			mergeServices(services, dcFile.services)
-			xProperties = append(xProperties, dcFile.xProperties)
-		}
-	} else {
-		dcFile := c.loadResolvedFileCache[resolvedFiles[0]].parsed
-		services = dcFile.services
-		resolvedFile = dcFile.resolvedFile
-		xProperties = append(xProperties, dcFile.xProperties)
-	}
-	for name, s := range services {
-		err := c.processExtends(name, s, services, resolvedFile)
+	dcFileMerged, xProperties := c.merge(resolvedFiles)
+	for _, s := range dcFileMerged.services {
+		err := c.processExtends(s, dcFileMerged)
 		if err != nil {
 			return nil, err
 		}
 	}
-	err := resolveDependsOn(services)
+	err := resolveDependsOn(dcFileMerged.services)
 	if err != nil {
 		return nil, err
 	}
-
 	// TODO https://github.com/kube-compose/kube-compose/issues/165 resolve named volumes
 	// TODO https://github.com/kube-compose/kube-compose/issues/166 error on duplicate mount points
-
 	configCanonical := &CanonicalDockerComposeConfig{}
 	configCanonical.Services = map[string]*Service{}
-	for name, s := range services {
+	for name, s := range dcFileMerged.services {
 		err = finalizeService(s)
 		if err != nil {
 			return nil, err
@@ -395,6 +381,34 @@ func New(files []string) (*CanonicalDockerComposeConfig, error) {
 	}
 	configCanonical.XProperties = xProperties
 	return configCanonical, nil
+}
+
+func (c *configLoader) merge(resolvedFiles []string) (dcFileMerged *dockerComposeFile, xProperties []XProperties) {
+	if len(resolvedFiles) > 1 {
+		// TODO https://github.com/kube-compose/kube-compose/issues/213 error when trying to merge different versions
+		// This if is not only an optimiziation (to avoid copying when there's only one service).
+		// resolvedFile is "" in this case, which means that we can state "merged docker compose files" instead of a specific file in error
+		// messages.
+		dcFile := c.loadResolvedFileCache[resolvedFiles[0]].parsed
+		dcFileMerged = &dockerComposeFile{
+			services: map[string]*serviceInternal{},
+			version:  dcFile.version,
+		}
+		for i := len(resolvedFiles) - 1; i >= 0; i-- {
+			dcFile := c.loadResolvedFileCache[resolvedFiles[0]].parsed
+			mergeServices(dcFileMerged.services, dcFile.services)
+			if dcFile.xProperties != nil {
+				xProperties = append(xProperties, dcFile.xProperties)
+			}
+		}
+	} else {
+		dcFile := c.loadResolvedFileCache[resolvedFiles[0]].parsed
+		dcFileMerged = dcFile
+		if dcFile.xProperties != nil {
+			xProperties = append(xProperties, dcFile.xProperties)
+		}
+	}
+	return
 }
 
 func finalizeService(s *serviceInternal) error {

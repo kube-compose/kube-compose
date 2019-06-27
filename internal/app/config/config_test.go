@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/kube-compose/kube-compose/internal/pkg/fs"
-	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
 )
 
@@ -138,7 +137,7 @@ func withMockFS2(vfsMock fs.VirtualFileSystem, cb func()) {
 
 func TestNew_Invalid(t *testing.T) {
 	withMockFS(func() {
-		_, err := New(util.NewString(dockerComposeYmlInvalid))
+		_, err := New([]string{dockerComposeYmlInvalid})
 		if err == nil {
 			t.Fail()
 		} else {
@@ -149,7 +148,7 @@ func TestNew_Invalid(t *testing.T) {
 
 func TestNew_InvalidServiceName(t *testing.T) {
 	withMockFS(func() {
-		_, err := New(util.NewString(dockerComposeYmlInvalidServiceName))
+		_, err := New([]string{dockerComposeYmlInvalidServiceName})
 		if err == nil {
 			t.Fail()
 		} else {
@@ -160,7 +159,7 @@ func TestNew_InvalidServiceName(t *testing.T) {
 
 func TestNew_InvalidXKubeCompose(t *testing.T) {
 	withMockFS(func() {
-		_, err := New(util.NewString(dockerComposeYmlInvalidXKubeCompose))
+		_, err := New([]string{dockerComposeYmlInvalidXKubeCompose})
 		if err == nil {
 			t.Fail()
 		} else {
@@ -171,7 +170,7 @@ func TestNew_InvalidXKubeCompose(t *testing.T) {
 
 func TestNew_ValidPushImages(t *testing.T) {
 	withMockFS(func() {
-		c, err := New(util.NewString(dockerComposeYmlValidPushImages))
+		c, err := New([]string{dockerComposeYmlValidPushImages})
 		if err != nil {
 			t.Error(err)
 		} else {
@@ -200,7 +199,7 @@ x-kube-compose:
 `),
 		},
 	}), func() {
-		c, err := New(&file)
+		c, err := New([]string{file})
 		if err != nil {
 			t.Error(err)
 		} else {
@@ -225,7 +224,7 @@ x-kube-compose:
 `),
 		},
 	}), func() {
-		_, err := New(&file)
+		_, err := New([]string{file})
 		if err == nil {
 			t.Fail()
 		}
@@ -243,7 +242,7 @@ x-kube-compose:
 `),
 		},
 	}), func() {
-		_, err := New(&file)
+		_, err := New([]string{file})
 		if err == nil {
 			t.Fail()
 		}
@@ -262,7 +261,7 @@ x-kube-compose:
 `),
 		},
 	}), func() {
-		c, err := New(&file)
+		c, err := New([]string{file})
 		if err != nil {
 			t.Error(err)
 		} else {
@@ -291,7 +290,7 @@ x-kube-compose:
 `),
 		},
 	}), func() {
-		_, err := New(&file)
+		_, err := New([]string{file})
 		if err == nil {
 			t.Fail()
 		}

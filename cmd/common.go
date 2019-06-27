@@ -36,7 +36,8 @@ func setFromKubeConfig(cfg *config.Config) error {
 func getFileFlags(cmd *cobra.Command) ([]string, error) {
 	var files []string
 	if cmd.Flags().Changed(fileFlagName) {
-		files, err := cmd.Flags().GetStringSlice(fileFlagName)
+		var err error
+		files, err = cmd.Flags().GetStringSlice(fileFlagName)
 		if err != nil {
 			return nil, err
 		}

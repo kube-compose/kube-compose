@@ -9,7 +9,8 @@ func addPortBinding(ports []PortBinding, port1 PortBinding) []PortBinding {
 	return append(ports, port1)
 }
 
-// Same logic for equal volumes as https://github.com/docker/compose/blob/99e67d0c061fa3d9b9793391f3b7c8bdf8e841fc/compose/config/config.py#L1423
+// Same logic for equal volumes as
+// https://github.com/docker/compose/blob/99e67d0c061fa3d9b9793391f3b7c8bdf8e841fc/compose/config/config.py#L1423
 func addVolume(volumes []ServiceVolume, volume1 ServiceVolume) []ServiceVolume {
 	for _, volume2 := range volumes {
 		if volume2.Short.ContainerPath == volume1.Short.ContainerPath {
@@ -111,6 +112,7 @@ func mergeServices(into, from map[string]*serviceInternal) {
 				},
 				environmentParsed: map[string]string{},
 				healthcheck:       &healthcheckInternal{},
+				name:              name,
 				portsParsed:       []PortBinding{},
 				volumes:           []ServiceVolume{},
 			}
