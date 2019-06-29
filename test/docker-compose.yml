@@ -1,9 +1,10 @@
-version: "2.1"
+version: '2'
 services:
   authentication-service:
     depends_on:
       db:
         condition: service_healthy
+    depends_on: ["db"]
     entrypoint: ["/bin/bash", "-c", "STOP=0; trap 'STOP=1' INT; while [[ $$STOP -eq 0 ]]; do sleep 1; echo 'heartbeat'; done"]
     environment:
     - ASDF=10

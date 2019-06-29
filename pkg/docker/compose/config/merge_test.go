@@ -3,9 +3,11 @@ package config
 import (
 	"reflect"
 	"testing"
+
+	"github.com/kube-compose/kube-compose/internal/pkg/util"
 )
 
-func TestMergePortBindings_Basic(t *testing.T) {
+func Test_MergePortBindings_Basic(t *testing.T) {
 	intoPorts := []PortBinding{{80, 80, 80, "tcp", ""}}
 	fromPorts := []PortBinding{{8000, 8000, 8000, "tcp", ""}}
 	expected := []PortBinding{{80, 80, 80, "tcp", ""}, {8000, 8000, 8000, "tcp", ""}}
@@ -16,7 +18,7 @@ func TestMergePortBindings_Basic(t *testing.T) {
 	}
 }
 
-func TestMergePortBindings_Duplicate(t *testing.T) {
+func Test_MergePortBindings_Duplicate(t *testing.T) {
 	intoPorts := []PortBinding{{80, 80, 80, "tcp", ""}, {8000, 8000, 8000, "tcp", ""}}
 	fromPorts := []PortBinding{{8000, 8000, 8000, "tcp", ""}}
 	expected := []PortBinding{{80, 80, 80, "tcp", ""}, {8000, 8000, 8000, "tcp", ""}}
@@ -27,7 +29,7 @@ func TestMergePortBindings_Duplicate(t *testing.T) {
 	}
 }
 
-func TestMergePortBindings_DuplicateInternalOnly(t *testing.T) {
+func Test_MergePortBindings_DuplicateInternalOnly(t *testing.T) {
 	intoPorts := []PortBinding{{80, 80, 80, "tcp", ""}, {8000, 8001, 8001, "tcp", ""}}
 	fromPorts := []PortBinding{{8000, 8000, 8000, "tcp", ""}}
 	expected := []PortBinding{{80, 80, 80, "tcp", ""}, {8000, 8001, 8001, "tcp", ""}, {8000, 8000, 8000, "tcp", ""}}
@@ -38,7 +40,7 @@ func TestMergePortBindings_DuplicateInternalOnly(t *testing.T) {
 	}
 }
 
-func TestMergePortBindings_Empty(t *testing.T) {
+func Test_MergePortBindings_Empty(t *testing.T) {
 	intoPorts := []PortBinding{}
 	fromPorts := []PortBinding{}
 	expected := []PortBinding{}
@@ -48,7 +50,7 @@ func TestMergePortBindings_Empty(t *testing.T) {
 		t.Fail()
 	}
 }
-func TestMergeStringMaps_Basic(t *testing.T) {
+func Test_MergeStringMaps_Basic(t *testing.T) {
 	intoStringMap := map[string]string{"a": "b"}
 	fromStringMap := map[string]string{"c": "d"}
 	expected := map[string]string{"a": "b", "c": "d"}
@@ -58,7 +60,7 @@ func TestMergeStringMaps_Basic(t *testing.T) {
 		t.Fail()
 	}
 }
-func TestMergeStringMaps_Duplicate(t *testing.T) {
+func Test_MergeStringMaps_Duplicate(t *testing.T) {
 	intoStringMap := map[string]string{"a": "b", "c": "d"}
 	fromStringMap := map[string]string{"c": "d"}
 	expected := map[string]string{"a": "b", "c": "d"}
@@ -68,7 +70,7 @@ func TestMergeStringMaps_Duplicate(t *testing.T) {
 		t.Fail()
 	}
 }
-func TestMergeStringMaps_Empty(t *testing.T) {
+func Test_MergeStringMaps_Empty(t *testing.T) {
 	intoStringMap := map[string]string{}
 	fromStringMap := map[string]string{}
 	expected := map[string]string{}
@@ -79,30 +81,102 @@ func TestMergeStringMaps_Empty(t *testing.T) {
 	}
 }
 
-func TestMerge_Basic(t *testing.T) {
-	serviceA := &composeFileParsedService{
-		service: &Service{
-			Environment: map[string]string{"a": "b"},
-			Ports:       []PortBinding{{80, 80, 80, "tcp", ""}},
-		},
+func Test_Merge_Basic(t *testing.T) {
+	serviceA := &serviceInternal{
+		environmentParsed: map[string]string{"a": "b"},
+		portsParsed:       []PortBinding{{80, 80, 80, "tcp", ""}},
 	}
 
-	serviceB := &composeFileParsedService{
-		service: &Service{
-			Environment: map[string]string{"b": "c"},
-			Ports:       []PortBinding{{8000, 8000, 8000, "tcp", ""}},
-		},
+	serviceB := &serviceInternal{
+		environmentParsed: map[string]string{"b": "c"},
+		portsParsed:       []PortBinding{{8000, 8000, 8000, "tcp", ""}},
 	}
 
-	expected := &composeFileParsedService{
-		service: &Service{
-			Environment: map[string]string{"a": "b", "b": "c"},
-			Ports:       []PortBinding{{80, 80, 80, "tcp", ""}, {8000, 8000, 8000, "tcp", ""}},
-		},
+	expected := &serviceInternal{
+		environmentParsed: map[string]string{"a": "b", "b": "c"},
+		portsParsed:       []PortBinding{{80, 80, 80, "tcp", ""}, {8000, 8000, 8000, "tcp", ""}},
 	}
 
-	merge(serviceA, serviceB)
+	merge(serviceA, serviceB, false)
 	if !reflect.DeepEqual(serviceA, expected) {
+		t.Fail()
+	}
+}
+
+func Test_AddVolume_SuccessNoDuplicates(t *testing.T) {
+	volumes := []ServiceVolume{}
+	volume := ServiceVolume{
+		Short: &PathMapping{},
+	}
+	actual := addVolume(volumes, volume)
+	expected := []ServiceVolume{volume}
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fail()
+	}
+}
+func Test_AddVolume_SuccessDuplicates(t *testing.T) {
+	volume := ServiceVolume{
+		Short: &PathMapping{
+			ContainerPath: "/mnt",
+		},
+	}
+	volumes := []ServiceVolume{
+		volume,
+	}
+	actual := addVolume(volumes, volume)
+	expected := []ServiceVolume{volume}
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fail()
+	}
+}
+func Test_MergeVolumes_Success(t *testing.T) {
+	volume := ServiceVolume{
+		Short: &PathMapping{
+			ContainerPath: "/mnt",
+		},
+	}
+	volumes := []ServiceVolume{
+		volume,
+	}
+	actual := mergeVolumes(volumes, volumes)
+	expected := volumes
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fail()
+	}
+}
+
+func Test_MergeDependsOnMaps_Success(t *testing.T) {
+	into := &dependsOn{
+		Values: map[string]ServiceHealthiness{},
+	}
+	from := &dependsOn{
+		Values: map[string]ServiceHealthiness{
+			"mergedependsonsuccess": ServiceStarted,
+		},
+	}
+	actual := mergeDependsOnMaps(into, from)
+	if !reflect.DeepEqual(actual, &dependsOn{
+		map[string]ServiceHealthiness{
+			"mergedependsonsuccess": ServiceStarted,
+		},
+	}) {
+		t.Fail()
+	}
+}
+
+func Test_MergeHealthchecks_Success(t *testing.T) {
+	into := &healthcheckInternal{}
+	from := &healthcheckInternal{
+		Disable:  new(bool),
+		Interval: util.NewString("10s"),
+		Retries:  new(uint),
+		Test: HealthcheckTest{
+			Values: []string{"CMD"},
+		},
+		Timeout: util.NewString("10s"),
+	}
+	actual := mergeHealthchecks(into, from)
+	if !reflect.DeepEqual(actual, from) {
 		t.Fail()
 	}
 }

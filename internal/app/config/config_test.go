@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/kube-compose/kube-compose/internal/pkg/fs"
-	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
 )
 
@@ -136,9 +135,9 @@ func withMockFS2(vfsMock fs.VirtualFileSystem, cb func()) {
 	cb()
 }
 
-func TestNew_Invalid(t *testing.T) {
+func Test_New_Invalid(t *testing.T) {
 	withMockFS(func() {
-		_, err := New(util.NewString(dockerComposeYmlInvalid))
+		_, err := New([]string{dockerComposeYmlInvalid})
 		if err == nil {
 			t.Fail()
 		} else {
@@ -147,9 +146,9 @@ func TestNew_Invalid(t *testing.T) {
 	})
 }
 
-func TestNew_InvalidServiceName(t *testing.T) {
+func Test_New_InvalidServiceName(t *testing.T) {
 	withMockFS(func() {
-		_, err := New(util.NewString(dockerComposeYmlInvalidServiceName))
+		_, err := New([]string{dockerComposeYmlInvalidServiceName})
 		if err == nil {
 			t.Fail()
 		} else {
@@ -158,9 +157,9 @@ func TestNew_InvalidServiceName(t *testing.T) {
 	})
 }
 
-func TestNew_InvalidXKubeCompose(t *testing.T) {
+func Test_New_InvalidXKubeCompose(t *testing.T) {
 	withMockFS(func() {
-		_, err := New(util.NewString(dockerComposeYmlInvalidXKubeCompose))
+		_, err := New([]string{dockerComposeYmlInvalidXKubeCompose})
 		if err == nil {
 			t.Fail()
 		} else {
@@ -169,9 +168,9 @@ func TestNew_InvalidXKubeCompose(t *testing.T) {
 	})
 }
 
-func TestNew_ValidPushImages(t *testing.T) {
+func Test_New_ValidPushImages(t *testing.T) {
 	withMockFS(func() {
-		c, err := New(util.NewString(dockerComposeYmlValidPushImages))
+		c, err := New([]string{dockerComposeYmlValidPushImages})
 		if err != nil {
 			t.Error(err)
 		} else {
@@ -189,7 +188,60 @@ func TestNew_ValidPushImages(t *testing.T) {
 	})
 }
 
-func TestNew_ClusterImageStorage_DockerSuccess(t *testing.T) {
+func Test_New_MergeSuccess(t *testing.T) {
+	file1 := "/xkubecomposemergesuccess1"
+	file2 := "/xkubecomposemergesuccess2"
+	withMockFS2(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+		file1: {
+			Content: []byte(`version: '2.4'
+services:
+  service1:
+    image: ubuntu:latest
+    environment:
+      ENV: docker_desktop
+x-kube-compose:
+  cluster_image_storage:
+    type: docker
+`),
+		},
+		file2: {
+			Content: []byte(`version: '2.4'
+services:
+  service1:
+    environment:
+      ENV: openshift
+x-kube-compose:
+  cluster_image_storage:
+    type: docker_registry
+    host: my-docker-registry.openshift-cluster.example.com
+`),
+		},
+	}), func() {
+		c, err := New([]string{
+			file1,
+			file2,
+		})
+		if err != nil {
+			t.Error(err)
+		} else {
+			if c.FindServiceByName("service1").DockerComposeService.Environment["ENV"] != "openshift" {
+				t.Fail()
+			}
+			expected := ClusterImageStorage{
+				DockerRegistry: &DockerRegistryClusterImageStorage{
+					Host: "my-docker-registry.openshift-cluster.example.com",
+				},
+			}
+			if !reflect.DeepEqual(c.ClusterImageStorage, expected) {
+				t.Logf("pushImages1: %+v\n", c.ClusterImageStorage)
+				t.Logf("pushImages2: %+v\n", expected)
+				t.Fail()
+			}
+		}
+	})
+}
+
+func Test_New_ClusterImageStorageDockerSuccess(t *testing.T) {
 	file := "/dockersuccess"
 	withMockFS2(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 		file: {
@@ -200,7 +252,7 @@ x-kube-compose:
 `),
 		},
 	}), func() {
-		c, err := New(&file)
+		c, err := New([]string{file})
 		if err != nil {
 			t.Error(err)
 		} else {
@@ -214,7 +266,7 @@ x-kube-compose:
 	})
 }
 
-func TestNew_ClusterImageStorage_InvalidType(t *testing.T) {
+func Test_New_ClusterImageStorageInvalidType(t *testing.T) {
 	file := "/invalidtype"
 	withMockFS2(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 		file: {
@@ -225,14 +277,14 @@ x-kube-compose:
 `),
 		},
 	}), func() {
-		_, err := New(&file)
+		_, err := New([]string{file})
 		if err == nil {
 			t.Fail()
 		}
 	})
 }
 
-func TestNew_ClusterImageStorage_DockerRegistryMissingHost(t *testing.T) {
+func Test_New_ClusterImageStorageDockerRegistryMissingHost(t *testing.T) {
 	file := "/dockerregistrymissinghost"
 	withMockFS2(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 		file: {
@@ -243,14 +295,14 @@ x-kube-compose:
 `),
 		},
 	}), func() {
-		_, err := New(&file)
+		_, err := New([]string{file})
 		if err == nil {
 			t.Fail()
 		}
 	})
 }
 
-func TestNew_ClusterImageStorage_DockerRegistrySuccess(t *testing.T) {
+func Test_New_ClusterImageStorageDockerRegistrySuccess(t *testing.T) {
 	file := "/dockerregistrysuccess"
 	withMockFS2(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 		file: {
@@ -262,7 +314,7 @@ x-kube-compose:
 `),
 		},
 	}), func() {
-		c, err := New(&file)
+		c, err := New([]string{file})
 		if err != nil {
 			t.Error(err)
 		} else {
@@ -278,20 +330,20 @@ x-kube-compose:
 	})
 }
 
-func TestNew_ClusterImageStorage_PushImagesAlsoSpecified(t *testing.T) {
+func Test_New_ClusterImageStoragePushImagesAlsoSpecified(t *testing.T) {
 	file := "/pushimagesalsospecified"
 	withMockFS2(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 		file: {
 			Content: []byte(`version: '2.4'
 x-kube-compose:
   cluster_image_storage:
-	type: docker
+    type: docker
   push_images:
     docker_registry: docker-registry-default.openshift-cluster.example.com
 `),
 		},
 	}), func() {
-		_, err := New(&file)
+		_, err := New([]string{file})
 		if err == nil {
 			t.Fail()
 		}

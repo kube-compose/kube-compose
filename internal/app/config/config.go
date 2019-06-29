@@ -57,11 +57,7 @@ func (cfg *Config) FindService(dockerComposeService *dockerComposeConfig.Service
 	return cfg.Services[dockerComposeService]
 }
 
-func New(file *string) (*Config, error) {
-	var files []string
-	if file != nil {
-		files = append(files, *file)
-	}
+func New(files []string) (*Config, error) {
 	cfg := &Config{
 		EnvironmentLabel: "env",
 	}
@@ -100,41 +96,48 @@ type clusterImageStorage struct {
 	Host *string `mapdecode:"host"`
 }
 
-func loadXKubeCompose(cfg *Config, xProperties dockerComposeConfig.XProperties) error {
-	var custom struct {
-		XKubeCompose struct {
-			ClusterImageStorage *clusterImageStorage `mapdecode:"cluster_image_storage"`
-			PushImages          *struct {
-				DockerRegistry string `mapdecode:"docker_registry"`
-			} `mapdecode:"push_images"`
-			VolumeInitBaseImage *string `mapdecode:"volume_init_base_image"`
-		} `mapdecode:"x-kube-compose"`
-	}
-	err := mapdecode.Decode(&custom, xProperties, mapdecode.IgnoreUnused(true))
-	if err != nil {
-		return errors.Wrap(err, "error while parsing \"x-kube-compose\" of a docker compose file")
-	}
-	if custom.XKubeCompose.ClusterImageStorage != nil {
-		if custom.XKubeCompose.PushImages != nil {
-			return fmt.Errorf("a docker compose file cannot set both \"x-kube-compose\".\"push_images\" and \"x-kube-compose\"." +
-				"\"cluster_image_storage\"")
-		}
-		err = loadClusterImageStorage(cfg, custom.XKubeCompose.ClusterImageStorage)
+type xKubeCompose struct {
+	XKubeCompose struct {
+		ClusterImageStorage *clusterImageStorage `mapdecode:"cluster_image_storage"`
+		PushImages          *struct {
+			DockerRegistry string `mapdecode:"docker_registry"`
+		} `mapdecode:"push_images"`
+		VolumeInitBaseImage *string `mapdecode:"volume_init_base_image"`
+	} `mapdecode:"x-kube-compose"`
+}
+
+func loadXKubeCompose(cfg *Config, xPropertiesSlice []dockerComposeConfig.XProperties) error {
+	for i := len(xPropertiesSlice) - 1; i >= 0; i-- {
+		var x xKubeCompose
+		err := mapdecode.Decode(&x, xPropertiesSlice[i], mapdecode.IgnoreUnused(true))
 		if err != nil {
-			return err
+			return errors.Wrap(err, "error while parsing \"x-kube-compose\" of a docker compose file")
 		}
-	} else if custom.XKubeCompose.PushImages != nil {
-		fmt.Println("WARNING: a docker compose file has set \"x-kube-compose\".\"push_images\", but this functionality is deprecated. " +
-			"See https://github.com/kube-compose/kube-compose.")
-		cfg.ClusterImageStorage.DockerRegistry = &DockerRegistryClusterImageStorage{
-			Host: custom.XKubeCompose.PushImages.DockerRegistry,
+		if x.XKubeCompose.ClusterImageStorage != nil {
+			if x.XKubeCompose.PushImages != nil {
+				return fmt.Errorf("a docker compose file cannot set both \"x-kube-compose\".\"push_images\" and \"x-kube-compose\"." +
+					"\"cluster_image_storage\"")
+			}
+			err = loadClusterImageStorage(cfg, x.XKubeCompose.ClusterImageStorage)
+			if err != nil {
+				return err
+			}
+		} else if x.XKubeCompose.PushImages != nil {
+			fmt.Println("WARNING: a docker compose file has set \"x-kube-compose\".\"push_images\", but this functionality is deprecated. " +
+				"See https://github.com/kube-compose/kube-compose.")
+			cfg.ClusterImageStorage.Docker = nil
+			cfg.ClusterImageStorage.DockerRegistry = &DockerRegistryClusterImageStorage{
+				Host: x.XKubeCompose.PushImages.DockerRegistry,
+			}
 		}
+		cfg.VolumeInitBaseImage = x.XKubeCompose.VolumeInitBaseImage
 	}
-	cfg.VolumeInitBaseImage = custom.XKubeCompose.VolumeInitBaseImage
 	return nil
 }
 
 func loadClusterImageStorage(cfg *Config, v *clusterImageStorage) error {
+	cfg.ClusterImageStorage.Docker = nil
+	cfg.ClusterImageStorage.DockerRegistry = nil
 	switch v.Type {
 	case "docker":
 		cfg.ClusterImageStorage.Docker = &struct{}{}
@@ -164,7 +167,7 @@ func (cfg *Config) AddService(name string, dockerComposeService *dockerComposeCo
 			panic("a service with name already exists")
 		}
 	} else {
-		if len(dockerComposeService.DependsOn) > 0 {
+		if dockerComposeService.DependsOn != nil {
 			panic("cannot add dockerComposeService that has dependencies")
 		}
 		service1 = &Service{

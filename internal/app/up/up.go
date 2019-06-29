@@ -668,7 +668,7 @@ func (a *app) GetArgsAndCommand(c *v1.Container) error {
 	// docker-compose does not ignore the entrypoint if it is an empty array. For example: if the entrypoint is empty but the command is not
 	// empty then the entrypoint becomes the command. But the Kubernetes client treats an empty entrypoint array as an unset entrypoint,
 	// consequently the image's entrypoint will be used. This if-else statement bridges the gap in behavior.
-	if a.composeService.DockerComposeService.EntrypointPresent && len(a.composeService.DockerComposeService.Entrypoint) == 0 {
+	if a.composeService.DockerComposeService.Entrypoint != nil && len(a.composeService.DockerComposeService.Entrypoint) == 0 {
 		c.Command = a.composeService.DockerComposeService.Command
 		if len(c.Command) == 0 {
 			c.Command = a.imageInfo.cmd

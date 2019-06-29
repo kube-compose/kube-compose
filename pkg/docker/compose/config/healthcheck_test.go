@@ -161,8 +161,8 @@ func TestParseTest_InvalidFirstElement(t *testing.T) {
 }
 
 func TestParseHealthcheck_Disabled(t *testing.T) {
-	healthcheckYAML := &ServiceHealthcheck{
-		Disable: true,
+	healthcheckYAML := &healthcheckInternal{
+		Disable: util.NewBool(true),
 	}
 	_, isDisabled, err := ParseHealthcheck(healthcheckYAML)
 	if err != nil {
@@ -182,7 +182,7 @@ func TestParseHealthcheck_Nil(t *testing.T) {
 	}
 }
 func TestParseHealthcheck_TestNone(t *testing.T) {
-	healthcheckYAML := &ServiceHealthcheck{
+	healthcheckYAML := &healthcheckInternal{
 		Test: HealthcheckTest{
 			Values: []string{HealthcheckCommandNone},
 		},
@@ -197,7 +197,7 @@ func TestParseHealthcheck_TestNone(t *testing.T) {
 }
 
 func TestParseHealthcheck_TestInvalid(t *testing.T) {
-	healthcheckYAML := &ServiceHealthcheck{
+	healthcheckYAML := &healthcheckInternal{
 		Test: HealthcheckTest{
 			Values: []string{"asdf4"},
 		},
@@ -209,7 +209,7 @@ func TestParseHealthcheck_TestInvalid(t *testing.T) {
 }
 
 func TestParseHealthcheck_IntervalInvalid(t *testing.T) {
-	healthcheckYAML := &ServiceHealthcheck{
+	healthcheckYAML := &healthcheckInternal{
 		Test: HealthcheckTest{
 			Values: []string{HealthcheckCommandShell, "echo 'Hello World 2!'"},
 		},
@@ -221,7 +221,7 @@ func TestParseHealthcheck_IntervalInvalid(t *testing.T) {
 	}
 }
 func TestParseHealthcheck_InvalidTimeout(t *testing.T) {
-	healthcheckYAML := &ServiceHealthcheck{
+	healthcheckYAML := &healthcheckInternal{
 		Test: HealthcheckTest{
 			Values: []string{HealthcheckCommandShell, "echo 'Hello World 3!'"},
 		},
@@ -234,7 +234,7 @@ func TestParseHealthcheck_InvalidTimeout(t *testing.T) {
 }
 
 func TestParseHealthcheck_Success(t *testing.T) {
-	healthcheckYAML := &ServiceHealthcheck{
+	healthcheckYAML := &healthcheckInternal{
 		Test: HealthcheckTest{
 			Values: []string{HealthcheckCommandShell, "echo 'Hello World 4!'"},
 		},

@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/kube-compose/kube-compose/internal/app/config"
-	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -34,16 +33,16 @@ func setFromKubeConfig(cfg *config.Config) error {
 	return nil
 }
 
-func getFileFlag(cmd *cobra.Command) (*string, error) {
-	var file *string
+func getFileFlags(cmd *cobra.Command) ([]string, error) {
+	var files []string
 	if cmd.Flags().Changed(fileFlagName) {
-		fileStr, err := cmd.Flags().GetString(fileFlagName)
+		var err error
+		files, err = cmd.Flags().GetStringSlice(fileFlagName)
 		if err != nil {
 			return nil, err
 		}
-		file = util.NewString(fileStr)
 	}
-	return file, nil
+	return files, nil
 }
 
 func getEnvIDFlag(cmd *cobra.Command) (string, error) {
@@ -85,11 +84,11 @@ func getCommandConfig(cmd *cobra.Command, args []string) (*config.Config, error)
 	if err != nil {
 		return nil, err
 	}
-	file, err := getFileFlag(cmd)
+	files, err := getFileFlags(cmd)
 	if err != nil {
 		return nil, err
 	}
-	cfg, err := config.New(file)
+	cfg, err := config.New(files)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
