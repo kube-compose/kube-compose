@@ -185,5 +185,12 @@ func parsePorts(inputs []port) ([]PortBinding, error) {
 			return nil, err
 		}
 	}
+	for i, portBinding1 := range portBindings {
+		for j, portBinding2 := range portBindings {
+			if i != j && portBinding1 == portBinding2 {
+				return nil, fmt.Errorf("duplicate ports")
+			}
+		}
+	}
 	return portBindings, nil
 }
