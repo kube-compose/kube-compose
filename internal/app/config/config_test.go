@@ -188,6 +188,59 @@ func Test_New_ValidPushImages(t *testing.T) {
 	})
 }
 
+func Test_New_MergeSuccess(t *testing.T) {
+	file1 := "/xkubecomposemergesuccess1"
+	file2 := "/xkubecomposemergesuccess2"
+	withMockFS2(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+		file1: {
+			Content: []byte(`version: '2.4'
+services:
+  service1:
+    image: ubuntu:latest
+    environment:
+      ENV: docker_desktop
+x-kube-compose:
+  cluster_image_storage:
+    type: docker
+`),
+		},
+		file2: {
+			Content: []byte(`version: '2.4'
+services:
+  service1:
+    environment:
+      ENV: openshift
+x-kube-compose:
+  cluster_image_storage:
+    type: docker_registry
+    host: my-docker-registry.openshift-cluster.example.com
+`),
+		},
+	}), func() {
+		c, err := New([]string{
+			file1,
+			file2,
+		})
+		if err != nil {
+			t.Error(err)
+		} else {
+			if c.FindServiceByName("service1").DockerComposeService.Environment["ENV"] != "openshift" {
+				t.Fail()
+			}
+			expected := ClusterImageStorage{
+				DockerRegistry: &DockerRegistryClusterImageStorage{
+					Host: "my-docker-registry.openshift-cluster.example.com",
+				},
+			}
+			if !reflect.DeepEqual(c.ClusterImageStorage, expected) {
+				t.Logf("pushImages1: %+v\n", c.ClusterImageStorage)
+				t.Logf("pushImages2: %+v\n", expected)
+				t.Fail()
+			}
+		}
+	})
+}
+
 func Test_New_ClusterImageStorageDockerSuccess(t *testing.T) {
 	file := "/dockersuccess"
 	withMockFS2(fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{

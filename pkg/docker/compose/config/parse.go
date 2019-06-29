@@ -58,6 +58,10 @@ type healthcheckInternal struct {
 	// start_period is only available in docker-compose 2.3 or higher
 }
 
+func (h *healthcheckInternal) IsEmpty() bool {
+	return h.Disable == nil && h.Interval == nil && h.Retries == nil && h.GetTest() == nil && h.Timeout == nil
+}
+
 func (h *healthcheckInternal) GetTest() []string {
 	return h.Test.Values
 }

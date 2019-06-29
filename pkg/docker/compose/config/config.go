@@ -395,7 +395,7 @@ func (c *configLoader) merge(resolvedFiles []string) (dcFileMerged *dockerCompos
 			version:  dcFile.version,
 		}
 		for i := len(resolvedFiles) - 1; i >= 0; i-- {
-			dcFile := c.loadResolvedFileCache[resolvedFiles[0]].parsed
+			dcFile := c.loadResolvedFileCache[resolvedFiles[i]].parsed
 			mergeServices(dcFileMerged.Services, dcFile.Services)
 			if dcFile.xProperties != nil {
 				xProperties = append(xProperties, dcFile.xProperties)
@@ -552,9 +552,6 @@ func (c *configLoader) parseDockerComposeFileService(dcFile *dockerComposeFile, 
 }
 
 func (c *configLoader) parseEnvironment(env []environmentNameValuePair) (map[string]string, error) {
-	if env == nil {
-		return nil, nil
-	}
 	envParsed := make(map[string]string, len(env))
 	for _, pair := range env {
 		var value string

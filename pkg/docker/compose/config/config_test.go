@@ -162,6 +162,9 @@ services:
   service1:
     depends_on:
     - service2
+    privileged: true
+    restart: nope
+    working_dir: /root
   service2:
     depends_on:
       service3:
@@ -754,7 +757,11 @@ func Test_New_DependsOnSuccess(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		} else {
-			service1 := &Service{}
+			service1 := &Service{
+				Privileged: true,
+				Restart:    "nope",
+				WorkingDir: "/root",
+			}
 			service2 := &Service{}
 			service3 := &Service{}
 			service1.DependsOn = map[*Service]ServiceHealthiness{
