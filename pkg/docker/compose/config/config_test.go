@@ -2,7 +2,9 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/kube-compose/kube-compose/internal/pkg/fs"
@@ -955,7 +957,7 @@ func Test_New_ExtendsInvalidDependsOn(t *testing.T) {
 
 func Test_New_Success(t *testing.T) {
 	withMockFS(func() {
-		_, err := New([]string{})
+		_, err := New(nil)
 		if err != nil {
 			t.Error(err)
 		}
@@ -1022,13 +1024,6 @@ func Test_ServiceInternal_ClearRecStack_Success(t *testing.T) {
 	s.recStack = true
 	s.clearRecStack()
 	if s.recStack {
-		t.Fail()
-	}
-}
-
-func Test_LoadFileError_Success(t *testing.T) {
-	err := loadFileError("some file", fmt.Errorf("an error occurred"))
-	if err == nil {
 		t.Fail()
 	}
 }
@@ -1102,4 +1097,106 @@ func Test_GetXProperties_Success(t *testing.T) {
 	if v[key2] != val2 {
 		t.Fail()
 	}
+}
+
+func withMockFS2(vfs fs.VirtualFileSystem, cb func()) {
+	orig := fs.OS
+	defer func() {
+		fs.OS = orig
+	}()
+	fs.OS = vfs
+	cb()
+}
+
+func Test_ConfigLoader_LoadStandardFiles_GetwdError(t *testing.T) {
+	errExpected := fmt.Errorf("getwderror")
+	vfs := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{})
+	vfs.GetwdError = errExpected
+	withMockFS2(vfs, func() {
+		c := newTestConfigLoader(nil)
+		_, errActual := c.loadStandardFiles()
+		if errActual != errExpected {
+			t.Fail()
+		}
+	})
+}
+
+func Test_ConfigLoader_LoadStandardFiles_EvalSymlinksCwdError(t *testing.T) {
+	errExpected := fmt.Errorf("getwderror")
+	vfs := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{})
+	vfs.Set("/", &fs.InMemoryFile{
+		Mode:  os.ModeDir,
+		Error: errExpected,
+	})
+	withMockFS2(vfs, func() {
+		c := newTestConfigLoader(nil)
+		_, errActual := c.loadStandardFiles()
+		if errActual != errExpected {
+			t.Fail()
+		}
+	})
+}
+
+func Test_ConfigLoader_LoadStandardFiles_NotFoundError(t *testing.T) {
+	vfs := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+		"/notfounderror": {
+			Mode: os.ModeDir,
+		},
+	})
+	err := vfs.Chdir("/notfounderror")
+	if err != nil {
+		t.Error(err)
+	}
+	withMockFS2(vfs, func() {
+		c := newTestConfigLoader(nil)
+		_, err := c.loadStandardFiles()
+		if err == nil || !strings.HasPrefix(err.Error(), "could not find file ") {
+			t.Fail()
+		}
+	})
+}
+
+func Test_New_OverrideSuccess(t *testing.T) {
+	vfs := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+		"/docker-compose.yaml": {
+			Content: []byte(`s:
+  environment:
+    ENV: '1'`),
+		},
+		"/docker-compose.override.yaml": {
+			Content: []byte(`s:
+  environment:
+    ENV: '2'`),
+		},
+	})
+	withMockFS2(vfs, func() {
+		c, err := New(nil)
+		if err != nil {
+			t.Error(err)
+		} else {
+			assertServiceMapsEqual(t, c.Services, map[string]*Service{
+				"s": {
+					Environment: map[string]string{
+						"ENV": "2",
+					},
+				},
+			})
+		}
+	})
+}
+
+func Test_LoadStandardFilesTry_LoadResolvedFileError(t *testing.T) {
+	msg := "tryloadresolvedfileerror"
+	vfs := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+		"/docker-compose.yml": {
+			ReadError: fmt.Errorf(msg),
+		},
+	})
+	withMockFS2(vfs, func() {
+		c := newTestConfigLoader(nil)
+		_, err := c.loadStandardFilesTry("/", "/", "")
+		if !strings.Contains(err.Error(), msg) {
+			t.Fail()
+		}
+	})
 }

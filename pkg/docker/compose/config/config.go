@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -123,16 +124,12 @@ type configLoader struct {
 	loadResolvedFileCache map[string]*loadResolvedFileCacheItem
 }
 
-func loadFileError(file string, err error) error {
-	return errors.Wrapf(err, "error loading file %#v", file)
-}
-
 // loadFile loads the specified file. If the file has already been loaded then a cache lookup is performed.
 // If file is relative then it is interpreted relative to the current working directory.
 func (c *configLoader) loadFile(file string) (*dockerComposeFile, error) {
 	resolvedFile, err := fs.OS.EvalSymlinks(file)
 	if err != nil {
-		return nil, loadFileError(file, err)
+		return nil, errors.Wrapf(err, "error when evaluating symlinks %#v", file)
 	}
 	return c.loadResolvedFile(resolvedFile)
 }
@@ -225,18 +222,60 @@ func (c *configLoader) loadResolvedFileCore(resolvedFile string, dcFile *dockerC
 	return c.parseDockerComposeFile(dcFile)
 }
 
-// loadStandardFile loads the docker compose file at a standard location.
-func (c *configLoader) loadStandardFile() (*dockerComposeFile, error) {
-	file := "docker-compose.yml"
-	resolvedFile, err := fs.OS.EvalSymlinks(file)
-	if os.IsNotExist(err) {
-		file = "docker-compose.yaml"
-		resolvedFile, err = fs.OS.EvalSymlinks(file)
+// loadStandardFiles loads the docker compose file at a standard location.
+func (c *configLoader) loadStandardFiles() ([]string, error) {
+	var resolvedFileSlice []string
+	cwd, err := fs.OS.Getwd()
+	if err != nil {
+		return nil, err
 	}
-	if err == nil {
-		return c.loadResolvedFile(resolvedFile)
+	dir := ""
+	resolvedDir, err := fs.OS.EvalSymlinks(cwd)
+	if err != nil {
+		return nil, err
 	}
-	return nil, loadFileError(file, err)
+	for {
+		resolvedFile, err := c.loadStandardFilesTry(dir, resolvedDir, "")
+		if err == nil {
+			resolvedFileSlice = append(resolvedFileSlice, resolvedFile)
+			resolvedFile, err = c.loadStandardFilesTry(dir, resolvedDir, ".override")
+			if err == nil {
+				resolvedFileSlice = append(resolvedFileSlice, resolvedFile)
+			}
+			if err == nil || os.IsNotExist(err) {
+				return resolvedFileSlice, nil
+			}
+		}
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+		resolvedDirParent := filepath.Dir(resolvedDir)
+		if resolvedDirParent == resolvedDir {
+			break
+		}
+		resolvedDir = resolvedDirParent
+		dir = ".." + string(filepath.Separator) + dir
+	}
+	return nil, fmt.Errorf("could not find file docker-compose.yml or docker.compose.yaml in (parents of) the current directory %#v", cwd)
+}
+
+func (c *configLoader) loadStandardFilesTry(dir, resolvedDir, override string) (resolvedFile string, err error) {
+	for _, suffix := range []string{".yml", ".yaml"} {
+		basename := "docker-compose" + override + suffix
+		file := dir + basename
+		resolvedFile, err = fs.OS.EvalSymlinks(resolvedDir + basename)
+		if err == nil {
+			_, err = c.loadResolvedFile(resolvedFile)
+			if err != nil {
+				return "", errors.Wrapf(err, "error while loading docker compose file %s (%#v)", dir+file, resolvedFile)
+			}
+			return resolvedFile, nil
+		}
+		if !os.IsNotExist(err) {
+			return "", errors.Wrapf(err, "error when evaluating symlinks %s (%#v)", dir+file, resolvedDir+basename)
+		}
+	}
+	return "", err
 }
 
 // processExtends process the extends field of a docker compose service. That is: given a docker compose service X,
@@ -352,11 +391,11 @@ func New(files []string) (*CanonicalDockerComposeConfig, error) {
 			resolvedFiles = append(resolvedFiles, dcFile.resolvedFile)
 		}
 	} else {
-		dcFile, err := c.loadStandardFile()
+		var err error
+		resolvedFiles, err = c.loadStandardFiles()
 		if err != nil {
 			return nil, err
 		}
-		resolvedFiles = append(resolvedFiles, dcFile.resolvedFile)
 	}
 	dcFileMerged, xProperties := c.merge(resolvedFiles)
 	for _, s := range dcFileMerged.Services {
