@@ -24,6 +24,7 @@ const testDockerComposeYmlExtendsInvalidDependsOn = "/docker-compose.extends-inv
 const testDockerComposeYmlDependsOnDoesNotExist = "/docker-compose.depends-on-does-not-exist.yml"
 const testDockerComposeYmlDependsOnCycle = "/docker-compose.depends-on-cycle.yml"
 const testDockerComposeYmlDependsOn = "/docker-compose.depends-on.yml"
+const testDockerComposeYmlInvalidHealthcheck = "/docker-compose.invalid-healthcheck.yml"
 
 var mockFS = fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 	testDockerComposeYml: {
@@ -160,6 +161,14 @@ services:
   service3: {}
 `),
 	},
+	testDockerComposeYmlInvalidHealthcheck: {
+		Content: []byte(`version: '2.3'
+services:
+  service1:
+	healthcheck:
+      timeout: henkie
+`),
+	},
 })
 
 var mockFileSystemStandardFileError = fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
@@ -265,10 +274,10 @@ func Test_ConfigLoader_LoadFile_Success(t *testing.T) {
 			}
 			expected := map[string]*serviceInternal{
 				"testservice": {
-					Command: stringOrStringSlice{
+					Command: &stringOrStringSlice{
 						Values: []string{"bash", "-c", "echo 'Hello World!'"},
 					},
-					Entrypoint: stringOrStringSlice{
+					Entrypoint: &stringOrStringSlice{
 						Values: []string{},
 					},
 					Image: util.NewString("ubuntu:latest"),
@@ -312,16 +321,26 @@ func assertServiceInternalMapsEqual(t *testing.T, m1, m2 map[string]*serviceInte
 	}
 }
 
+func areStringOrStringSlicesEqual(s1, s2 *stringOrStringSlice) bool {
+	if s1 == nil {
+		return s2 == nil
+	}
+	if s2 == nil {
+		return false
+	}
+	return areStringSlicesEqual(s1.Values, s2.Values)
+}
+
 func assertServiceInternalEqual(t *testing.T, s1, s2 *serviceInternal) {
-	if !areStringSlicesEqual(s1.Command.Values, s2.Command.Values) {
+	if !areStringOrStringSlicesEqual(s1.Command, s2.Command) {
 		t.Fail()
 		return
 	}
-	if !areDependsOnMapsEqual(s1.DependsOn.Values, s2.DependsOn.Values) {
+	if !areDependsOnEqual(s1.DependsOn, s2.DependsOn) {
 		t.Fail()
 		return
 	}
-	if !areStringSlicesEqual(s1.Entrypoint.Values, s2.Entrypoint.Values) {
+	if !areStringOrStringSlicesEqual(s1.Entrypoint, s2.Entrypoint) {
 		t.Fail()
 		return
 	}
@@ -458,17 +477,17 @@ func reverseMap(services map[string]*Service) map[*Service]string {
 	return ret
 }
 
-func areDependsOnMapsEqual(m1, m2 map[string]ServiceHealthiness) bool {
+func areDependsOnEqual(m1, m2 *dependsOn) bool {
 	if m1 == nil {
 		return m2 == nil
 	}
 	if m2 == nil {
 		return false
 	}
-	if len(m1) != len(m2) {
+	if len(m1.Values) != len(m2.Values) {
 		return false
 	}
-	return isDependsOnMapSubsetOf(m1, m2) && isDependsOnMapSubsetOf(m2, m1)
+	return isDependsOnMapSubsetOf(m1.Values, m2.Values) && isDependsOnMapSubsetOf(m2.Values, m1.Values)
 }
 
 func isDependsOnMapSubsetOf(m1, m2 map[string]ServiceHealthiness) bool {
@@ -732,6 +751,17 @@ func Test_New_DependsOn(t *testing.T) {
 	})
 }
 
+func Test_New_InvalidHealthcheckError(t *testing.T) {
+	withMockFS(func() {
+		_, err := New([]string{
+			testDockerComposeYmlInvalidHealthcheck,
+		})
+		if err == nil {
+			t.Fail()
+		}
+	})
+}
+
 func Test_New_IOError(t *testing.T) {
 	withMockFS(func() {
 		_, err := New([]string{
@@ -780,17 +810,60 @@ func Test_New_ExtendsSuccess(t *testing.T) {
 		} else {
 			assertServiceMapsEqual(t, c.Services, map[string]*Service{
 				"service1": {
+					Command:    []string{"bash", "-c", "echo 'Hello World!'"},
+					Entrypoint: []string{},
 					Environment: map[string]string{
 						"KEY1": "VALUE1",
 						"KEY2": "VALUE2",
 					},
+					Image: "ubuntu:latest",
+					Volumes: []ServiceVolume{
+						{
+							Short: &PathMapping{
+								ContainerPath: "bb",
+								HasHostPath:   true,
+								HasMode:       true,
+								HostPath:      "aa",
+								Mode:          "cc",
+							},
+						},
+					},
 				},
 				"service2": {
+					Command:    []string{"bash", "-c", "echo 'Hello World!'"},
+					Entrypoint: []string{},
 					Environment: map[string]string{
 						"KEY2": "VALUE2",
 					},
+					Image: "ubuntu:latest",
+					Volumes: []ServiceVolume{
+						{
+							Short: &PathMapping{
+								ContainerPath: "bb",
+								HasHostPath:   true,
+								HasMode:       true,
+								HostPath:      "aa",
+								Mode:          "cc",
+							},
+						},
+					},
 				},
-				"service3": {},
+				"service3": {
+					Command:    []string{"bash", "-c", "echo 'Hello World!'"},
+					Entrypoint: []string{},
+					Image:      "ubuntu:latest",
+					Volumes: []ServiceVolume{
+						{
+							Short: &PathMapping{
+								ContainerPath: "bb",
+								HasHostPath:   true,
+								HasMode:       true,
+								HostPath:      "aa",
+								Mode:          "cc",
+							},
+						},
+					},
+				},
 			})
 		}
 	})
@@ -938,31 +1011,12 @@ func Test_ConfigLoader_ParseDockerComposeFileService_InvalidPortsError(t *testin
 	}
 }
 
-func Test_ConfigLoader_ParseDockerComposeFileService_InvalidHealthcheckError(t *testing.T) {
-	c := newTestConfigLoader(nil)
-
-	dcFile := &dockerComposeFile{
-		Services: map[string]*serviceInternal{
-			"service1": {
-				Healthcheck: &healthcheckInternal{
-					Timeout: util.NewString("henkie"),
-				},
-			},
-		},
-	}
-	s := dcFile.Services["service1"]
-	err := c.parseDockerComposeFileService(dcFile, s)
-	if err == nil {
-		t.Fail()
-	}
-}
-
 func Test_ConfigLoader_ParseDockerComposeFile_InvalidEnvironmentError(t *testing.T) {
 	c := newTestConfigLoader(nil)
 	dcFile := &dockerComposeFile{
 		Services: map[string]*serviceInternal{
 			"service1": {
-				Environment: environment{
+				Environment: &environment{
 					Values: []environmentNameValuePair{
 						{
 							Name: "",

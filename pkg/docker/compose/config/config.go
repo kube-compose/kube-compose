@@ -64,11 +64,11 @@ type Service struct {
 // TODO https://github.com/kube-compose/kube-compose/issues/211 merge with composeFileService struct
 type serviceInternal struct {
 	// TODO https://github.com/kube-compose/kube-compose/issues/153 interpret string command/entrypoint correctly
-	Command   stringOrStringSlice `mapdecode:"command"`
-	DependsOn dependsOn           `mapdecode:"depends_on"`
+	Command   *stringOrStringSlice `mapdecode:"command"`
+	DependsOn *dependsOn           `mapdecode:"depends_on"`
 	// TODO https://github.com/kube-compose/kube-compose/issues/153 interpret string command/entrypoint correctly
-	Entrypoint        stringOrStringSlice `mapdecode:"entrypoint"`
-	Environment       environment         `mapdecode:"environment"`
+	Entrypoint        *stringOrStringSlice `mapdecode:"entrypoint"`
+	Environment       *environment         `mapdecode:"environment"`
 	environmentParsed map[string]string
 	Extends           *extends `mapdecode:"extends"`
 	// The final docker compose service in CanonicalDockerComposeConfig (only set if this is not an intermediate result).
@@ -285,7 +285,7 @@ func (c *configLoader) resolveExtends(
 			return nil, err
 		}
 		// TODO https://github.com/kube-compose/kube-compose/issues/212 fail if there is a version mismatch
-		sExtended = dcFile.Services[s.Extends.Service]
+		sExtended = dcFileExtended.Services[s.Extends.Service]
 		if sExtended == nil {
 			return nil, extendsNotFoundError(s.name, dcFile.resolvedFile, s.Extends.Service, dcFileExtended.resolvedFile)
 		}
@@ -296,7 +296,7 @@ func (c *configLoader) resolveExtends(
 			return nil, extendsNotFoundError(s.name, dcFile.resolvedFile, s.Extends.Service, dcFileExtended.resolvedFile)
 		}
 	}
-	if sExtended.DependsOn.Values != nil {
+	if sExtended.DependsOn != nil {
 		return nil, fmt.Errorf("cannot extend service %s: services with 'depends_on' cannot be extended",
 			s.Extends.Service,
 		)
@@ -412,7 +412,13 @@ func (c *configLoader) merge(resolvedFiles []string) (dcFileMerged *dockerCompos
 }
 
 func finalizeService(s *serviceInternal) error {
-	
+	if s.Command != nil {
+		s.finalService.Command = s.Command.Values
+	}
+	if s.Entrypoint != nil {
+		s.finalService.Entrypoint = s.Entrypoint.Values
+	}
+	s.finalService.Environment = s.environmentParsed
 
 	// Healthchecks are processed after merging.
 	healthcheck, healthcheckDisabled, err := ParseHealthcheck(s.Healthcheck)
@@ -425,12 +431,15 @@ func finalizeService(s *serviceInternal) error {
 	if s.Image != nil {
 		s.finalService.Image = *s.Image
 	}
+	s.finalService.Ports = s.portsParsed
 	if s.Privileged != nil {
 		s.finalService.Privileged = *s.Privileged
 	}
 	if s.Restart != nil {
 		s.finalService.Restart = *s.Restart
 	}
+	s.finalService.User = s.User
+	s.finalService.Volumes = s.Volumes
 	if s.WorkingDir != nil {
 		s.finalService.WorkingDir = *s.WorkingDir
 	}
@@ -457,9 +466,11 @@ func getXProperties(gm interface{}) XProperties {
 }
 
 func resolveDependsOn(services map[string]*serviceInternal) error {
-	for name1, s1 := range services {
+	for _, s1 := range services {
 		s1.finalService = &Service{}
-		if s1.DependsOn.Values != nil {
+	}
+	for name1, s1 := range services {
+		if s1.DependsOn != nil {
 			s1.finalService.DependsOn = map[*Service]ServiceHealthiness{}
 			for name2, serviceHealthiness := range s1.DependsOn.Values {
 				s2 := services[name2]
@@ -490,16 +501,18 @@ func ensureNoDependsOnCycle(s1 *serviceInternal, services map[string]*serviceInt
 	s1.visited = true
 	s1.recStack = true
 	defer s1.clearRecStack()
-	for name := range s1.DependsOn.Values {
-		s2 := services[name]
-		if !s2.visited {
-			err := ensureNoDependsOnCycle(s2, services)
-			if err != nil {
-				return err
+	if s1.DependsOn != nil {
+		for name := range s1.DependsOn.Values {
+			s2 := services[name]
+			if !s2.visited {
+				err := ensureNoDependsOnCycle(s2, services)
+				if err != nil {
+					return err
+				}
+			} else if s2.recStack {
+				return fmt.Errorf("a service %s depends on a service %s, but this means there is a cycle in the depends_on relationship",
+					s1.name, name)
 			}
-		} else if s2.recStack {
-			return fmt.Errorf("a service %s depends on a service %s, but this means there is a cycle in the depends_on relationship",
-				s1.name, name)
 		}
 	}
 	return nil
@@ -522,10 +535,11 @@ func (c *configLoader) parseDockerComposeFileService(dcFile *dockerComposeFile, 
 	if err != nil {
 		return err
 	}
-
-	s.environmentParsed, err = c.parseEnvironment(s.Environment.Values)
-	if err != nil {
-		return err
+	if s.Environment != nil {
+		s.environmentParsed, err = c.parseEnvironment(s.Environment.Values)
+		if err != nil {
+			return err
+		}
 	}
 	// TODO https://github.com/kube-compose/kube-compose/issues/163 only resolve volume paths if volume_driver is not set.
 	for i := 0; i < len(s.Volumes); i++ {

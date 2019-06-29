@@ -22,14 +22,17 @@ func addVolume(volumes []ServiceVolume, volume1 ServiceVolume) []ServiceVolume {
 
 func merge(into, from *serviceInternal, mergeExtends bool) {
 	// Rules here are based on https://docs.docker.com/compose/extends/#adding-and-overriding-configuration
-	into.DependsOn.Values = mergeDependsOnMaps(into.DependsOn.Values, from.DependsOn.Values)
+	if into.Command == nil {
+		into.Command = from.Command
+	}
+	into.DependsOn = mergeDependsOnMaps(into.DependsOn, from.DependsOn)
 	into.environmentParsed = mergeStringMaps(into.environmentParsed, from.environmentParsed)
 	into.Healthcheck = mergeHealthchecks(into.Healthcheck, from.Healthcheck)
 	into.portsParsed = mergePortBindings(into.portsParsed, from.portsParsed)
 	into.Volumes = mergeVolumes(into.Volumes, from.Volumes)
 
-	if into.Entrypoint.Values == nil {
-		into.Entrypoint.Values = from.Entrypoint.Values
+	if into.Entrypoint == nil {
+		into.Entrypoint = from.Entrypoint
 	}
 	if into.Image == nil {
 		into.Image = from.Image
@@ -48,13 +51,15 @@ func merge(into, from *serviceInternal, mergeExtends bool) {
 	}
 }
 
-func mergeDependsOnMaps(into, from map[string]ServiceHealthiness) map[string]ServiceHealthiness {
+func mergeDependsOnMaps(into, from *dependsOn) *dependsOn {
 	if into == nil {
 		return from
 	}
-	for k, v := range from {
-		if _, ok := into[k]; !ok {
-			into[k] = v
+	if from != nil {
+		for k, v := range from.Values {
+			if _, ok := into.Values[k]; !ok {
+				into.Values[k] = v
+			}
 		}
 	}
 	return into
@@ -64,25 +69,24 @@ func mergeHealthchecks(into, from *healthcheckInternal) *healthcheckInternal {
 	if into == nil {
 		return from
 	}
-	if into.Disable != nil && *into.Disable {
-		return into
-	}
-	if into.Disable == nil {
-		into.Disable = from.Disable
-	}
-	if into.Interval == nil {
-		into.Interval = from.Interval
-	}
-	if into.Retries == nil {
-		into.Retries = from.Retries
-	}
-	// Test.Values is nil if and only if the field is not set. We need to know whether the field is set to correctly merge. See also
-	// healthcheckInternal.
-	if into.Test.Values == nil {
-		into.Test.Values = from.Test.Values
-	}
-	if into.Timeout == nil {
-		into.Timeout = from.Timeout
+	if from != nil && (into.Disable == nil || !*into.Disable) {
+		if into.Disable == nil {
+			into.Disable = from.Disable
+		}
+		if into.Interval == nil {
+			into.Interval = from.Interval
+		}
+		if into.Retries == nil {
+			into.Retries = from.Retries
+		}
+		// Test.Values is nil if and only if the field is not set. We need to know whether the field is set to correctly merge. See also
+		// healthcheckInternal.
+		if into.Test.Values == nil {
+			into.Test.Values = from.Test.Values
+		}
+		if into.Timeout == nil {
+			into.Timeout = from.Timeout
+		}
 	}
 	return into
 }
@@ -107,7 +111,7 @@ func mergeServices(into, from map[string]*serviceInternal) {
 		intoService := into[name]
 		if intoService == nil {
 			intoService = &serviceInternal{
-				DependsOn: dependsOn{
+				DependsOn: &dependsOn{
 					Values: map[string]ServiceHealthiness{},
 				},
 				environmentParsed: map[string]string{},
