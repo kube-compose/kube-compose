@@ -175,8 +175,6 @@ The `get` subcommand of `kube-compose` allows dynamic test configuration to be g
 # User guide
 ## Known limitations
 1. The `up` subcommand does not build images of `docker-compose` services if they are not present locally ([#188](https://github.com/kube-compose/kube-compose/issues/188)).
-1. If no `-f` and `--file` flags are present then `kube-compose` never looks for a `docker-compose.yml` or `docker-compose.yaml` file in parents of the current working directory ([#151](https://github.com/kube-compose/kube-compose/issues/151)).
-1. `kube-compose` never loads `docker-compose.override.yml` and `docker-compose.override.yaml` files and behaves as if those do not exists ([#124](https://github.com/kube-compose/kube-compose/issues/124)).
 1. Volumes: see [this section](#Limitations).
 
 ## x-kube-compose
