@@ -7,6 +7,10 @@ import (
 	"testing"
 )
 
+func Test_OSFileSystem_EvalSymlinks(t *testing.T) {
+	_, _ = OS.EvalSymlinks("")
+}
+
 func Test_VirtualFileSystem_EvalSymlinks_AbsRootInjectedFault(t *testing.T) {
 	fs := NewInMemoryUnixFileSystem(map[string]InMemoryFile{})
 	errExpected := fmt.Errorf("absRootInjectedFault")

@@ -21,7 +21,29 @@ func (h *evalSymlinksHelper) getNameComp(slashPos int) string {
 	return h.nameRem[:slashPos]
 }
 
+func (h *evalSymlinksHelper) init() error {
+	var err error
+	if h.nameRem != "" && h.nameRem[0] == '/' {
+		h.resolved = "/"
+		h.nameRem = h.nameRem[1:]
+		h.n = h.fs.root
+		if h.n.err != nil {
+			return h.n.err
+		}
+	} else {
+		h.n, _, err = h.fs.find(h.fs.cwd, false, true)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (h *evalSymlinksHelper) run() error {
+	err := h.init()
+	if err != nil {
+		return err
+	}
 	for h.nameRem != "" {
 		slashPos := strings.IndexByte(h.nameRem, '/')
 		nameComp := h.getNameComp(slashPos)
@@ -90,24 +112,10 @@ func (h *evalSymlinksHelper) updateNameRemFromSlashPos(slashPos int) {
 // EvalSymlinks should behave the same as "path/filepath".EvalSymlinks, but on the virtual file system.
 func (fs *InMemoryFileSystem) EvalSymlinks(path string) (string, error) {
 	h := &evalSymlinksHelper{
-		fs: fs,
+		fs:      fs,
+		nameRem: path,
 	}
-	var err error
-	if path != "" && path[0] == '/' {
-		h.resolved = "/"
-		h.nameRem = path[1:]
-		h.n = fs.root
-		if h.n.err != nil {
-			return "", h.n.err
-		}
-	} else {
-		h.n, _, err = h.fs.find(h.fs.cwd, false, true)
-		if err != nil {
-			return "", err
-		}
-		h.nameRem = path
-	}
-	err = h.run()
+	err := h.run()
 	if err != nil {
 		return "", err
 	}

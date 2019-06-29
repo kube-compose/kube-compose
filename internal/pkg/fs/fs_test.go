@@ -17,8 +17,8 @@ func Test_OSFileSystem_Abs(t *testing.T) {
 	_, _ = OS.Abs("")
 }
 
-func Test_OSFileSystem_EvalSymlinks(t *testing.T) {
-	_, _ = OS.EvalSymlinks("")
+func Test_OSFileSystem_Getwd(t *testing.T) {
+	_, _ = OS.Getwd()
 }
 
 func Test_OSFileSystem_Lstat(t *testing.T) {
@@ -177,6 +177,26 @@ func Test_VirtualFileSystem_DirectoryInconsistency2(t *testing.T) {
 	fs.Set("/dir/fileforreal2", &InMemoryFile{
 		Content: []byte("regularfile3"),
 	})
+}
+
+func Test_VirtualFileSystem_GetwdError(t *testing.T) {
+	var fs = NewInMemoryUnixFileSystem(map[string]InMemoryFile{})
+	errExpected := fmt.Errorf("getwderror")
+	fs.GetwdError = errExpected
+	_, errActual := fs.Getwd()
+	if errActual != errExpected {
+		t.Fail()
+	}
+}
+
+func Test_VirtualFileSystem_GetwdSuccess(t *testing.T) {
+	var fs = NewInMemoryUnixFileSystem(map[string]InMemoryFile{})
+	cwd, err := fs.Getwd()
+	if err != nil {
+		t.Error(err)
+	} else if cwd != "/" {
+		t.Fail()
+	}
 }
 
 func Test_VirtualFileDescriptor_Read_EmptyBuffer(t *testing.T) {

@@ -18,7 +18,9 @@ type FileDescriptor interface {
 // VirtualFileSystem is an abstraction of the file system to improve testability of code.
 type VirtualFileSystem interface {
 	Abs(name string) (string, error)
+	Chdir(dir string) error
 	EvalSymlinks(path string) (string, error)
+	Getwd() (string, error)
 	Mkdir(name string, perm os.FileMode) error
 	MkdirAll(name string, perm os.FileMode) error
 	Lstat(name string) (os.FileInfo, error)
@@ -36,6 +38,10 @@ func (fs *osFileSystem) Abs(name string) (string, error) {
 
 func (fs *osFileSystem) EvalSymlinks(path string) (string, error) {
 	return filepath.EvalSymlinks(path)
+}
+
+func (fs *osFileSystem) Getwd() (string, error) {
+	return os.Getwd()
 }
 
 func (fs *osFileSystem) Mkdir(name string, perm os.FileMode) error {
@@ -68,9 +74,10 @@ var OS VirtualFileSystem = &osFileSystem{}
 
 // InMemoryFileSystem is a VirtualFileSystem with additional fields and functions useful for testing.
 type InMemoryFileSystem struct {
-	AbsError error
-	cwd      string
-	root     *node
+	AbsError   error
+	cwd        string
+	GetwdError error
+	root       *node
 }
 
 var (
@@ -371,6 +378,13 @@ func (fs *InMemoryFileSystem) Abs(name string) (string, error) {
 		return "", fs.AbsError
 	}
 	return fs.abs(name), nil
+}
+
+func (fs *InMemoryFileSystem) Getwd() (string, error) {
+	if fs.GetwdError != nil {
+		return "", fs.GetwdError
+	}
+	return fs.cwd, nil
 }
 
 func (fs *InMemoryFileSystem) Open(name string) (FileDescriptor, error) {

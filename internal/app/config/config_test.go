@@ -10,16 +10,24 @@ import (
 
 func newTestConfig() *Config {
 	cfg := &Config{}
-	serviceA := cfg.AddService("a", &dockerComposeConfig.Service{})
-	serviceB := cfg.AddService("b", &dockerComposeConfig.Service{})
-	serviceC := cfg.AddService("c", &dockerComposeConfig.Service{})
-	serviceD := cfg.AddService("d", &dockerComposeConfig.Service{})
-	serviceA.DockerComposeService.DependsOn = map[*dockerComposeConfig.Service]dockerComposeConfig.ServiceHealthiness{
-		serviceB.DockerComposeService: dockerComposeConfig.ServiceHealthy,
+	serviceA := cfg.AddService(&dockerComposeConfig.Service{
+		Name: "a",
+	})
+	serviceB := cfg.AddService(&dockerComposeConfig.Service{
+		Name: "b",
+	})
+	cfg.AddService(&dockerComposeConfig.Service{
+		Name: "c",
+	})
+	cfg.AddService(&dockerComposeConfig.Service{
+		Name: "d",
+	})
+	serviceA.DockerComposeService.DependsOn = map[string]dockerComposeConfig.ServiceHealthiness{
+		"b": dockerComposeConfig.ServiceHealthy,
 	}
-	serviceB.DockerComposeService.DependsOn = map[*dockerComposeConfig.Service]dockerComposeConfig.ServiceHealthiness{
-		serviceC.DockerComposeService: dockerComposeConfig.ServiceHealthy,
-		serviceD.DockerComposeService: dockerComposeConfig.ServiceHealthy,
+	serviceB.DockerComposeService.DependsOn = map[string]dockerComposeConfig.ServiceHealthiness{
+		"c": dockerComposeConfig.ServiceHealthy,
+		"d": dockerComposeConfig.ServiceHealthy,
 	}
 	return cfg
 }
@@ -28,11 +36,11 @@ func TestAddToFilter(t *testing.T) {
 	cfg := newTestConfig()
 
 	// Since a depends on b, and b depends on c and d, we expect the result to contain all 4 apps.
-	cfg.AddToFilter(cfg.FindServiceByName("a"))
-	resultContainsAppA := cfg.MatchesFilter(cfg.FindServiceByName("a"))
-	resultContainsAppB := cfg.MatchesFilter(cfg.FindServiceByName("b"))
-	resultContainsAppC := cfg.MatchesFilter(cfg.FindServiceByName("c"))
-	resultContainsAppD := cfg.MatchesFilter(cfg.FindServiceByName("d"))
+	cfg.AddToFilter(cfg.Services["a"])
+	resultContainsAppA := cfg.MatchesFilter(cfg.Services["a"])
+	resultContainsAppB := cfg.MatchesFilter(cfg.Services["b"])
+	resultContainsAppC := cfg.MatchesFilter(cfg.Services["c"])
+	resultContainsAppD := cfg.MatchesFilter(cfg.Services["d"])
 	if !resultContainsAppA || !resultContainsAppB || !resultContainsAppC || !resultContainsAppD {
 		t.Fail()
 	}
@@ -40,7 +48,7 @@ func TestAddToFilter(t *testing.T) {
 
 func TestClearFilter(t *testing.T) {
 	cfg := newTestConfig()
-	cfg.AddToFilter(cfg.FindServiceByName("a"))
+	cfg.AddToFilter(cfg.Services["a"])
 	cfg.ClearFilter()
 	for _, service := range cfg.Services {
 		if service.matchesFilter {
@@ -56,7 +64,9 @@ func TestAddService_ErrorDuplicateName(t *testing.T) {
 			t.Fail()
 		}
 	}()
-	cfg.AddService("a", &dockerComposeConfig.Service{})
+	cfg.AddService(&dockerComposeConfig.Service{
+		Name: "a",
+	})
 }
 
 func TestAddService_ErrorDockerComposeServiceInUse(t *testing.T) {
@@ -66,7 +76,7 @@ func TestAddService_ErrorDockerComposeServiceInUse(t *testing.T) {
 			t.Fail()
 		}
 	}()
-	cfg.AddService("z", cfg.FindServiceByName("a").DockerComposeService)
+	cfg.AddService(cfg.Services["a"].DockerComposeService)
 }
 
 func TestAddService_ErrorServiceHasDependsOn(t *testing.T) {
@@ -76,10 +86,11 @@ func TestAddService_ErrorServiceHasDependsOn(t *testing.T) {
 			t.Fail()
 		}
 	}()
-	cfg.AddService("z", &dockerComposeConfig.Service{
-		DependsOn: map[*dockerComposeConfig.Service]dockerComposeConfig.ServiceHealthiness{
-			cfg.FindServiceByName("a").DockerComposeService: dockerComposeConfig.ServiceStarted,
+	cfg.AddService(&dockerComposeConfig.Service{
+		DependsOn: map[string]dockerComposeConfig.ServiceHealthiness{
+			"a": dockerComposeConfig.ServiceStarted,
 		},
+		Name: "z",
 	})
 }
 
@@ -224,7 +235,7 @@ x-kube-compose:
 		if err != nil {
 			t.Error(err)
 		} else {
-			if c.FindServiceByName("service1").DockerComposeService.Environment["ENV"] != "openshift" {
+			if c.Services["service1"].DockerComposeService.Environment["ENV"] != "openshift" {
 				t.Fail()
 			}
 			expected := ClusterImageStorage{
