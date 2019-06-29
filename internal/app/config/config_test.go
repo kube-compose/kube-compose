@@ -284,7 +284,7 @@ func Test_New_ClusterImageStoragePushImagesAlsoSpecified(t *testing.T) {
 			Content: []byte(`version: '2.4'
 x-kube-compose:
   cluster_image_storage:
-	type: docker
+    type: docker
   push_images:
     docker_registry: docker-registry-default.openshift-cluster.example.com
 `),

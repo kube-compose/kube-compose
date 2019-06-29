@@ -22,7 +22,8 @@ const testDockerComposeYmlExtendsDoesNotExist = "/docker-compose.extends-does-no
 const testDockerComposeYmlExtendsDoesNotExistFile = "/docker-compose.extends-does-not-exist-file.yml"
 const testDockerComposeYmlExtendsInvalidDependsOn = "/docker-compose.extends-invalid-depends-on.yml"
 const testDockerComposeYmlDependsOnDoesNotExist = "/docker-compose.depends-on-does-not-exist.yml"
-const testDockerComposeYmlDependsOnCycle = "/docker-compose.depends-on-cycle.yml"
+const testDockerComposeYmlDependsOnCycle1 = "/docker-compose.depends-on-cycle-1.yml"
+const testDockerComposeYmlDependsOnCycle2 = "/docker-compose.depends-on-cycle-2.yml"
 const testDockerComposeYmlDependsOn = "/docker-compose.depends-on.yml"
 const testDockerComposeYmlInvalidHealthcheck = "/docker-compose.invalid-healthcheck.yml"
 
@@ -137,7 +138,7 @@ services:
     - service2
 `),
 	},
-	testDockerComposeYmlDependsOnCycle: {
+	testDockerComposeYmlDependsOnCycle1: {
 		Content: []byte(`version: '2.3'
 services:
   service1:
@@ -146,6 +147,13 @@ services:
   service2:
     depends_on:
     - service1
+`),
+	},
+	testDockerComposeYmlDependsOnCycle2: {
+		Content: []byte(`version: '2.3'
+services:
+  service1:
+	command: []
 `),
 	},
 	testDockerComposeYmlDependsOn: {
@@ -713,10 +721,10 @@ func Test_New_DependsOnDoesNotExist(t *testing.T) {
 		}
 	})
 }
-func Test_New_DependsOnCycle(t *testing.T) {
+func Test_New_DependsOnCycle1(t *testing.T) {
 	withMockFS(func() {
 		_, err := New([]string{
-			testDockerComposeYmlDependsOnCycle,
+			testDockerComposeYmlDependsOnCycle1,
 		})
 		if err == nil {
 			t.Fail()
@@ -725,7 +733,20 @@ func Test_New_DependsOnCycle(t *testing.T) {
 		}
 	})
 }
-func Test_New_DependsOn(t *testing.T) {
+func Test_New_DependsOnCycle2(t *testing.T) {
+	withMockFS(func() {
+		_, err := New([]string{
+			testDockerComposeYmlDependsOnCycle1,
+			testDockerComposeYmlDependsOnCycle2,
+		})
+		if err == nil {
+			t.Fail()
+		} else {
+			t.Log(err)
+		}
+	})
+}
+func Test_New_DependsOnSuccess(t *testing.T) {
 	withMockFS(func() {
 		c, err := New([]string{
 			testDockerComposeYmlDependsOn,

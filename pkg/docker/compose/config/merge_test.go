@@ -3,6 +3,8 @@ package config
 import (
 	"reflect"
 	"testing"
+
+	"github.com/kube-compose/kube-compose/internal/pkg/util"
 )
 
 func Test_MergePortBindings_Basic(t *testing.T) {
@@ -97,6 +99,54 @@ func Test_Merge_Basic(t *testing.T) {
 
 	merge(serviceA, serviceB, false)
 	if !reflect.DeepEqual(serviceA, expected) {
+		t.Fail()
+	}
+}
+
+func Test_AddVolume_SuccessNoDuplicates(t *testing.T) {
+	volumes := []ServiceVolume{}
+	volume := ServiceVolume{
+		Short: &PathMapping{},
+	}
+	actual := addVolume(volumes, volume)
+	expected := []ServiceVolume{volume}
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fail()
+	}
+}
+
+func Test_MergeDependsOnMaps_Success(t *testing.T) {
+	into := &dependsOn{
+		Values: map[string]ServiceHealthiness{},
+	}
+	from := &dependsOn{
+		Values: map[string]ServiceHealthiness{
+			"mergedependsonsuccess": ServiceStarted,
+		},
+	}
+	actual := mergeDependsOnMaps(into, from)
+	if !reflect.DeepEqual(actual, &dependsOn{
+		map[string]ServiceHealthiness{
+			"mergedependsonsuccess": ServiceStarted,
+		},
+	}) {
+		t.Fail()
+	}
+}
+
+func Test_MergeHealthchecks_Success(t *testing.T) {
+	into := &healthcheckInternal{}
+	from := &healthcheckInternal{
+		Disable:  new(bool),
+		Interval: util.NewString("10s"),
+		Retries:  new(uint),
+		Test: HealthcheckTest{
+			Values: []string{"CMD"},
+		},
+		Timeout: util.NewString("10s"),
+	}
+	actual := mergeHealthchecks(into, from)
+	if !reflect.DeepEqual(actual, from) {
 		t.Fail()
 	}
 }
