@@ -185,7 +185,7 @@ services:
 		Content: []byte(`version: '2.3'
 services:
   service1:
-	healthcheck:
+    healthcheck:
       test: []
 `),
 	},

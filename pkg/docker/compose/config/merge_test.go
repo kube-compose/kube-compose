@@ -114,6 +114,36 @@ func Test_AddVolume_SuccessNoDuplicates(t *testing.T) {
 		t.Fail()
 	}
 }
+func Test_AddVolume_SuccessDuplicates(t *testing.T) {
+	volume := ServiceVolume{
+		Short: &PathMapping{
+			ContainerPath: "/mnt",
+		},
+	}
+	volumes := []ServiceVolume{
+		volume,
+	}
+	actual := addVolume(volumes, volume)
+	expected := []ServiceVolume{volume}
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fail()
+	}
+}
+func Test_MergeVolumes_Success(t *testing.T) {
+	volume := ServiceVolume{
+		Short: &PathMapping{
+			ContainerPath: "/mnt",
+		},
+	}
+	volumes := []ServiceVolume{
+		volume,
+	}
+	actual := mergeVolumes(volumes, volumes)
+	expected := volumes
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fail()
+	}
+}
 
 func Test_MergeDependsOnMaps_Success(t *testing.T) {
 	into := &dependsOn{
