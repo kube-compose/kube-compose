@@ -14,6 +14,7 @@ import (
 	"github.com/kube-compose/kube-compose/internal/app/config"
 	"github.com/kube-compose/kube-compose/internal/app/k8smeta"
 	"github.com/kube-compose/kube-compose/internal/pkg/docker"
+	"github.com/kube-compose/kube-compose/internal/pkg/progress/reporter"
 	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
 	cmdColor "github.com/logrusorgru/aurora"
@@ -62,6 +63,7 @@ type app struct {
 	maxObservedPodStatus                 podStatus
 	containersForWhichWeAreStreamingLogs map[string]bool
 	color                                cmdColor.Color
+	reporterRow                          *reporter.ReporterRow
 	volumes                              []*appVolume
 	volumeInitImage                      appVolumesInitImage
 }
@@ -101,6 +103,7 @@ type upRunner struct {
 	localImagesCache      localImagesCache
 	maxServiceNameLength  int
 	opts                  *Options
+	reporter              *reporter.Reporter
 	totalVolumeCount      int
 }
 
@@ -118,19 +121,20 @@ func (u *upRunner) initKubernetesClientset() error {
 func (u *upRunner) initAppsToBeStarted() {
 	u.appsToBeStarted = map[*app]bool{}
 	colorIndex := 0
-	for _, app := range u.apps {
-		if !u.cfg.MatchesFilter(app.composeService) {
+	for _, a := range u.apps {
+		if !u.cfg.MatchesFilter(a.composeService) {
 			continue
 		}
-		u.appsToBeStarted[app] = true
+		a.reporterRow = u.opts.Reporter.AddRow(a.name())
+		u.appsToBeStarted[a] = true
 		if colorIndex < len(colorSupported) {
-			app.color = colorSupported[colorIndex]
+			a.color = colorSupported[colorIndex]
 			colorIndex++
 		} else {
 			colorIndex = 0
 		}
-		if len(app.name()) > u.maxServiceNameLength {
-			u.maxServiceNameLength = len(app.name())
+		if len(a.name()) > u.maxServiceNameLength {
+			u.maxServiceNameLength = len(a.name())
 		}
 	}
 }
@@ -256,14 +260,18 @@ func (u *upRunner) getAppVolumeInitImage(a *app) error {
 }
 
 func (u *upRunner) pushImage(sourceImageID, name, tag, imageDescr string, a *app) (podImage string, err error) {
+	pt := a.reporterRow.AddProgressTask("pushing " + imageDescr)
+	defer pt.Done()
 	imagePush := fmt.Sprintf("%s/%s/%s:%s", u.cfg.ClusterImageStorage.DockerRegistry.Host, u.cfg.Namespace, name, tag)
 	err = u.dockerClient.ImageTag(u.opts.Context, sourceImageID, imagePush)
 	if err != nil {
 		return
 	}
 	var digest string
-	digest, err = pushImageWithLogging(u.opts.Context, u.dockerClient, a.name(), imagePush, u.cfg.KubeConfig.BearerToken,
-		imageDescr)
+	registryAuth := docker.EncodeRegistryAuth("unused", u.cfg.KubeConfig.BearerToken)
+	digest, err = docker.PushImage(u.opts.Context, u.dockerClient, imagePush, registryAuth, func(push *docker.PullOrPush) {
+		pt.Update(push.Progress())
+	})
 	if err != nil {
 		return
 	}
@@ -370,7 +378,7 @@ func (u *upRunner) getAppImageInfoEnsureSourceImageID(sourceImage string, source
 		if !sourceImageIsNamed {
 			return fmt.Errorf("could not find image %#v locally, and building images is not supported", sourceImage)
 		}
-		digest, err := pullImageWithLogging(u.opts.Context, u.dockerClient, a.name(), sourceImageRef.String())
+		digest, err := u.getAppImageInfoPullImage(sourceImageRef, a)
 		if err != nil {
 			return err
 		}
@@ -386,6 +394,14 @@ func (u *upRunner) getAppImageInfoEnsureSourceImageID(sourceImage string, source
 	}
 	// len(podImage) > 0 by definition of resolveLocalImageAfterPull
 	return nil
+}
+
+func (u *upRunner) getAppImageInfoPullImage(sourceImageRef dockerRef.Reference, a *app) (string, error) {
+	pt := a.reporterRow.AddProgressTask("pulling image")
+	defer pt.Done()
+	return docker.PullImage(u.opts.Context, u.dockerClient, sourceImageRef.String(), "123", func(pull *docker.PullOrPush) {
+		pt.Update(pull.Progress())
+	})
 }
 
 func (u *upRunner) getAppImageInfoUser(a *app, inspect *dockerTypes.ImageInspect, sourceImage string) error {
@@ -1133,6 +1149,9 @@ func Run(cfg *config.Config, opts *Options) error {
 		cfg:  cfg,
 		opts: opts,
 	}
+	u.opts.Reporter.SetTaskAnimationType("pulling image", reporter.AnimationTypeDockerPull)
+	u.opts.Reporter.SetTaskAnimationType("pushing image", reporter.AnimationTypeDockerPush)
+	u.opts.Reporter.SetTaskAnimationType("pushing volume init image", reporter.AnimationTypeDockerPush)
 	u.hostAliases.once = &sync.Once{}
 	u.localImagesCache.once = &sync.Once{}
 	return u.run()

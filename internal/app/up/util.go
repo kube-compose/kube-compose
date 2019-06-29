@@ -295,24 +295,6 @@ func getTag(ref dockerRef.Reference) string {
 	return refWithTag.Tag()
 }
 
-func pullImageWithLogging(ctx context.Context, puller docker.ImagePuller, appName, image string) (string, error) {
-	lastLogTime := time.Now().Add(-2 * time.Second)
-	digest, err := docker.PullImage(ctx, puller, image, "123", func(pull *docker.PullOrPush) {
-		t := time.Now()
-		elapsed := t.Sub(lastLogTime)
-		if elapsed >= 2*time.Second {
-			lastLogTime = t
-			progress := pull.Progress()
-			fmt.Printf("app %s: pulling image %s (%.1f%%)\n", appName, image, progress*100.0)
-		}
-	})
-	if err != nil {
-		return "", err
-	}
-	fmt.Printf("app %s: pulling image %s (%.1f%%)   @%s\n", appName, image, 100.0, digest)
-	return digest, nil
-}
-
 func pushImageWithLogging(ctx context.Context, pusher docker.ImagePusher, appName, image, bearerToken, imageDescr string) (string, error) {
 	lastLogTime := time.Now().Add(-2 * time.Second)
 	registryAuth := docker.EncodeRegistryAuth("unused", bearerToken)
