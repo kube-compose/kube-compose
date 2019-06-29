@@ -67,7 +67,7 @@ type app struct {
 }
 
 func (a *app) name() string {
-	return a.composeService.Name
+	return a.composeService.Name()
 }
 
 func (a *app) hasService() bool {
@@ -427,7 +427,7 @@ func (u *upRunner) findAppFromObjectMeta(objectMeta *metav1.ObjectMeta) *app {
 	if composeService == nil {
 		return nil
 	}
-	return u.apps[composeService.Name]
+	return u.apps[composeService.Name()]
 }
 
 func (u *upRunner) waitForServiceClusterIPUpdate(service *v1.Service) (*app, error) {
@@ -925,9 +925,9 @@ func (u *upRunner) streamPodLogs(pod *v1.Pod, completedChannel chan interface{},
 func (u *upRunner) createPodsIfNeeded() error {
 	for app1 := range u.appsToBeStarted {
 		createPod := true
-		for dcService, healthiness := range app1.composeService.DockerComposeService.DependsOn {
-			composeService := u.cfg.FindService(dcService)
-			app2 := u.apps[composeService.Name]
+		for name, healthiness := range app1.composeService.DockerComposeService.DependsOn {
+			composeService := u.cfg.Services[name]
+			app2 := u.apps[composeService.Name()]
 			if healthiness == dockerComposeConfig.ServiceHealthy {
 				if app2.maxObservedPodStatus != podStatusReady {
 					createPod = false
@@ -955,12 +955,11 @@ func (u *upRunner) formatCreatePodReason(app1 *app) string {
 	reason := strings.Builder{}
 	reason.WriteString("its dependency conditions are met (")
 	comma := false
-	for dcService, healthiness := range app1.composeService.DockerComposeService.DependsOn {
-		composeService := u.cfg.FindService(dcService)
+	for name, healthiness := range app1.composeService.DockerComposeService.DependsOn {
 		if comma {
 			reason.WriteString(", ")
 		}
-		reason.WriteString(composeService.Name)
+		reason.WriteString(name)
 		if healthiness == dockerComposeConfig.ServiceHealthy {
 			reason.WriteString(": ready")
 		} else {

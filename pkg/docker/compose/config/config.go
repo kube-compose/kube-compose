@@ -46,12 +46,13 @@ type Service struct {
 	// When adding a field here, please update merge.go with the logic required to merge these fields.
 	Command []string
 	// TODO https://github.com/kube-compose/kube-compose/issues/214 consider simplifying to map[string]ServiceHealthiness
-	DependsOn           map[*Service]ServiceHealthiness
+	DependsOn           map[string]ServiceHealthiness
 	Entrypoint          []string
 	Environment         map[string]string
 	Healthcheck         *Healthcheck
 	HealthcheckDisabled bool
 	Image               string
+	Name                string
 	Ports               []PortBinding
 	Privileged          bool
 	Restart             string
@@ -431,6 +432,7 @@ func finalizeService(s *serviceInternal) error {
 	if s.Image != nil {
 		s.finalService.Image = *s.Image
 	}
+	s.finalService.Name = s.name
 	s.finalService.Ports = s.portsParsed
 	if s.Privileged != nil {
 		s.finalService.Privileged = *s.Privileged
@@ -471,15 +473,13 @@ func resolveDependsOn(services map[string]*serviceInternal) error {
 	}
 	for name1, s1 := range services {
 		if s1.DependsOn != nil {
-			s1.finalService.DependsOn = map[*Service]ServiceHealthiness{}
-			for name2, serviceHealthiness := range s1.DependsOn.Values {
+			for name2 := range s1.DependsOn.Values {
 				s2 := services[name2]
 				if s2 == nil {
-					return fmt.Errorf("service %s refers to a non-existing service in its depends_on: %s",
-						name1, name2)
+					return fmt.Errorf("service %s refers to a non-existing service in its depends_on: %s", name1, name2)
 				}
-				s1.finalService.DependsOn[s2.finalService] = serviceHealthiness
 			}
+			s1.finalService.DependsOn = s1.DependsOn.Values
 		}
 	}
 	for _, s1 := range services {

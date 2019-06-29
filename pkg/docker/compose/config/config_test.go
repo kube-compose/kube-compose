@@ -449,53 +449,9 @@ func assertServiceMapsEqual(t *testing.T, services1, services2 map[string]*Servi
 			t.Fail()
 		} else {
 			assertServicesEqual(t, service1, service2)
-			assertAreDependsOnEqual(t, name, services1, services2)
+			areDependsOnMapsEqual(service1.DependsOn, service2.DependsOn)
 		}
 	}
-}
-
-func assertAreDependsOnEqual(t *testing.T, name string, services1, services2 map[string]*Service) {
-	dependsOn1 := services1[name].DependsOn
-	dependsOn2 := services2[name].DependsOn
-	if (dependsOn1 == nil) != (dependsOn2 == nil) {
-		t.Fail()
-		return
-	}
-	if dependsOn2 == nil {
-		return
-	}
-	if len(dependsOn1) != len(dependsOn2) {
-		t.Fail()
-		return
-	}
-	names := reverseMap(services1)
-	for service1, healthiness1 := range dependsOn1 {
-		name, ok := names[service1]
-		if !ok {
-			panic("dependsOn refers to a service that is not in services")
-		}
-		service2 := services2[name]
-		if service2 == nil {
-			t.Fail()
-			return
-		}
-		healthiness2, ok := dependsOn2[service2]
-		if !ok || healthiness1 != healthiness2 {
-			t.Fail()
-			return
-		}
-	}
-}
-
-func reverseMap(services map[string]*Service) map[*Service]string {
-	ret := map[*Service]string{}
-	for name, service := range services {
-		if _, ok := ret[service]; ok {
-			panic("services is invalid")
-		}
-		ret[service] = name
-	}
-	return ret
 }
 
 func areDependsOnEqual(m1, m2 *dependsOn) bool {
@@ -509,6 +465,19 @@ func areDependsOnEqual(m1, m2 *dependsOn) bool {
 		return false
 	}
 	return isDependsOnMapSubsetOf(m1.Values, m2.Values) && isDependsOnMapSubsetOf(m2.Values, m1.Values)
+}
+
+func areDependsOnMapsEqual(m1, m2 map[string]ServiceHealthiness) bool {
+	if m1 == nil {
+		return m2 == nil
+	}
+	if m2 == nil {
+		return false
+	}
+	if len(m1) != len(m2) {
+		return false
+	}
+	return isDependsOnMapSubsetOf(m1, m2) && isDependsOnMapSubsetOf(m2, m1)
 }
 
 func isDependsOnMapSubsetOf(m1, m2 map[string]ServiceHealthiness) bool {
@@ -774,11 +743,11 @@ func Test_New_DependsOnSuccess(t *testing.T) {
 			}
 			service2 := &Service{}
 			service3 := &Service{}
-			service1.DependsOn = map[*Service]ServiceHealthiness{
-				service2: ServiceStarted,
+			service1.DependsOn = map[string]ServiceHealthiness{
+				"service2": ServiceStarted,
 			}
-			service2.DependsOn = map[*Service]ServiceHealthiness{
-				service3: ServiceHealthy,
+			service2.DependsOn = map[string]ServiceHealthiness{
+				"service3": ServiceHealthy,
 			}
 			assertServiceMapsEqual(t, c.Services, map[string]*Service{
 				"service1": service1,

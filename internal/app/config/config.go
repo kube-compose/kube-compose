@@ -18,9 +18,12 @@ type DockerRegistryClusterImageStorage struct {
 type Service struct {
 	DockerComposeService *dockerComposeConfig.Service
 	matchesFilter        bool
-	Name                 string
 	NameEscaped          string
 	Ports                []Port
+}
+
+func (s *Service) Name() string {
+	return s.DockerComposeService.Name
 }
 
 type ClusterImageStorage struct {
@@ -29,8 +32,6 @@ type ClusterImageStorage struct {
 }
 
 type Config struct {
-	dockerComposeServices map[string]*dockerComposeConfig.Service
-
 	// All Kubernetes resources are named with "-"+EnvironmentID as a suffix,
 	// and have an additional label "env="+EnvironmentID so that namespaces can be shared.
 	EnvironmentID       string
@@ -40,21 +41,13 @@ type Config struct {
 	ClusterImageStorage ClusterImageStorage
 	VolumeInitBaseImage *string
 
-	Services map[*dockerComposeConfig.Service]*Service
+	Services map[string]*Service
 }
 
 type Port struct {
 	Port int32
 	// one of "udp", "tcp" and "sctp"
 	Protocol string
-}
-
-func (cfg *Config) FindServiceByName(name string) *Service {
-	return cfg.FindService(cfg.dockerComposeServices[name])
-}
-
-func (cfg *Config) FindService(dockerComposeService *dockerComposeConfig.Service) *Service {
-	return cfg.Services[dockerComposeService]
 }
 
 func New(files []string) (*Config, error) {
@@ -65,15 +58,13 @@ func New(files []string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg.dockerComposeServices = dcCfg.Services
-	cfg.Services = map[*dockerComposeConfig.Service]*Service{}
+	cfg.Services = map[string]*Service{}
 	for name, dcService := range dcCfg.Services {
 		if e := validation.IsDNS1123Subdomain(name); len(e) > 0 {
 			return nil, fmt.Errorf("sorry, we do not support the potentially valid docker compose service named %s: %s", name, e[0])
 		}
 		service := &Service{
 			DockerComposeService: dcService,
-			Name:                 name,
 			NameEscaped:          util.EscapeName(name),
 		}
 		for _, portBinding := range dcService.Ports {
@@ -82,7 +73,7 @@ func New(files []string) (*Config, error) {
 				Port:     portBinding.Internal,
 			})
 		}
-		cfg.Services[dcService] = service
+		cfg.Services[name] = service
 	}
 	err = loadXKubeCompose(cfg, dcCfg.XProperties)
 	if err != nil {
@@ -157,34 +148,24 @@ func loadClusterImageStorage(cfg *Config, v *clusterImageStorage) error {
 }
 
 // AddService adds a service to this configuration.
-func (cfg *Config) AddService(name string, dockerComposeService *dockerComposeConfig.Service) *Service {
-	service1 := cfg.FindServiceByName(name)
-	service2 := cfg.FindService(dockerComposeService)
-	if service1 != nil || service2 != nil {
-		if service1 == nil {
-			panic("dockerComposeService was previously registered with a different name")
-		} else if service2 == nil {
-			panic("a service with name already exists")
-		}
+func (cfg *Config) AddService(dockerComposeService *dockerComposeConfig.Service) *Service {
+	service := cfg.Services[dockerComposeService.Name]
+	if service != nil {
+		panic("a docker compose service with that name is already registered")
 	} else {
 		if dockerComposeService.DependsOn != nil {
 			panic("cannot add dockerComposeService that has dependencies")
 		}
-		service1 = &Service{
+		service = &Service{
 			DockerComposeService: dockerComposeService,
-			Name:                 name,
-			NameEscaped:          util.EscapeName(name),
+			NameEscaped:          util.EscapeName(dockerComposeService.Name),
 		}
 		if cfg.Services == nil {
-			cfg.Services = map[*dockerComposeConfig.Service]*Service{}
+			cfg.Services = map[string]*Service{}
 		}
-		cfg.Services[dockerComposeService] = service1
-		if cfg.dockerComposeServices == nil {
-			cfg.dockerComposeServices = map[string]*dockerComposeConfig.Service{}
-		}
-		cfg.dockerComposeServices[name] = dockerComposeService
+		cfg.Services[dockerComposeService.Name] = service
 	}
-	return service1
+	return service
 }
 
 // MatchesFilter determines whether a service (by name) matches the current filter.
@@ -212,7 +193,7 @@ func (cfg *Config) AddToFilter(service *Service) {
 		if !service1.matchesFilter {
 			service1.matchesFilter = true
 			for d := range service1.DockerComposeService.DependsOn {
-				service2 := cfg.FindService(d)
+				service2 := cfg.Services[d]
 				if n < len(queue) {
 					queue[n] = service2
 				} else {

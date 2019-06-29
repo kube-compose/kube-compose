@@ -50,7 +50,7 @@ func (g *getRunner) run() (*ServiceDetails, error) {
 		return nil, err
 	}
 	details := &ServiceDetails{
-		Name:      g.service.Name,
+		Name:      g.service.Name(),
 		Hostname:  result.Name + "." + result.Namespace + ".svc.cluster.local",
 		ClusterIP: result.Spec.ClusterIP,
 	}

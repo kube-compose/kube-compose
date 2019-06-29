@@ -33,13 +33,13 @@ func InitObjectMeta(cfg *config.Config, objectMeta *metav1.ObjectMeta, composeSe
 	if objectMeta.Annotations == nil {
 		objectMeta.Annotations = map[string]string{}
 	}
-	objectMeta.Annotations[AnnotationName] = composeService.Name
+	objectMeta.Annotations[AnnotationName] = composeService.Name()
 }
 
 // FindFromObjectMeta finds a docker compose service from resource metadata.
 func FindFromObjectMeta(cfg *config.Config, objectMeta *metav1.ObjectMeta) *config.Service {
 	if composeServiceName, ok := objectMeta.Annotations[AnnotationName]; ok {
-		composeService := cfg.FindServiceByName(composeServiceName)
+		composeService := cfg.Services[composeServiceName]
 		if composeService != nil {
 			return composeService
 		}

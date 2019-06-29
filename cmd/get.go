@@ -42,7 +42,7 @@ func getCommand(cmd *cobra.Command, args []string) error {
 			os.Exit(1)
 		}
 	}
-	service := cfg.FindServiceByName(args[0])
+	service := cfg.Services[args[0]]
 	d, err := details.GetServiceDetails(cfg, service)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

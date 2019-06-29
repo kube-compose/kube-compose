@@ -107,7 +107,7 @@ func getCommandConfig(cmd *cobra.Command, args []string) (*config.Config, error)
 		}
 	} else {
 		for _, arg := range args {
-			service := cfg.FindServiceByName(arg)
+			service := cfg.Services[arg]
 			if service == nil {
 				fmt.Fprintf(os.Stderr, "no service named %#v exists\n", arg)
 				os.Exit(1)

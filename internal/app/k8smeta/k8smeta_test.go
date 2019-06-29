@@ -10,16 +10,18 @@ import (
 
 func newTestConfig() *config.Config {
 	cfg := &config.Config{}
-	cfg.AddService("a", &dockerComposeConfig.Service{})
+	cfg.AddService(&dockerComposeConfig.Service{
+		Name: "a",
+	})
 	return cfg
 }
 
 func TestFindFromObjectMeta_AnnotationSuccess(t *testing.T) {
 	cfg := newTestConfig()
-	serviceA := cfg.FindServiceByName("a")
+	serviceA := cfg.Services["a"]
 	objectMeta := metav1.ObjectMeta{
 		Annotations: map[string]string{
-			AnnotationName: serviceA.Name,
+			AnnotationName: serviceA.Name(),
 		},
 	}
 	composeService := FindFromObjectMeta(cfg, &objectMeta)
@@ -50,7 +52,9 @@ func TestInitObjectMeta_Success(t *testing.T) {
 	cfg := &config.Config{
 		EnvironmentID: "myenv",
 	}
-	serviceA := cfg.AddService("a", &dockerComposeConfig.Service{})
+	serviceA := cfg.AddService(&dockerComposeConfig.Service{
+		Name: "a",
+	})
 	objectMeta := metav1.ObjectMeta{}
 	InitObjectMeta(cfg, &objectMeta, serviceA)
 }
