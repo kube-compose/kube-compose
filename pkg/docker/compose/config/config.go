@@ -296,7 +296,7 @@ func (c *configLoader) resolveExtends(
 			return nil, extendsNotFoundError(s.name, dcFile.resolvedFile, s.Extends.Service, dcFileExtended.resolvedFile)
 		}
 	}
-	if sExtended.DependsOn != nil {
+	if sExtended.DependsOn != nil && len(sExtended.DependsOn.Values) > 0 {
 		return nil, fmt.Errorf("cannot extend service %s: services with 'depends_on' cannot be extended",
 			s.Extends.Service,
 		)

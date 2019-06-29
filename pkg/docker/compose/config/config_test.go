@@ -25,7 +25,8 @@ const testDockerComposeYmlDependsOnDoesNotExist = "/docker-compose.depends-on-do
 const testDockerComposeYmlDependsOnCycle1 = "/docker-compose.depends-on-cycle-1.yml"
 const testDockerComposeYmlDependsOnCycle2 = "/docker-compose.depends-on-cycle-2.yml"
 const testDockerComposeYmlDependsOn = "/docker-compose.depends-on.yml"
-const testDockerComposeYmlInvalidHealthcheck = "/docker-compose.invalid-healthcheck.yml"
+const testDockerComposeYmlInvalidHealthcheck1 = "/docker-compose.invalid-healthcheck-1.yml"
+const testDockerComposeYmlInvalidHealthcheck2 = "/docker-compose.invalid-healthcheck-2.yml"
 
 var mockFS = fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 	testDockerComposeYml: {
@@ -172,12 +173,20 @@ services:
   service3: {}
 `),
 	},
-	testDockerComposeYmlInvalidHealthcheck: {
+	testDockerComposeYmlInvalidHealthcheck1: {
 		Content: []byte(`version: '2.3'
 services:
   service1:
 	healthcheck:
       timeout: henkie
+`),
+	},
+	testDockerComposeYmlInvalidHealthcheck2: {
+		Content: []byte(`version: '2.3'
+services:
+  service1:
+	healthcheck:
+      test: []
 `),
 	},
 })
@@ -257,6 +266,7 @@ func Test_ConfigLoader_ParseEnvironment_Success(t *testing.T) {
 		t.Error(output)
 	}
 }
+
 func Test_ConfigLoader_ParseEnvironment_InvalidName(t *testing.T) {
 	input := []environmentNameValuePair{
 		{
@@ -779,10 +789,20 @@ func Test_New_DependsOnSuccess(t *testing.T) {
 	})
 }
 
-func Test_New_InvalidHealthcheckError(t *testing.T) {
+func Test_New_InvalidHealthcheckError1(t *testing.T) {
 	withMockFS(func() {
 		_, err := New([]string{
-			testDockerComposeYmlInvalidHealthcheck,
+			testDockerComposeYmlInvalidHealthcheck1,
+		})
+		if err == nil {
+			t.Fail()
+		}
+	})
+}
+func Test_New_InvalidHealthcheckError2(t *testing.T) {
+	withMockFS(func() {
+		_, err := New([]string{
+			testDockerComposeYmlInvalidHealthcheck2,
 		})
 		if err == nil {
 			t.Fail()
@@ -803,11 +823,10 @@ func Test_New_IOError(t *testing.T) {
 	})
 }
 
-func Test_New_MultipleFiles(t *testing.T) {
+func Test_New_ExtendsCycle1(t *testing.T) {
 	withMockFS(func() {
 		_, err := New([]string{
-			testDockerComposeYml,
-			testDockerComposeYmlExtends,
+			testDockerComposeYmlExtendsCycle,
 		})
 		if err == nil {
 			t.Fail()
@@ -817,9 +836,10 @@ func Test_New_MultipleFiles(t *testing.T) {
 	})
 }
 
-func Test_New_ExtendsCycle(t *testing.T) {
+func Test_New_ExtendsCycle2(t *testing.T) {
 	withMockFS(func() {
 		_, err := New([]string{
+			testDockerComposeYmlExtendsCycle,
 			testDockerComposeYmlExtendsCycle,
 		})
 		if err == nil {
@@ -917,9 +937,35 @@ func Test_New_ExtendsDoesNotExist(t *testing.T) {
 		}
 	})
 }
+func Test_New_ExtendsDoesNotExistMerged(t *testing.T) {
+	withMockFS(func() {
+		_, err := New([]string{
+			testDockerComposeYmlExtendsDoesNotExist,
+			testDockerComposeYmlExtendsDoesNotExist,
+		})
+		if err == nil {
+			t.Fail()
+		} else {
+			t.Log(err)
+		}
+	})
+}
 func Test_New_ExtendsDoesNotExistFile(t *testing.T) {
 	withMockFS(func() {
 		_, err := New([]string{testDockerComposeYmlExtendsDoesNotExistFile})
+		if err == nil {
+			t.Fail()
+		} else {
+			t.Log(err)
+		}
+	})
+}
+func Test_New_ExtendsDoesNotExistFileMerged(t *testing.T) {
+	withMockFS(func() {
+		_, err := New([]string{
+			testDockerComposeYmlExtendsDoesNotExistFile,
+			testDockerComposeYmlExtendsDoesNotExistFile,
+		})
 		if err == nil {
 			t.Fail()
 		} else {
