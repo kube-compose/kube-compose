@@ -14,11 +14,13 @@ kube-compose creates and destroys environments in Kubernetes based on docker com
 * [Examples](#Examples)
   * [Waiting for startup and startup order](#Waiting-for-startup-and-startup-order)
   * [Volumes](#Volumes)
-    * [x-kube-compose configuration](#x-kube-compose-configuration)
     * [Limitations](#Limitations)
   * [Running containers as specific users](#Running-containers-as-specific-users)
   * [Dynamic test configuration](#Dynamic-test-configuration)
-* [Known limitations](#Known-limitations)
+* [User guide](#User-guide)
+  * [Known limitations](#Known-limitations)
+  * [x-kube-compose](#x-kube-compose)
+    * [Merging](#Merging)
 * [Developer information](#Developer-information)
 
 # Installation
@@ -110,12 +112,7 @@ NOTE: in the background `kube-compose` converts [Docker healthchecks](https://do
 ## Volumes
 `kube-compose` currently supports a basic simulation of `docker-compose`'s bind mounted volumes. This supports the use case of mounting configuration files into containers, which is a common way of parameterising containers (in CI).
 
-`kube-compose` implements this by:
-1. Building a helper image with the relevant host files;
-1. Running the helper image as an [initContainer](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/) that initialises an [emptyDir](https://kubernetes.io/docs/concepts/storage/volumes/) volume; -and
-1. Mounting the emptyDir volume into the application container at the configured mount path.
-
-Simulation of bind mounted volumes can be seen in action by running the `up` command with the following docker compose YAML:
+For examle, consider the following docker compose file:
 ```yaml
 version: '2.4'
 services:
@@ -131,20 +128,19 @@ services:
     - './docker-compose.yml:/mnt/inception:ro'
 x-kube-compose:
   cluster_image_storage:
-    # Change to type: 'docker' when using Docker Desktop's cluster
-    type: 'docker_registry'
-    host: 'docker-registry.apps.openshift-cluster.example.com'
+    type: 'docker'
   volume_init_base_image: 'ubuntu:latest'
 ```
-The example creates a pod that prints the contents of the docker compose YAML that describes it.
+It describes a service that prints the contents of the host file `./docker-compose.yaml`, using a bind mounted volume. When `kube-compose`'s `up` command is run against the above file, `kube-compose` simulates the bind mounted volume by:
+1. Building a helper image with the relevant host files (in this case only `./docker-compose.yaml`);
+1. Running the helper image as an [initContainer](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/) that initialises an [emptyDir](https://kubernetes.io/docs/concepts/storage/volumes/) volume; -and
+1. Mounting the emptyDir volume into the main container at the configured mount path.
 
-### x-kube-compose configuration
-Because `kube-compose` builds and runs helper images, both a base image (see `volume_init_base_image`) and a image storage location need to be configured. The base image must have `bash` and `cp` installed. The image storage location can be a docker registry or a docker daemon (typically the local docker daemon). The latter can be used to test locally with [Docker Dekstop's cluster](https://docs.docker.com/docker-for-mac/kubernetes/).
+The additional `x-kube-compose` configuration is required so that:
+1. `kube-compose` knows where to store docker images so that the Kubernetes cluster can run them.
+2. `kube-compose` knowns which base image to use for helper images.
 
-Currently `kube-compose` can only push to docker registries that are configured like OpenShift's default docker registry. In particular, `kube-compose` makes the following assumptions when the image storage location is a docker registry:
-1. Within the cluster the hostname of the docker registry is assumed to be `docker-registry.default.svc:5000`.
-1. The kube configuration is assumed to have bearer token credentials, that are supplied as the password to the docker registry (the username will be `unused`). If the docker registry is unauthenticated then this authentication should be ignored.
-1. References to pushed images have the form `<registry>/<project>/<imagestream>:latest`, [as required by OpenShift](https://blog.openshift.com/remotely-push-pull-container-images-openshift/).
+NOTE: a `cluster_image_storage` with `type: docker` typically only works with [Docker Desktop](https://www.docker.com/products/docker-desktop)'s Kubernetes cluster. See [this section](#x-kube-compose) on how to configure other clusters.
 
 ### Limitations
 1. Volumes that are not bind mounted volumes are ignored.
@@ -176,11 +172,37 @@ my-service-myenv.mynamespace.svc.cluster.local
 
 The `get` subcommand of `kube-compose` allows dynamic test configuration to be generated through simple Shell scripts.
 
-# Known limitations
+# User guide
+## Known limitations
 1. The `up` subcommand does not build images of `docker-compose` services if they are not present locally ([#188](https://github.com/kube-compose/kube-compose/issues/188)).
 1. If no `-f` and `--file` flags are present then `kube-compose` never looks for a `docker-compose.yml` or `docker-compose.yaml` file in parents of the current working directory ([#151](https://github.com/kube-compose/kube-compose/issues/151)).
 1. `kube-compose` never loads `docker-compose.override.yml` and `docker-compose.override.yaml` files and behaves as if those do not exists ([#124](https://github.com/kube-compose/kube-compose/issues/124)).
 1. Volumes: see [this section](#Limitations).
+
+## x-kube-compose
+`x-kube-compose` is an additional configuration section in docker compose files. It is required by `kube-compose`'s simulation of bind mounted volumes (see [Volumes](#Volumes)), and it can also be set to make `kube-compose` push images to a different docker registry as part of deployments. For example, consider the following docker compose file:
+```yaml
+version: '3'
+services:
+    service1:
+        image: 'docker-registry.example.com/ubuntu:latest'
+x-kube-compose:
+    cluster_image_storage:
+        type: 'docker_registry'
+        host: 'docker-registry.openshift-cluster.example.com'
+    volume_init_base_image: 'docker-registry.example.com/ubuntu:latest'
+```
+The `volume_init_base_image` configuration item specifies the base image of helper images built to implement bind mounted volumes. This option is useful for corporate networks that do not have a proxy or docker registry mirror available. The base image must have `bash` and `cp` installed.
+
+The `cluster_image_storage` configuration item includes the field `type` which must be either `docker` or `docker_registry`, denoting a docker daemon or a docker registry. The former can be used when deploying to [Docker Dekstop's cluster](https://docs.docker.com/docker-for-mac/kubernetes/). The latter also implies that a field `host` (the host of the docker registry) must be included.
+
+Currently `kube-compose` can only push to docker registries that are configured like OpenShift's default docker registry. In particular, `kube-compose` makes the following assumptions when the image storage location is a docker registry:
+1. Within the cluster the hostname of the docker registry is assumed to be `docker-registry.default.svc:5000`.
+1. The kube configuration is assumed to have bearer token credentials, that are supplied as the password to the docker registry (the username will be `unused`). If the docker registry is unauthenticated then this authentication should be ignored.
+1. References to pushed images have the form `<registry>/<project>/<imagestream>:latest`, [as required by OpenShift](https://blog.openshift.com/remotely-push-pull-container-images-openshift/).
+
+### Merging
+When specifying multiple files on the command line, the `x-kube-compose` section will also be merged.
 
 # Developer information
 
