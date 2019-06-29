@@ -4,17 +4,15 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jbrekelmans/kube-compose/internal/app/config"
-	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
+	"github.com/kube-compose/kube-compose/internal/app/config"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/util/validation"
 
 	// Plugin does not export any functions therefore it is ignored IE. "_"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/tools/clientcmd"
 )
-
-const envVarPrefix = "KUBECOMPOSE_"
 
 var envGetter = os.LookupEnv
 
@@ -35,29 +33,35 @@ func setFromKubeConfig(cfg *config.Config) error {
 	return nil
 }
 
-func getFileFlag(cmd *cobra.Command) (*string, error) {
-	var file *string
+func getFileFlags(cmd *cobra.Command) ([]string, error) {
+	var files []string
 	if cmd.Flags().Changed(fileFlagName) {
-		fileStr, err := cmd.Flags().GetString(fileFlagName)
+		var err error
+		files, err = cmd.Flags().GetStringSlice(fileFlagName)
 		if err != nil {
 			return nil, err
 		}
-		file = util.NewString(fileStr)
 	}
-	return file, nil
+	return files, nil
 }
 
 func getEnvIDFlag(cmd *cobra.Command) (string, error) {
 	var envID string
 	var exists bool
 	if !cmd.Flags().Changed(envIDFlagName) {
-		envID, exists = envGetter(envVarPrefix + "ENVID")
+		envID, exists = envGetter(envIDEnvVarName)
 		if !exists {
-			return "", fmt.Errorf("either the flag --env-id or the environment variable %sENVID must be set", envVarPrefix)
+			return "", fmt.Errorf("either the flag --env-id or the environment variable %s must be set", envIDEnvVarName)
 		}
-		return envID, nil
+		if e := validation.IsValidLabelValue(envID); len(e) > 0 {
+			return "", fmt.Errorf("the environment variable %s must be a valid label value: %s", envIDEnvVarName, e[0])
+		}
+	} else {
+		envID, _ = cmd.Flags().GetString(envIDFlagName)
+		if e := validation.IsValidLabelValue(envID); len(e) > 0 {
+			return "", fmt.Errorf("the --env-id flag must be a valid label value: %s", e[0])
+		}
 	}
-	envID, _ = cmd.Flags().GetString(envIDFlagName)
 	return envID, nil
 }
 
@@ -65,7 +69,7 @@ func getNamespaceFlag(cmd *cobra.Command) (string, bool) {
 	var namespace string
 	var exists bool
 	if !cmd.Flags().Changed(namespaceFlagName) {
-		namespace, exists = envGetter(envVarPrefix + "NAMESPACE")
+		namespace, exists = envGetter(namespaceEnvVarName)
 		if !exists {
 			return "", false
 		}
@@ -80,16 +84,18 @@ func getCommandConfig(cmd *cobra.Command, args []string) (*config.Config, error)
 	if err != nil {
 		return nil, err
 	}
-	file, err := getFileFlag(cmd)
+	files, err := getFileFlags(cmd)
 	if err != nil {
 		return nil, err
 	}
-	cfg, err := config.New(file)
+	cfg, err := config.New(files)
 	if err != nil {
-		return nil, err
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 	if err := setFromKubeConfig(cfg); err != nil {
-		return nil, err
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 	cfg.EnvironmentID = envID
 	if namespace, exists := getNamespaceFlag(cmd); exists {
@@ -101,9 +107,10 @@ func getCommandConfig(cmd *cobra.Command, args []string) (*config.Config, error)
 		}
 	} else {
 		for _, arg := range args {
-			service := cfg.FindServiceByName(arg)
+			service := cfg.Services[arg]
 			if service == nil {
-				return nil, fmt.Errorf("no service named %#v does exists", arg)
+				fmt.Fprintf(os.Stderr, "no service named %#v exists\n", arg)
+				os.Exit(1)
 			}
 			cfg.AddToFilter(service)
 		}

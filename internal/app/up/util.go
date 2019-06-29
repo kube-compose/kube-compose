@@ -17,10 +17,10 @@ import (
 	dockerFilters "github.com/docker/docker/api/types/filters"
 	dockerClient "github.com/docker/docker/client"
 	dockerArchive "github.com/docker/docker/pkg/archive"
-	"github.com/jbrekelmans/kube-compose/internal/pkg/docker"
-	"github.com/jbrekelmans/kube-compose/internal/pkg/linux"
-	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
-	dockerComposeConfig "github.com/jbrekelmans/kube-compose/pkg/docker/compose/config"
+	"github.com/kube-compose/kube-compose/internal/pkg/docker"
+	"github.com/kube-compose/kube-compose/internal/pkg/unix"
+	"github.com/kube-compose/kube-compose/internal/pkg/util"
+	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 )
@@ -125,7 +125,7 @@ func copyFileFromContainer(ctx context.Context, dc *dockerClient.Client, contain
 	}
 	defer util.CloseAndLogError(readCloser)
 	if (stat.Mode & os.ModeType) != 0 {
-		// TODO https://github.com/jbrekelmans/kube-compose/issues/70 we should follow symlinks
+		// TODO https://github.com/kube-compose/kube-compose/issues/70 we should follow symlinks
 		return fmt.Errorf("could not copy %#v because it is not a regular file", srcFile)
 	}
 	srcInfo := dockerArchive.CopyInfo{
@@ -136,7 +136,7 @@ func copyFileFromContainer(ctx context.Context, dc *dockerClient.Client, contain
 	}
 	err = dockerArchive.CopyTo(readCloser, srcInfo, dstFile)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("error while copying image file %#v to local file %#v", srcFile, dstFile))
+		return errors.Wrapf(err, "error while copying image file %#v to local file %#v", srcFile, dstFile)
 	}
 	return nil
 }
@@ -175,14 +175,14 @@ func getUserinfoFromImage(ctx context.Context, dc *dockerClient.Client, image st
 }
 
 func getUserinfoFromImageUID(ctx context.Context, dc *dockerClient.Client, containerID, tmpDir string, user *docker.Userinfo) error {
-	// TODO https://github.com/jbrekelmans/kube-compose/issues/70 this is not correct for non-Linux containers
+	// TODO https://github.com/kube-compose/kube-compose/issues/70 this is not correct for non-Linux containers
 	if user.UID == nil {
-		err := copyFileFromContainer(ctx, dc, containerID, "/etc/passwd", tmpDir)
+		err := copyFileFromContainer(ctx, dc, containerID, unix.EtcPasswd, tmpDir)
 		if err != nil {
 			return err
 		}
 		var uid *int64
-		uid, err = linux.FindUserInPasswd(path.Join(tmpDir, "passwd"), user.User)
+		uid, err = unix.FindUIDByNameInPasswd(path.Join(tmpDir, "passwd"), user.User)
 		if err != nil {
 			return err
 		}
@@ -195,14 +195,14 @@ func getUserinfoFromImageUID(ctx context.Context, dc *dockerClient.Client, conta
 }
 
 func getUserinfoFromImageGID(ctx context.Context, dc *dockerClient.Client, containerID, tmpDir string, user *docker.Userinfo) error {
-	// TODO https://github.com/jbrekelmans/kube-compose/issues/70 this is not correct for non-Linux containers
+	// TODO https://github.com/kube-compose/kube-compose/issues/70 this is not correct for non-Linux containers
 	if user.GID == nil && user.Group != "" {
 		err := copyFileFromContainer(ctx, dc, containerID, "/etc/group", tmpDir)
 		if err != nil {
 			return err
 		}
 		var gid *int64
-		gid, err = linux.FindUserInPasswd(path.Join(tmpDir, "group"), user.Group)
+		gid, err = unix.FindUIDByNameInPasswd(path.Join(tmpDir, "group"), user.Group)
 		if err != nil {
 			return err
 		}
@@ -313,7 +313,7 @@ func pullImageWithLogging(ctx context.Context, puller docker.ImagePuller, appNam
 	return digest, nil
 }
 
-func pushImageWithLogging(ctx context.Context, pusher docker.ImagePusher, appName, image, bearerToken string) (string, error) {
+func pushImageWithLogging(ctx context.Context, pusher docker.ImagePusher, appName, image, bearerToken, imageDescr string) (string, error) {
 	lastLogTime := time.Now().Add(-2 * time.Second)
 	registryAuth := docker.EncodeRegistryAuth("unused", bearerToken)
 	digest, err := docker.PushImage(ctx, pusher, image, registryAuth, func(push *docker.PullOrPush) {
@@ -322,12 +322,12 @@ func pushImageWithLogging(ctx context.Context, pusher docker.ImagePusher, appNam
 		if elapsed >= 2*time.Second {
 			lastLogTime = t
 			progress := push.Progress()
-			fmt.Printf("app %s: pushing image %s (%.1f%%)\n", appName, image, progress*100.0)
+			fmt.Printf("app %s: pushing %s %s (%.1f%%)\n", appName, imageDescr, image, progress*100.0)
 		}
 	})
 	if err != nil {
 		return "", err
 	}
-	fmt.Printf("app %s: pushing image %s (%.1f%%) @%s\n", appName, image, 100.0, digest)
+	fmt.Printf("app %s: pushing %s %s (%.1f%%) @%s\n", appName, imageDescr, image, 100.0, digest)
 	return digest, err
 }

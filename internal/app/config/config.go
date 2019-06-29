@@ -3,39 +3,45 @@ package config
 import (
 	"fmt"
 
-	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
-	dockerComposeConfig "github.com/jbrekelmans/kube-compose/pkg/docker/compose/config"
+	"github.com/kube-compose/kube-compose/internal/pkg/util"
+	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
 	"github.com/pkg/errors"
 	"github.com/uber-go/mapdecode"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/rest"
 )
 
-type PushImagesConfig struct {
-	DockerRegistry string `mapdecode:"docker_registry"`
+type DockerRegistryClusterImageStorage struct {
+	Host string
 }
 
 type Service struct {
 	DockerComposeService *dockerComposeConfig.Service
 	matchesFilter        bool
-	Name                 string
 	NameEscaped          string
 	Ports                []Port
 }
 
-type Config struct {
-	dockerComposeServices map[string]*dockerComposeConfig.Service
+func (s *Service) Name() string {
+	return s.DockerComposeService.Name
+}
 
+type ClusterImageStorage struct {
+	Docker         *struct{}
+	DockerRegistry *DockerRegistryClusterImageStorage
+}
+
+type Config struct {
 	// All Kubernetes resources are named with "-"+EnvironmentID as a suffix,
 	// and have an additional label "env="+EnvironmentID so that namespaces can be shared.
-	EnvironmentID    string
-	EnvironmentLabel string
+	EnvironmentID       string
+	EnvironmentLabel    string
+	KubeConfig          *rest.Config
+	Namespace           string
+	ClusterImageStorage ClusterImageStorage
+	VolumeInitBaseImage *string
 
-	KubeConfig *rest.Config
-	Namespace  string
-	PushImages *PushImagesConfig
-
-	Services map[*dockerComposeConfig.Service]*Service
+	Services map[string]*Service
 }
 
 type Port struct {
@@ -44,19 +50,7 @@ type Port struct {
 	Protocol string
 }
 
-func (cfg *Config) FindServiceByName(name string) *Service {
-	return cfg.FindService(cfg.dockerComposeServices[name])
-}
-
-func (cfg *Config) FindService(dockerComposeService *dockerComposeConfig.Service) *Service {
-	return cfg.Services[dockerComposeService]
-}
-
-func New(file *string) (*Config, error) {
-	var files []string
-	if file != nil {
-		files = append(files, *file)
-	}
+func New(files []string) (*Config, error) {
 	cfg := &Config{
 		EnvironmentLabel: "env",
 	}
@@ -64,18 +58,13 @@ func New(file *string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg.dockerComposeServices = dcCfg.Services
-	cfg.Services = map[*dockerComposeConfig.Service]*Service{}
+	cfg.Services = map[string]*Service{}
 	for name, dcService := range dcCfg.Services {
 		if e := validation.IsDNS1123Subdomain(name); len(e) > 0 {
 			return nil, fmt.Errorf("sorry, we do not support the potentially valid docker compose service named %s: %s", name, e[0])
 		}
-		if dcService.EntrypointPresent && len(dcService.Entrypoint) == 0 {
-			return nil, fmt.Errorf("error at docker compose service %s: entrypoint cannot be set to an empty array", name)
-		}
 		service := &Service{
 			DockerComposeService: dcService,
-			Name:                 name,
 			NameEscaped:          util.EscapeName(name),
 		}
 		for _, portBinding := range dcService.Ports {
@@ -84,54 +73,99 @@ func New(file *string) (*Config, error) {
 				Port:     portBinding.Internal,
 			})
 		}
-		cfg.Services[dcService] = service
+		cfg.Services[name] = service
 	}
-	var custom struct {
-		Custom struct {
-			PushImages *PushImagesConfig `mapdecode:"push_images"`
-		} `mapdecode:"x-kube-compose"`
-	}
-	err = mapdecode.Decode(&custom, dcCfg.XProperties, mapdecode.IgnoreUnused(true))
+	err = loadXKubeCompose(cfg, dcCfg.XProperties)
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("error while parsing x-kube-compose of %#v", *file))
+		return nil, err
 	}
-
-	if custom.Custom.PushImages != nil {
-		cfg.PushImages = custom.Custom.PushImages
-	}
-
 	return cfg, nil
 }
 
-// AddService adds a service to this configuration.
-func (cfg *Config) AddService(name string, dockerComposeService *dockerComposeConfig.Service) *Service {
-	service1 := cfg.FindServiceByName(name)
-	service2 := cfg.FindService(dockerComposeService)
-	if service1 != nil || service2 != nil {
-		if service1 == nil {
-			panic("dockerComposeService was previously registered with a different name")
-		} else if service2 == nil {
-			panic("a service with name already exists")
+type clusterImageStorage struct {
+	Type string  `mapdecode:"type"`
+	Host *string `mapdecode:"host"`
+}
+
+type xKubeCompose struct {
+	XKubeCompose struct {
+		ClusterImageStorage *clusterImageStorage `mapdecode:"cluster_image_storage"`
+		PushImages          *struct {
+			DockerRegistry string `mapdecode:"docker_registry"`
+		} `mapdecode:"push_images"`
+		VolumeInitBaseImage *string `mapdecode:"volume_init_base_image"`
+	} `mapdecode:"x-kube-compose"`
+}
+
+func loadXKubeCompose(cfg *Config, xPropertiesSlice []dockerComposeConfig.XProperties) error {
+	for i := len(xPropertiesSlice) - 1; i >= 0; i-- {
+		var x xKubeCompose
+		err := mapdecode.Decode(&x, xPropertiesSlice[i], mapdecode.IgnoreUnused(true))
+		if err != nil {
+			return errors.Wrap(err, "error while parsing \"x-kube-compose\" of a docker compose file")
 		}
+		if x.XKubeCompose.ClusterImageStorage != nil {
+			if x.XKubeCompose.PushImages != nil {
+				return fmt.Errorf("a docker compose file cannot set both \"x-kube-compose\".\"push_images\" and \"x-kube-compose\"." +
+					"\"cluster_image_storage\"")
+			}
+			err = loadClusterImageStorage(cfg, x.XKubeCompose.ClusterImageStorage)
+			if err != nil {
+				return err
+			}
+		} else if x.XKubeCompose.PushImages != nil {
+			fmt.Println("WARNING: a docker compose file has set \"x-kube-compose\".\"push_images\", but this functionality is deprecated. " +
+				"See https://github.com/kube-compose/kube-compose.")
+			cfg.ClusterImageStorage.Docker = nil
+			cfg.ClusterImageStorage.DockerRegistry = &DockerRegistryClusterImageStorage{
+				Host: x.XKubeCompose.PushImages.DockerRegistry,
+			}
+		}
+		cfg.VolumeInitBaseImage = x.XKubeCompose.VolumeInitBaseImage
+	}
+	return nil
+}
+
+func loadClusterImageStorage(cfg *Config, v *clusterImageStorage) error {
+	cfg.ClusterImageStorage.Docker = nil
+	cfg.ClusterImageStorage.DockerRegistry = nil
+	switch v.Type {
+	case "docker":
+		cfg.ClusterImageStorage.Docker = &struct{}{}
+	case "docker_registry":
+		if v.Host == nil {
+			return fmt.Errorf("a docker compose file is missing a required value at \"x-kube-compose\".\"cluster_image_storage\"." +
+				"\"host\"")
+		}
+		cfg.ClusterImageStorage.DockerRegistry = &DockerRegistryClusterImageStorage{
+			Host: *v.Host,
+		}
+	default:
+		return fmt.Errorf("a docker compose file has an invalid value at \"x-kube-compose\".\"cluster_image_storage\".\"type\": " +
+			"value must be one of \"docker\" and \"docker_registry\"")
+	}
+	return nil
+}
+
+// AddService adds a service to this configuration.
+func (cfg *Config) AddService(dockerComposeService *dockerComposeConfig.Service) *Service {
+	service := cfg.Services[dockerComposeService.Name]
+	if service != nil {
+		panic("a docker compose service with that name is already registered")
 	} else {
-		if len(dockerComposeService.DependsOn) > 0 {
+		if dockerComposeService.DependsOn != nil {
 			panic("cannot add dockerComposeService that has dependencies")
 		}
-		service1 = &Service{
+		service = &Service{
 			DockerComposeService: dockerComposeService,
-			Name:                 name,
-			NameEscaped:          util.EscapeName(name),
+			NameEscaped:          util.EscapeName(dockerComposeService.Name),
 		}
 		if cfg.Services == nil {
-			cfg.Services = map[*dockerComposeConfig.Service]*Service{}
+			cfg.Services = map[string]*Service{}
 		}
-		cfg.Services[dockerComposeService] = service1
-		if cfg.dockerComposeServices == nil {
-			cfg.dockerComposeServices = map[string]*dockerComposeConfig.Service{}
-		}
-		cfg.dockerComposeServices[name] = dockerComposeService
+		cfg.Services[dockerComposeService.Name] = service
 	}
-	return service1
+	return service
 }
 
 // MatchesFilter determines whether a service (by name) matches the current filter.
@@ -159,7 +193,7 @@ func (cfg *Config) AddToFilter(service *Service) {
 		if !service1.matchesFilter {
 			service1.matchesFilter = true
 			for d := range service1.DockerComposeService.DependsOn {
-				service2 := cfg.FindService(d)
+				service2 := cfg.Services[d]
 				if n < len(queue) {
 					queue[n] = service2
 				} else {

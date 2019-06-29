@@ -5,7 +5,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
+	"github.com/kube-compose/kube-compose/internal/pkg/util"
 )
 
 type Userinfo struct {

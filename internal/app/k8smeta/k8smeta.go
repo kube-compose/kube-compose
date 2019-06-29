@@ -3,7 +3,7 @@ package k8smeta
 import (
 	"fmt"
 
-	"github.com/jbrekelmans/kube-compose/internal/app/config"
+	"github.com/kube-compose/kube-compose/internal/app/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -33,18 +33,18 @@ func InitObjectMeta(cfg *config.Config, objectMeta *metav1.ObjectMeta, composeSe
 	if objectMeta.Annotations == nil {
 		objectMeta.Annotations = map[string]string{}
 	}
-	objectMeta.Annotations[AnnotationName] = composeService.Name
+	objectMeta.Annotations[AnnotationName] = composeService.Name()
 }
 
 // FindFromObjectMeta finds a docker compose service from resource metadata.
-func FindFromObjectMeta(cfg *config.Config, objectMeta *metav1.ObjectMeta) (*config.Service, error) {
+func FindFromObjectMeta(cfg *config.Config, objectMeta *metav1.ObjectMeta) *config.Service {
 	if composeServiceName, ok := objectMeta.Annotations[AnnotationName]; ok {
-		composeService := cfg.FindServiceByName(composeServiceName)
+		composeService := cfg.Services[composeServiceName]
 		if composeService != nil {
-			return composeService, nil
+			return composeService
 		}
 	}
-	return nil, nil
+	return nil
 }
 
 func GetK8sName(service *config.Service, cfg *config.Config) string {

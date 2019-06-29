@@ -1,28 +1,31 @@
-version: "2.1"
+version: '2'
 services:
   authentication-service:
-    entrypoint: ["/bin/bash", "-c", "STOP=0; trap 'STOP=1' INT; while [[ $$STOP -eq 0 ]]; do sleep 1; done"]
-    image: ubuntu:latest
-    environment:
-    - ASDF=10
-    - HENK
     depends_on:
       db:
         condition: service_healthy
+    depends_on: ["db"]
+    entrypoint: ["/bin/bash", "-c", "STOP=0; trap 'STOP=1' INT; while [[ $$STOP -eq 0 ]]; do sleep 1; echo 'heartbeat'; done"]
     environment:
-      DB_URL: postgresql://db:5432
+    - ASDF=10
+    - DB_URL=postgresql://db:5432
+    - HENK
+    image: ubuntu:latest
     ports:
     - "8080"
     - "8080"
     working_dir: /app/test
+    volumes:
+    - './docker-compose.yml:/mnt/vol1/docker-compose.yml:ro'
+    - './data:/mnt/vol2/root:ro'
   generic-service:
-    image: ubuntu:latest
+    image: ubuntu:latest2
     environment:
       ENVVAR_EXTENDS: test
     ports:
-      - 8235:8234
+      - 8236:8234
   permission-service:
-    entrypoint: ["/bin/bash", "-c", "STOP=0; trap 'STOP=1' INT; while [[ $$STOP -eq 0 ]]; do sleep 1; done"]
+    entrypoint: ["/bin/bash", "-c", "STOP=0; trap 'STOP=1' INT; while [[ $$STOP -eq 0 ]]; do sleep 1; echo 'heartbeat'; done"]
     image: ubuntu:latest
     extends:
       service: generic-service
@@ -32,8 +35,11 @@ services:
       ENVVAR_FLOAT1: 23.15
       ENVVAR_FLOAT2: 2312934891234981234.15123412384718237481723412341234
       ENVVAR_NULL:
+    extends:
+      service: generic-service
     healthcheck:
       disable: true
+    image: ubuntu:latest
     ports:
     - "8080"
     - 8081
@@ -51,7 +57,3 @@ services:
       timeout: 5s
       retries: 5
     user: root
-
-x-kube-compose:
-  push_images:
-    docker_registry: 'localhost:5000'

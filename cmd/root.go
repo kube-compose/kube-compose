@@ -7,9 +7,12 @@ import (
 )
 
 const (
-	fileFlagName      = "file"
-	namespaceFlagName = "namespace"
-	envIDFlagName     = "env-id"
+	envVarPrefix        = "KUBECOMPOSE_"
+	fileFlagName        = "file"
+	namespaceFlagName   = "namespace"
+	namespaceEnvVarName = envVarPrefix + "NAMESPACE"
+	envIDFlagName       = "env-id"
+	envIDEnvVarName     = envVarPrefix + "ENVID"
 )
 
 func Execute() error {
@@ -17,7 +20,7 @@ func Execute() error {
 		Use:     "kube-compose",
 		Short:   "k8s",
 		Long:    "Environments on k8s made easy",
-		Version: "0.4.1",
+		Version: "0.6.1",
 	}
 	rootCmd.AddCommand(newDownCli(), newUpCli(), newGetCli())
 	setRootCommandFlags(rootCmd)
@@ -25,8 +28,9 @@ func Execute() error {
 }
 
 func setRootCommandFlags(rootCmd *cobra.Command) {
-	rootCmd.PersistentFlags().StringP(fileFlagName, "f", "", "Specify an alternate compose file")
-	rootCmd.PersistentFlags().StringP(namespaceFlagName, "n", "", "namespace for environment")
+	rootCmd.PersistentFlags().StringSliceP(fileFlagName, "f", []string{}, "Specify an alternate compose file")
+	rootCmd.PersistentFlags().StringP(namespaceFlagName, "n", "", fmt.Sprintf("namespace for environment. Can also be set via "+
+		"environment variable %sNAMESPACE", envVarPrefix))
 	rootCmd.PersistentFlags().StringP(envIDFlagName, "e", "", "used to isolate environments deployed to a shared namespace, "+
 		"by (1) using this value as a suffix of pod and service names and (2) using this value to isolate selectors. Either this flag or "+
 		fmt.Sprintf("the environment variable %sENVID must be set", envVarPrefix))

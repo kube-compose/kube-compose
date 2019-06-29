@@ -25,30 +25,30 @@ type Healthcheck struct {
 	Timeout     time.Duration
 }
 
-func ParseHealthcheck(healthcheckYAML *ServiceHealthcheck) (*Healthcheck, bool, error) {
-	if healthcheckYAML == nil {
+func ParseHealthcheck(i *healthcheckInternal) (*Healthcheck, bool, error) {
+	if i == nil || i.IsEmpty() {
 		return nil, false, nil
 	}
-	if healthcheckYAML.Disable {
+	if i.Disable != nil && *i.Disable {
 		return nil, true, nil
 	}
 	healthcheck := &Healthcheck{}
-	err := healthcheck.parseTest(healthcheckYAML.GetTest())
+	err := healthcheck.parseTest(i.GetTest())
 	if err != nil {
 		if err == errorCommandIsNone {
 			return nil, true, nil
 		}
 		return nil, false, err
 	}
-	err = healthcheck.parseInterval(healthcheckYAML.Interval)
+	err = healthcheck.parseInterval(i.Interval)
 	if err != nil {
 		return nil, false, err
 	}
-	err = healthcheck.parseTimeout(healthcheckYAML.Timeout)
+	err = healthcheck.parseTimeout(i.Timeout)
 	if err != nil {
 		return nil, false, err
 	}
-	healthcheck.parseRetries(healthcheckYAML.Retries)
+	healthcheck.parseRetries(i.Retries)
 	return healthcheck, false, nil
 }
 

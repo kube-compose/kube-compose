@@ -7,9 +7,9 @@ import (
 )
 
 func withMockedEnv(mockEnv map[string]string, callback func()) {
-	fsOld := envGetter
+	orig := envGetter
 	defer func() {
-		envGetter = fsOld
+		envGetter = orig
 	}()
 	envGetter = func(name string) (string, bool) {
 		value, ok := mockEnv[name]
@@ -18,69 +18,97 @@ func withMockedEnv(mockEnv map[string]string, callback func()) {
 	callback()
 }
 
-func TestGetEnvIDFlag_EnvLookUpExists(t *testing.T) {
+func Test_GetEnvIDFlag_EnvLookupSuccess(t *testing.T) {
 	withMockedEnv(map[string]string{
 		"KUBECOMPOSE_ENVID": "12345",
 	}, func() {
 		cmd := &cobra.Command{}
 		key, err := getEnvIDFlag(cmd)
-		if key != "12345" || err != nil {
+		if err != nil {
+			t.Error(err)
+		} else if key != "12345" {
 			t.Fail()
 		}
 	})
 }
 
-func TestGetEnvIDFlag_EnvLookUpNotExists(t *testing.T) {
+func Test_GetEnvIDFlag_NotSetError(t *testing.T) {
 	withMockedEnv(map[string]string{}, func() {
 		cmd := &cobra.Command{}
-		key, err := getEnvIDFlag(cmd)
-		if key != "" || err == nil {
+		_, err := getEnvIDFlag(cmd)
+		if err == nil {
 			t.Fail()
 		}
 	})
 }
 
-func TestGetEnvIDFlag_FlagIsSet(t *testing.T) {
+func Test_GetEnvIDFlag_InvalidEnvError(t *testing.T) {
+	withMockedEnv(map[string]string{
+		"KUBECOMPOSE_ENVID": ".",
+	}, func() {
+		cmd := &cobra.Command{}
+		_, err := getEnvIDFlag(cmd)
+		if err == nil {
+			t.Fail()
+		}
+	})
+}
+
+func Test_GetEnvIDFlag_FlagSuccess(t *testing.T) {
 	withMockedEnv(map[string]string{}, func() {
 		cmd := &cobra.Command{}
 		setRootCommandFlags(cmd)
 		_ = cmd.ParseFlags([]string{"--" + envIDFlagName, "123"})
 		key, err := getEnvIDFlag(cmd)
-		if key != "123" || err != nil {
+		if err != nil {
+			t.Error(err)
+		} else if key != "123" {
 			t.Fail()
 		}
 	})
 }
 
-func TestGetNamespaceFlag_EnvLookUpExists(t *testing.T) {
+func Test_GetEnvIDFlag_InvalidFlagError(t *testing.T) {
+	withMockedEnv(map[string]string{}, func() {
+		cmd := &cobra.Command{}
+		setRootCommandFlags(cmd)
+		_ = cmd.ParseFlags([]string{"--" + envIDFlagName, ","})
+		_, err := getEnvIDFlag(cmd)
+		if err == nil {
+			t.Fail()
+		}
+	})
+}
+
+func Test_GetNamespaceFlag_EnvLookupSuccess(t *testing.T) {
 	withMockedEnv(map[string]string{
 		"KUBECOMPOSE_NAMESPACE": "1234",
 	}, func() {
 		cmd := &cobra.Command{}
 		key, exists := getNamespaceFlag(cmd)
-		if key != "1234" || exists == false {
+		if key != "1234" || !exists {
 			t.Fail()
 		}
 	})
 }
 
-func TestGetNamespaceFlag_EnvLookUpNotExists(t *testing.T) {
+func Test_GetNamespaceFlag_NotSet(t *testing.T) {
 	withMockedEnv(map[string]string{}, func() {
 		cmd := &cobra.Command{}
 		key, exists := getNamespaceFlag(cmd)
-		if key != "" || exists == true {
+		if key != "" || exists {
 			t.Fail()
 		}
 	})
 }
 
-func TestGetNamespaceFlag_FlagIsSet(t *testing.T) {
+func Test_GetNamespaceFlag_FlagSuccess(t *testing.T) {
 	withMockedEnv(map[string]string{}, func() {
 		cmd := &cobra.Command{}
 		setRootCommandFlags(cmd)
 		_ = cmd.ParseFlags([]string{"--" + namespaceFlagName, "test"})
 		key, exists := getNamespaceFlag(cmd)
-		if key != "test" || exists != true {
+		if key != "test" || !exists {
 			t.Fail()
 		}
 	})

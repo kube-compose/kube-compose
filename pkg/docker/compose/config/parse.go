@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
+	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	"github.com/uber-go/mapdecode"
 )
 
@@ -47,16 +47,22 @@ func (t *HealthcheckTest) Decode(into mapdecode.Into) error {
 	return nil
 }
 
-type ServiceHealthcheck struct {
-	Disable  bool            `mapdecode:"disable"`
-	Interval *string         `mapdecode:"interval"`
-	Retries  *uint           `mapdecode:"retries"`
-	Test     HealthcheckTest `mapdecode:"test"`
-	Timeout  *string         `mapdecode:"timeout"`
+type healthcheckInternal struct {
+	Disable  *bool   `mapdecode:"disable"`
+	Interval *string `mapdecode:"interval"`
+	Retries  *uint   `mapdecode:"retries"`
+	// Test.Values is nil if and only if the field "test" is not present in the map.
+	// If the field "test" is present and is an empty slice, then Test.Values will not be nil.
+	Test    HealthcheckTest `mapdecode:"test"`
+	Timeout *string         `mapdecode:"timeout"`
 	// start_period is only available in docker-compose 2.3 or higher
 }
 
-func (h *ServiceHealthcheck) GetTest() []string {
+func (h *healthcheckInternal) IsEmpty() bool {
+	return h.Disable == nil && h.Interval == nil && h.Retries == nil && h.GetTest() == nil && h.Timeout == nil
+}
+
+func (h *healthcheckInternal) GetTest() []string {
 	return h.Test.Values
 }
 
@@ -105,7 +111,7 @@ type environmentNameValuePair struct {
 	Value *environmentValue
 }
 
-// TODO https://github.com/jbrekelmans/kube-compose/issues/40 check whether handling of large numbers is consistent with docker-compose
+// TODO https://github.com/kube-compose/kube-compose/issues/40 check whether handling of large numbers is consistent with docker-compose
 // See https://github.com/docker/compose/blob/master/compose/config/config_schema_v2.1.json#L418
 type environmentValue struct {
 	FloatValue  *float64
@@ -218,28 +224,20 @@ func (p *port) Decode(into mapdecode.Into) error {
 	return err
 }
 
-type composeFileService struct {
-	Build *struct {
-		Context    string `mapdecode:"context"`
-		Dockerfile string `mapdecode:"dockerfile"`
-	} `mapdecode:"build"`
-	// TODO https://github.com/jbrekelmans/kube-compose/issues/153 interpret string command/entrypoint correctly
-	Command   stringOrStringSlice `mapdecode:"command"`
-	DependsOn *dependsOn          `mapdecode:"depends_on"`
-	// TODO https://github.com/jbrekelmans/kube-compose/issues/153 interpret string command/entrypoint correctly
-	Entrypoint  *stringOrStringSlice `mapdecode:"entrypoint"`
-	Environment environment          `mapdecode:"environment"`
-	Extends     *extends             `mapdecode:"extends"`
-	Healthcheck *ServiceHealthcheck  `mapdecode:"healthcheck"`
-	Image       string               `mapdecode:"image"`
-	Ports       []port               `mapdecode:"ports"`
-	User        *string              `mapdecode:"user"`
-	Volumes     []string             `mapdecode:"volumes"`
-	WorkingDir  string               `mapdecode:"working_dir"`
-	Restart     string               `mapdecode:"restart"`
+// ServiceVolume is the type used to encode each volume of a docker compose service.
+type ServiceVolume struct {
+	Short *PathMapping
 }
 
-type composeFile struct {
-	Services map[string]*composeFileService `mapdecode:"services"`
-	Volumes  map[string]interface{}         `mapdecode:"volumes"`
+// Decode parses either the long or short syntax of a docker-compose service volume into the ServiceVolume type.
+func (sv *ServiceVolume) Decode(into mapdecode.Into) error {
+	var shortSyntax string
+	err := into(&shortSyntax)
+	if err == nil {
+		sv.Short = &PathMapping{}
+		*sv.Short = parsePathMapping(shortSyntax)
+		return nil
+	}
+	// TODO https://github.com/kube-compose/kube-compose/issues/161 support long volume syntax
+	return err
 }

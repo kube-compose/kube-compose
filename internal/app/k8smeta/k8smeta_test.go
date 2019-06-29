@@ -3,29 +3,28 @@ package k8smeta
 import (
 	"testing"
 
-	"github.com/jbrekelmans/kube-compose/internal/app/config"
-	dockerComposeConfig "github.com/jbrekelmans/kube-compose/pkg/docker/compose/config"
+	"github.com/kube-compose/kube-compose/internal/app/config"
+	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func newTestConfig() *config.Config {
 	cfg := &config.Config{}
-	cfg.AddService("a", &dockerComposeConfig.Service{})
+	cfg.AddService(&dockerComposeConfig.Service{
+		Name: "a",
+	})
 	return cfg
 }
 
 func TestFindFromObjectMeta_AnnotationSuccess(t *testing.T) {
 	cfg := newTestConfig()
-	serviceA := cfg.FindServiceByName("a")
+	serviceA := cfg.Services["a"]
 	objectMeta := metav1.ObjectMeta{
 		Annotations: map[string]string{
-			AnnotationName: serviceA.Name,
+			AnnotationName: serviceA.Name(),
 		},
 	}
-	composeService, err := FindFromObjectMeta(cfg, &objectMeta)
-	if err != nil {
-		t.Fail()
-	}
+	composeService := FindFromObjectMeta(cfg, &objectMeta)
 	if composeService != serviceA {
 		t.Fail()
 	}
@@ -43,8 +42,8 @@ func TestGetK8sName(t *testing.T) {
 func TestFindFromObjectMeta_NotFound(t *testing.T) {
 	cfg := config.Config{}
 	objectMeta := metav1.ObjectMeta{}
-	composeService, err := FindFromObjectMeta(&cfg, &objectMeta)
-	if composeService != nil || err != nil {
+	composeService := FindFromObjectMeta(&cfg, &objectMeta)
+	if composeService != nil {
 		t.Fail()
 	}
 }
@@ -53,7 +52,9 @@ func TestInitObjectMeta_Success(t *testing.T) {
 	cfg := &config.Config{
 		EnvironmentID: "myenv",
 	}
-	serviceA := cfg.AddService("a", &dockerComposeConfig.Service{})
+	serviceA := cfg.AddService(&dockerComposeConfig.Service{
+		Name: "a",
+	})
 	objectMeta := metav1.ObjectMeta{}
 	InitObjectMeta(cfg, &objectMeta, serviceA)
 }

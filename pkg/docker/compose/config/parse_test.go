@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
+	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	"github.com/uber-go/mapdecode"
 )
 
@@ -355,7 +355,7 @@ func TestHealthcheckTestDecode_StringSuccess(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if !reflect.DeepEqual(dst.Values, append([]string{HealthcheckCommandShell, src})) {
+	if !reflect.DeepEqual(dst.Values, []string{HealthcheckCommandShell, src}) {
 		t.Error(dst)
 	}
 }
@@ -395,6 +395,34 @@ func TestStringOrStringSliceDecode_StringSliceSuccess(t *testing.T) {
 func TestStringOrStringSliceDecode_Error(t *testing.T) {
 	var src int
 	var dst stringOrStringSlice
+	err := mapdecode.Decode(&dst, src)
+	if err == nil {
+		t.Fail()
+	}
+}
+
+func TestServiceVolumeDecode_Success(t *testing.T) {
+	src := "aa:bb:cc"
+	var dst ServiceVolume
+	err := mapdecode.Decode(&dst, src)
+	if err != nil {
+		t.Error(err)
+	} else if !reflect.DeepEqual(dst, ServiceVolume{
+		Short: &PathMapping{
+			ContainerPath: "bb",
+			HasHostPath:   true,
+			HasMode:       true,
+			HostPath:      "aa",
+			Mode:          "cc",
+		},
+	}) {
+		t.Fail()
+	}
+}
+
+func TestServiceVolumeDecode_Error(t *testing.T) {
+	src := 0
+	var dst ServiceVolume
 	err := mapdecode.Decode(&dst, src)
 	if err == nil {
 		t.Fail()

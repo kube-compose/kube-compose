@@ -15,11 +15,13 @@ type staticStatusInfo struct {
 	weightBefore float64
 }
 
-const sha256Prefix = "sha256:"
-const sha256BitLength = 256
+const (
+	sha256Prefix    = "sha256:"
+	sha256BitLength = 256
+)
 
 var (
-	digestRegExp = regexp.MustCompile(
+	digestRegexp = regexp.MustCompile(
 		fmt.Sprintf(
 			"%s[a-fA-F0-9]{%d}(?:[^a-fA-F0-9]|$)",
 			regexp.QuoteMeta(sha256Prefix),
@@ -180,13 +182,22 @@ func (waiter *pullOrPushWaiter) handleMessage(d *PullOrPush, msg *jsonmessage.JS
 		s.statusEnum = statusEnum
 		s.progress = msg.Progress
 		waiter.onUpdate(d)
-		// TODO https://github.com/jbrekelmans/kube-compose/issues/5 support non-sha256 digests
-	} else if loc := digestRegExp.FindStringIndex(msg.Status); loc != nil {
-		y := sha256BitLength/4 + len(sha256Prefix)
-		waiter.digest = msg.Status[loc[0] : loc[0]+y]
+	} else if digest := FindDigest(msg.Status); digest != "" {
+		waiter.digest = digest
 	} else if msg.Error != nil && len(msg.Error.Message) > 0 {
 		waiter.lastError = msg.Error.Message
 	}
+}
+
+// FindDigest finds a digest within a string. If it is found the digest is returned, otherwise returns the empty string.
+func FindDigest(s string) string {
+	// TODO https://github.com/kube-compose/kube-compose/issues/5 support non-sha256 digests
+	loc := digestRegexp.FindStringIndex(s)
+	if loc == nil {
+		return ""
+	}
+	i := sha256BitLength/4 + len(sha256Prefix)
+	return s[loc[0] : loc[0]+i]
 }
 
 func (waiter *pullOrPushWaiter) end(d *PullOrPush) (string, error) {

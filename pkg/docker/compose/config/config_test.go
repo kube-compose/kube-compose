@@ -2,35 +2,42 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"reflect"
+	"strings"
 	"testing"
 
-	fsPackage "github.com/jbrekelmans/kube-compose/internal/pkg/fs"
-	"github.com/jbrekelmans/kube-compose/internal/pkg/util"
+	"github.com/kube-compose/kube-compose/internal/pkg/fs"
+	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	"github.com/pkg/errors"
 )
 
-const testDockerComposeYml = "docker-compose.yaml"
-const testDockerComposeYmlIOError = "docker-compose.io-error.yaml"
-const testDockerComposeYmlInvalidVersion = "docker-compose.invalid-version.yml"
-const testDockerComposeYmlInterpolationIssue = "docker-compose.interpolation-issue.yml"
-const testDockerComposeYmlDecodeIssue = "docker-compose.decode-issue.yml"
-const testDockerComposeYmlExtends = "docker-compose.extends.yml"
-const testDockerComposeYmlExtendsCycle = "docker-compose.extends-cycle.yml"
-const testDockerComposeYmlExtendsIOError = "docker-compose.extends-io-error.yml"
-const testDockerComposeYmlExtendsDoesNotExist = "docker-compose.extends-does-not-exist.yml"
-const testDockerComposeYmlExtendsDoesNotExistFile = "docker-compose.extends-does-not-exist-file.yml"
-const testDockerComposeYmlExtendsInvalidDependsOn = "docker-compose.extends-invalid-depends-on.yml"
-const testDockerComposeYmlDependsOnDoesNotExist = "docker-compose.depends-on-does-not-exist.yml"
-const testDockerComposeYmlDependsOnCycle = "docker-compose.depends-on-cycle.yml"
-const testDockerComposeYmlDependsOn = "docker-compose.depends-on.yml"
+const testDockerComposeYml = "/docker-compose.yaml"
+const testDockerComposeYmlIOError = "/docker-compose.io-error.yaml"
+const testDockerComposeYmlInvalidVersion = "/docker-compose.invalid-version.yml"
+const testDockerComposeYmlInterpolationIssue = "/docker-compose.interpolation-issue.yml"
+const testDockerComposeYmlDecodeIssue = "/docker-compose.decode-issue.yml"
+const testDockerComposeYmlExtends = "/docker-compose.extends.yml"
+const testDockerComposeYmlExtendsCycle = "/docker-compose.extends-cycle.yml"
+const testDockerComposeYmlExtendsIOError = "/docker-compose.extends-io-error.yml"
+const testDockerComposeYmlExtendsDoesNotExist = "/docker-compose.extends-does-not-exist.yml"
+const testDockerComposeYmlExtendsDoesNotExistFile = "/docker-compose.extends-does-not-exist-file.yml"
+const testDockerComposeYmlExtendsInvalidDependsOn = "/docker-compose.extends-invalid-depends-on.yml"
+const testDockerComposeYmlDependsOnDoesNotExist = "/docker-compose.depends-on-does-not-exist.yml"
+const testDockerComposeYmlDependsOnCycle1 = "/docker-compose.depends-on-cycle-1.yml"
+const testDockerComposeYmlDependsOnCycle2 = "/docker-compose.depends-on-cycle-2.yml"
+const testDockerComposeYmlDependsOn = "/docker-compose.depends-on.yml"
+const testDockerComposeYmlInvalidHealthcheck1 = "/docker-compose.invalid-healthcheck-1.yml"
+const testDockerComposeYmlInvalidHealthcheck2 = "/docker-compose.invalid-healthcheck-2.yml"
 
-var mockFileSystem = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
+var mockFS = fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
 	testDockerComposeYml: {
 		Content: []byte(`testservice:
   entrypoint: []
   command: ["bash", "-c", "echo 'Hello World!'"]
   image: ubuntu:latest
+  volumes:
+  - "aa:bb:cc"
 `),
 	},
 	testDockerComposeYmlIOError: {
@@ -65,11 +72,11 @@ services:
     environment:
       KEY2: VALUE2
     extends:
-      file: '` + testDockerComposeYml + `'
+      file: '` + testDockerComposeYml[1:] + `'
       service: testservice
   service3:
     extends:
-      file: '` + testDockerComposeYml + `'
+      file: '` + testDockerComposeYml[1:] + `'
       service: testservice
 `),
 	},
@@ -134,7 +141,7 @@ services:
     - service2
 `),
 	},
-	testDockerComposeYmlDependsOnCycle: {
+	testDockerComposeYmlDependsOnCycle1: {
 		Content: []byte(`version: '2.3'
 services:
   service1:
@@ -145,12 +152,22 @@ services:
     - service1
 `),
 	},
+	testDockerComposeYmlDependsOnCycle2: {
+		Content: []byte(`version: '2.3'
+services:
+  service1:
+	command: []
+`),
+	},
 	testDockerComposeYmlDependsOn: {
 		Content: []byte(`version: '2.3'
 services:
   service1:
     depends_on:
     - service2
+    privileged: true
+    restart: nope
+    working_dir: /root
   service2:
     depends_on:
       service3:
@@ -158,20 +175,36 @@ services:
   service3: {}
 `),
 	},
+	testDockerComposeYmlInvalidHealthcheck1: {
+		Content: []byte(`version: '2.3'
+services:
+  service1:
+	healthcheck:
+      timeout: henkie
+`),
+	},
+	testDockerComposeYmlInvalidHealthcheck2: {
+		Content: []byte(`version: '2.3'
+services:
+  service1:
+    healthcheck:
+      test: []
+`),
+	},
 })
 
-var mockFileSystemStandardFileError = fsPackage.MockFileSystem(map[string]fsPackage.MockFile{
-	"docker-compose.yml": {
+var mockFileSystemStandardFileError = fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+	"/docker-compose.yml": {
 		Error: errors.New("unknown error 2"),
 	},
 })
 
 func withMockFS(cb func()) {
-	fsOld := FS
+	original := fs.OS
 	defer func() {
-		FS = fsOld
+		fs.OS = original
 	}()
-	FS = mockFileSystem
+	fs.OS = mockFS
 	cb()
 }
 
@@ -183,7 +216,7 @@ func newTestConfigLoader(env map[string]string) *configLoader {
 	return c
 }
 
-func TestConfigLoaderParseEnvironment_Success(t *testing.T) {
+func Test_ConfigLoader_ParseEnvironment_Success(t *testing.T) {
 	name1 := "CFGLOADER_PARSEENV_VAR1"
 	value1 := "CFGLOADER_PARSEENV_VAL1"
 	name2 := "CFGLOADER_PARSEENV_VAR2"
@@ -235,7 +268,8 @@ func TestConfigLoaderParseEnvironment_Success(t *testing.T) {
 		t.Error(output)
 	}
 }
-func TestConfigLoaderParseEnvironment_InvalidName(t *testing.T) {
+
+func Test_ConfigLoader_ParseEnvironment_InvalidName(t *testing.T) {
 	input := []environmentNameValuePair{
 		{
 			Name: "",
@@ -248,52 +282,163 @@ func TestConfigLoaderParseEnvironment_InvalidName(t *testing.T) {
 	}
 }
 
-func TestConfigLoaderLoadFile_Success(t *testing.T) {
+func Test_ConfigLoader_LoadFile_Success(t *testing.T) {
 	withMockFS(func() {
 		c := newTestConfigLoader(nil)
-		cfParsed, err := c.loadFile(testDockerComposeYml)
+		dcFile, err := c.loadFile(testDockerComposeYml)
 		if err != nil {
 			t.Error(err)
 		} else {
-			if !cfParsed.version.Equal(v1) {
+			if !dcFile.version.Equal(v1) {
 				t.Fail()
 			}
-			if len(cfParsed.xProperties) != 0 {
+			if dcFile.xProperties != nil {
 				t.Fail()
 			}
-			expected := map[string]*composeFileParsedService{
+			expected := map[string]*serviceInternal{
 				"testservice": {
-					dependsOn: map[string]ServiceHealthiness{},
-					service: &Service{
-						Command:           []string{"bash", "-c", "echo 'Hello World!'"},
-						EntrypointPresent: true,
-						Image:             "ubuntu:latest",
+					Command: &stringOrStringSlice{
+						Values: []string{"bash", "-c", "echo 'Hello World!'"},
+					},
+					Entrypoint: &stringOrStringSlice{
+						Values: []string{},
+					},
+					Image: util.NewString("ubuntu:latest"),
+					Volumes: []ServiceVolume{
+						{
+							Short: &PathMapping{
+								ContainerPath: "bb",
+								HasHostPath:   true,
+								HasMode:       true,
+								HostPath:      "aa",
+								Mode:          "cc",
+							},
+						},
 					},
 				},
 			}
-			assertComposeFileServicesEqual(t, cfParsed.services, expected)
+			assertServiceInternalMapsEqual(t, dcFile.Services, expected)
 		}
 	})
 }
 
-func assertComposeFileServicesEqual(t *testing.T, services1, services2 map[string]*composeFileParsedService) {
-	if len(services1) != len(services2) {
+func assertServiceInternalMapsEqual(t *testing.T, m1, m2 map[string]*serviceInternal) {
+	if (m1 == nil) != (m2 == nil) {
 		t.Fail()
+		return
 	}
-	for name, service1 := range services1 {
-		service2 := services2[name]
-		if service2 == nil {
+	if m1 == nil {
+		return
+	}
+	if len(m1) != len(m2) {
+		t.Fail()
+		return
+	}
+	for name, s1 := range m1 {
+		s2 := m2[name]
+		if s2 == nil {
 			t.Fail()
-		} else {
-			if len(service1.dependsOn) > 0 || len(service2.dependsOn) > 0 {
-				panic("services must not have depends on")
-			}
-			if service1.extends != nil || service2.extends != nil {
-				panic("services must not have extends")
-			}
-			assertServicesEqual(t, service1.service, service2.service, true)
+			return
 		}
+		assertServiceInternalEqual(t, s1, s2)
 	}
+}
+
+func areStringOrStringSlicesEqual(s1, s2 *stringOrStringSlice) bool {
+	if s1 == nil {
+		return s2 == nil
+	}
+	if s2 == nil {
+		return false
+	}
+	return areStringSlicesEqual(s1.Values, s2.Values)
+}
+
+func assertServiceInternalEqual(t *testing.T, s1, s2 *serviceInternal) {
+	if !areStringOrStringSlicesEqual(s1.Command, s2.Command) {
+		t.Fail()
+		return
+	}
+	if !areDependsOnEqual(s1.DependsOn, s2.DependsOn) {
+		t.Fail()
+		return
+	}
+	if !areStringOrStringSlicesEqual(s1.Entrypoint, s2.Entrypoint) {
+		t.Fail()
+		return
+	}
+	if !areStringMapsEqual(s1.environmentParsed, s2.environmentParsed) {
+		t.Fail()
+		return
+	}
+	if !areExtendsEqual(s1.Extends, s2.Extends) {
+		t.Fail()
+		return
+	}
+	if s1.Healthcheck != nil || s2.Healthcheck != nil {
+		t.Logf("comparing healthchecks is not supported")
+		t.Fail()
+		return
+	}
+	assertServiceInternalEqualContinued(t, s1, s2)
+}
+
+func areExtendsEqual(e1, e2 *extends) bool {
+	if (e1 == nil) != (e2 == nil) {
+		return false
+	}
+	if e1 == nil {
+		return true
+	}
+	if e1.Service != e2.Service {
+		return false
+	}
+	return areStringPointersEqual(e1.File, e2.File)
+}
+
+func assertServiceInternalEqualContinued(t *testing.T, s1, s2 *serviceInternal) {
+	if !areStringPointersEqual(s1.Image, s2.Image) {
+		t.Fail()
+		return
+	}
+	if !arePortsEqual(s1.portsParsed, s2.portsParsed) {
+		t.Fail()
+		return
+	}
+	if !areBoolPointersEqual(s1.Privileged, s2.Privileged) {
+		t.Fail()
+		return
+	}
+	if !areStringPointersEqual(s1.Restart, s2.Restart) {
+		t.Fail()
+		return
+	}
+	if !areStringPointersEqual(s1.User, s2.User) {
+		t.Fail()
+		return
+	}
+	if !areServiceVolumesEqual(s1.Volumes, s2.Volumes) {
+		t.Fail()
+		return
+	}
+	if !areStringPointersEqual(s1.WorkingDir, s2.WorkingDir) {
+		t.Fail()
+		return
+	}
+}
+
+func areBoolPointersEqual(b1, b2 *bool) bool {
+	if (b1 == nil) != (b2 == nil) {
+		return false
+	}
+	return b1 == nil || *b1 == *b2
+}
+
+func areStringPointersEqual(s1, s2 *string) bool {
+	if (s1 == nil) != (s2 == nil) {
+		return false
+	}
+	return s1 == nil || *s1 == *s2
 }
 
 func assertServiceMapsEqual(t *testing.T, services1, services2 map[string]*Service) {
@@ -305,41 +450,41 @@ func assertServiceMapsEqual(t *testing.T, services1, services2 map[string]*Servi
 		if service2 == nil {
 			t.Fail()
 		} else {
-			assertServicesEqual(t, service1, service2, true)
-			if !areDependsOnMapsEqual(services1, services2, name) {
-				t.Logf("dependsOn1: %+v\n", service1.DependsOn)
-				t.Logf("dependsOn2: %+v\n", service2.DependsOn)
-				t.Fail()
-			}
+			assertServicesEqual(t, service1, service2)
+			areDependsOnMapsEqual(service1.DependsOn, service2.DependsOn)
 		}
 	}
 }
 
-func buildNameMap(services map[string]*Service) map[*Service]string {
-	names := map[*Service]string{}
-	for name, service := range services {
-		if _, ok := names[service]; ok {
-			panic(errors.New("invalid services map"))
-		}
-		names[service] = name
+func areDependsOnEqual(m1, m2 *dependsOn) bool {
+	if m1 == nil {
+		return m2 == nil
 	}
-	return names
-}
-
-func areDependsOnMapsEqual(services1, services2 map[string]*Service, name string) bool {
-	dependsOn1 := services1[name].DependsOn
-	dependsOn2 := services2[name].DependsOn
-	if len(dependsOn1) != len(dependsOn2) {
+	if m2 == nil {
 		return false
 	}
-	names1 := buildNameMap(services1)
-	for service1, healthiness1 := range dependsOn1 {
-		name = names1[service1]
-		service2 := services2[name]
-		if service2 == nil {
-			return false
-		}
-		healthiness2, ok := dependsOn2[service2]
+	if len(m1.Values) != len(m2.Values) {
+		return false
+	}
+	return isDependsOnMapSubsetOf(m1.Values, m2.Values) && isDependsOnMapSubsetOf(m2.Values, m1.Values)
+}
+
+func areDependsOnMapsEqual(m1, m2 map[string]ServiceHealthiness) bool {
+	if m1 == nil {
+		return m2 == nil
+	}
+	if m2 == nil {
+		return false
+	}
+	if len(m1) != len(m2) {
+		return false
+	}
+	return isDependsOnMapSubsetOf(m1, m2) && isDependsOnMapSubsetOf(m2, m1)
+}
+
+func isDependsOnMapSubsetOf(m1, m2 map[string]ServiceHealthiness) bool {
+	for name, healthiness1 := range m1 {
+		healthiness2, ok := m2[name]
 		if !ok || healthiness1 != healthiness2 {
 			return false
 		}
@@ -347,7 +492,7 @@ func areDependsOnMapsEqual(services1, services2 map[string]*Service, name string
 	return true
 }
 
-func assertServicesEqual(t *testing.T, service1, service2 *Service, ignoreDependsOn bool) {
+func assertServicesEqual(t *testing.T, service1, service2 *Service) {
 	if service1.Restart != service2.Restart {
 		t.Fail()
 	}
@@ -368,7 +513,7 @@ func assertServicesEqual(t *testing.T, service1, service2 *Service, ignoreDepend
 		t.Logf("ports2: %+v\n", service2.Ports)
 		t.Fail()
 	}
-	assertServicesEqualContinued(t, service1, service2, ignoreDependsOn)
+	assertServicesEqualContinued(t, service1, service2)
 }
 
 func portsIsSubsetOf(ports1, ports2 []PortBinding) bool {
@@ -394,15 +539,13 @@ func arePortsEqual(ports1, ports2 []PortBinding) bool {
 	return portsIsSubsetOf(ports1, ports2) && portsIsSubsetOf(ports2, ports1)
 }
 
-func assertServicesEqualContinued(t *testing.T, service1, service2 *Service, ignoreDependsOn bool) {
+func assertServicesEqualContinued(t *testing.T, service1, service2 *Service) {
 	if !areStringMapsEqual(service1.Environment, service2.Environment) {
 		t.Logf("env1: %+v\n", service1.Environment)
 		t.Logf("env2: %+v\n", service2.Environment)
 		t.Fail()
 	}
-	if service1.EntrypointPresent != service2.EntrypointPresent {
-		t.Fail()
-	} else if service1.EntrypointPresent && !areStringSlicesEqual(service1.Entrypoint, service2.Entrypoint) {
+	if !areStringSlicesEqual(service1.Entrypoint, service2.Entrypoint) {
 		t.Logf("entrypoint1: %+v\n", service1.Entrypoint)
 		t.Logf("entrypoint2: %+v\n", service2.Entrypoint)
 		t.Fail()
@@ -412,12 +555,46 @@ func assertServicesEqualContinued(t *testing.T, service1, service2 *Service, ign
 		t.Logf("command2: %+v\n", service2.Command)
 		t.Fail()
 	}
-	if !ignoreDependsOn && (len(service1.DependsOn) > 0 || len(service2.DependsOn) > 0) {
-		panic("services must not have depends on")
+	if !areServiceVolumesEqual(service1.Volumes, service2.Volumes) {
+		t.Logf("volumes1: %+v\n", service1.Volumes)
+		t.Logf("volumes2: %+v\n", service2.Volumes)
+		t.Fail()
 	}
 }
 
+func areServiceVolumesEqual(volumes1, volumes2 []ServiceVolume) bool {
+	if volumes1 == nil {
+		return volumes2 == nil
+	}
+	if volumes2 == nil {
+		return false
+	}
+	n := len(volumes1)
+	if n != len(volumes2) {
+		return false
+	}
+	for i := 0; i < n; i++ {
+		if !arePathMappingsEqual(volumes1[i].Short, volumes2[i].Short) {
+			return false
+		}
+	}
+	return true
+}
+
+func arePathMappingsEqual(pm1, pm2 *PathMapping) bool {
+	if pm1 == nil {
+		return pm2 == nil
+	}
+	return pm2 != nil && *pm1 == *pm2
+}
+
 func areStringMapsEqual(m1, m2 map[string]string) bool {
+	if m1 == nil {
+		return m2 == nil
+	}
+	if m2 == nil {
+		return false
+	}
 	if len(m1) != len(m2) {
 		return false
 	}
@@ -431,6 +608,12 @@ func areStringMapsEqual(m1, m2 map[string]string) bool {
 }
 
 func areStringSlicesEqual(slice1, slice2 []string) bool {
+	if slice1 == nil {
+		return slice2 == nil
+	}
+	if slice2 == nil {
+		return false
+	}
 	n := len(slice1)
 	if n != len(slice2) {
 		return false
@@ -443,7 +626,7 @@ func areStringSlicesEqual(slice1, slice2 []string) bool {
 	return true
 }
 
-func TestConfigLoaderLoadFile_Error(t *testing.T) {
+func Test_ConfigLoader_LoadFile_Error(t *testing.T) {
 	withMockFS(func() {
 		c := newTestConfigLoader(nil)
 		_, err := c.loadFile(testDockerComposeYmlIOError)
@@ -453,7 +636,7 @@ func TestConfigLoaderLoadFile_Error(t *testing.T) {
 	})
 }
 
-func TestConfigLoaderLoadResolvedFile_Caching(t *testing.T) {
+func Test_ConfigLoader_LoadResolvedFile_Caching(t *testing.T) {
 	withMockFS(func() {
 		c := newTestConfigLoader(nil)
 		cfParsed1, err := c.loadResolvedFile(testDockerComposeYml)
@@ -470,7 +653,7 @@ func TestConfigLoaderLoadResolvedFile_Caching(t *testing.T) {
 	})
 }
 
-func TestConfigLoaderLoadResolvedFile_OpenFileError(t *testing.T) {
+func Test_ConfigLoader_LoadResolvedFile_OpenFileError(t *testing.T) {
 	withMockFS(func() {
 		c := newTestConfigLoader(nil)
 		_, err := c.loadResolvedFile(testDockerComposeYmlIOError)
@@ -480,7 +663,7 @@ func TestConfigLoaderLoadResolvedFile_OpenFileError(t *testing.T) {
 	})
 }
 
-func TestConfigLoaderLoadResolvedFile_VersionError(t *testing.T) {
+func Test_ConfigLoader_LoadResolvedFile_VersionError(t *testing.T) {
 	withMockFS(func() {
 		c := newTestConfigLoader(nil)
 		_, err := c.loadResolvedFile(testDockerComposeYmlInvalidVersion)
@@ -490,7 +673,7 @@ func TestConfigLoaderLoadResolvedFile_VersionError(t *testing.T) {
 	})
 }
 
-func TestConfigLoaderLoadResolvedFile_InterpolationError(t *testing.T) {
+func Test_ConfigLoader_LoadResolvedFile_InterpolationError(t *testing.T) {
 	withMockFS(func() {
 		c := newTestConfigLoader(nil)
 		_, err := c.loadResolvedFile(testDockerComposeYmlInterpolationIssue)
@@ -500,7 +683,7 @@ func TestConfigLoaderLoadResolvedFile_InterpolationError(t *testing.T) {
 	})
 }
 
-func TestConfigLoaderLoadResolvedFile_DecodeError(t *testing.T) {
+func Test_ConfigLoader_LoadResolvedFile_DecodeError(t *testing.T) {
 	withMockFS(func() {
 		c := newTestConfigLoader(nil)
 		_, err := c.loadResolvedFile(testDockerComposeYmlDecodeIssue)
@@ -510,7 +693,7 @@ func TestConfigLoaderLoadResolvedFile_DecodeError(t *testing.T) {
 	})
 }
 
-func TestNew_DependsOnDoesNotExist(t *testing.T) {
+func Test_New_DependsOnDoesNotExist(t *testing.T) {
 	withMockFS(func() {
 		_, err := New([]string{
 			testDockerComposeYmlDependsOnDoesNotExist,
@@ -522,10 +705,10 @@ func TestNew_DependsOnDoesNotExist(t *testing.T) {
 		}
 	})
 }
-func TestNew_DependsOnCycle(t *testing.T) {
+func Test_New_DependsOnCycle1(t *testing.T) {
 	withMockFS(func() {
 		_, err := New([]string{
-			testDockerComposeYmlDependsOnCycle,
+			testDockerComposeYmlDependsOnCycle1,
 		})
 		if err == nil {
 			t.Fail()
@@ -534,7 +717,20 @@ func TestNew_DependsOnCycle(t *testing.T) {
 		}
 	})
 }
-func TestNew_DependsOn(t *testing.T) {
+func Test_New_DependsOnCycle2(t *testing.T) {
+	withMockFS(func() {
+		_, err := New([]string{
+			testDockerComposeYmlDependsOnCycle1,
+			testDockerComposeYmlDependsOnCycle2,
+		})
+		if err == nil {
+			t.Fail()
+		} else {
+			t.Log(err)
+		}
+	})
+}
+func Test_New_DependsOnSuccess(t *testing.T) {
 	withMockFS(func() {
 		c, err := New([]string{
 			testDockerComposeYmlDependsOn,
@@ -542,14 +738,18 @@ func TestNew_DependsOn(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		} else {
-			service1 := &Service{}
+			service1 := &Service{
+				Privileged: true,
+				Restart:    "nope",
+				WorkingDir: "/root",
+			}
 			service2 := &Service{}
 			service3 := &Service{}
-			service1.DependsOn = map[*Service]ServiceHealthiness{
-				service2: ServiceStarted,
+			service1.DependsOn = map[string]ServiceHealthiness{
+				"service2": ServiceStarted,
 			}
-			service2.DependsOn = map[*Service]ServiceHealthiness{
-				service3: ServiceHealthy,
+			service2.DependsOn = map[string]ServiceHealthiness{
+				"service3": ServiceHealthy,
 			}
 			assertServiceMapsEqual(t, c.Services, map[string]*Service{
 				"service1": service1,
@@ -560,7 +760,28 @@ func TestNew_DependsOn(t *testing.T) {
 	})
 }
 
-func TestNew_IOError(t *testing.T) {
+func Test_New_InvalidHealthcheckError1(t *testing.T) {
+	withMockFS(func() {
+		_, err := New([]string{
+			testDockerComposeYmlInvalidHealthcheck1,
+		})
+		if err == nil {
+			t.Fail()
+		}
+	})
+}
+func Test_New_InvalidHealthcheckError2(t *testing.T) {
+	withMockFS(func() {
+		_, err := New([]string{
+			testDockerComposeYmlInvalidHealthcheck2,
+		})
+		if err == nil {
+			t.Fail()
+		}
+	})
+}
+
+func Test_New_IOError(t *testing.T) {
 	withMockFS(func() {
 		_, err := New([]string{
 			testDockerComposeYmlIOError,
@@ -573,21 +794,7 @@ func TestNew_IOError(t *testing.T) {
 	})
 }
 
-func TestNew_MultipleFiles(t *testing.T) {
-	withMockFS(func() {
-		_, err := New([]string{
-			testDockerComposeYml,
-			testDockerComposeYmlExtends,
-		})
-		if err == nil {
-			t.Fail()
-		} else {
-			t.Log(err)
-		}
-	})
-}
-
-func TestNew_ExtendsCycle(t *testing.T) {
+func Test_New_ExtendsCycle1(t *testing.T) {
 	withMockFS(func() {
 		_, err := New([]string{
 			testDockerComposeYmlExtendsCycle,
@@ -600,7 +807,21 @@ func TestNew_ExtendsCycle(t *testing.T) {
 	})
 }
 
-func TestNew_ExtendsSuccess(t *testing.T) {
+func Test_New_ExtendsCycle2(t *testing.T) {
+	withMockFS(func() {
+		_, err := New([]string{
+			testDockerComposeYmlExtendsCycle,
+			testDockerComposeYmlExtendsCycle,
+		})
+		if err == nil {
+			t.Fail()
+		} else {
+			t.Log(err)
+		}
+	})
+}
+
+func Test_New_ExtendsSuccess(t *testing.T) {
 	withMockFS(func() {
 		c, err := New([]string{testDockerComposeYmlExtends})
 		if err != nil {
@@ -608,23 +829,66 @@ func TestNew_ExtendsSuccess(t *testing.T) {
 		} else {
 			assertServiceMapsEqual(t, c.Services, map[string]*Service{
 				"service1": {
+					Command:    []string{"bash", "-c", "echo 'Hello World!'"},
+					Entrypoint: []string{},
 					Environment: map[string]string{
 						"KEY1": "VALUE1",
 						"KEY2": "VALUE2",
 					},
+					Image: "ubuntu:latest",
+					Volumes: []ServiceVolume{
+						{
+							Short: &PathMapping{
+								ContainerPath: "bb",
+								HasHostPath:   true,
+								HasMode:       true,
+								HostPath:      "aa",
+								Mode:          "cc",
+							},
+						},
+					},
 				},
 				"service2": {
+					Command:    []string{"bash", "-c", "echo 'Hello World!'"},
+					Entrypoint: []string{},
 					Environment: map[string]string{
 						"KEY2": "VALUE2",
 					},
+					Image: "ubuntu:latest",
+					Volumes: []ServiceVolume{
+						{
+							Short: &PathMapping{
+								ContainerPath: "bb",
+								HasHostPath:   true,
+								HasMode:       true,
+								HostPath:      "aa",
+								Mode:          "cc",
+							},
+						},
+					},
 				},
-				"service3": {},
+				"service3": {
+					Command:    []string{"bash", "-c", "echo 'Hello World!'"},
+					Entrypoint: []string{},
+					Image:      "ubuntu:latest",
+					Volumes: []ServiceVolume{
+						{
+							Short: &PathMapping{
+								ContainerPath: "bb",
+								HasHostPath:   true,
+								HasMode:       true,
+								HostPath:      "aa",
+								Mode:          "cc",
+							},
+						},
+					},
+				},
 			})
 		}
 	})
 }
 
-func TestNew_ExtendsIOError(t *testing.T) {
+func Test_New_ExtendsIOError(t *testing.T) {
 	withMockFS(func() {
 		_, err := New([]string{testDockerComposeYmlExtendsIOError})
 		if err == nil {
@@ -634,7 +898,7 @@ func TestNew_ExtendsIOError(t *testing.T) {
 		}
 	})
 }
-func TestNew_ExtendsDoesNotExist(t *testing.T) {
+func Test_New_ExtendsDoesNotExist(t *testing.T) {
 	withMockFS(func() {
 		_, err := New([]string{testDockerComposeYmlExtendsDoesNotExist})
 		if err == nil {
@@ -644,7 +908,20 @@ func TestNew_ExtendsDoesNotExist(t *testing.T) {
 		}
 	})
 }
-func TestNew_ExtendsDoesNotExistFile(t *testing.T) {
+func Test_New_ExtendsDoesNotExistMerged(t *testing.T) {
+	withMockFS(func() {
+		_, err := New([]string{
+			testDockerComposeYmlExtendsDoesNotExist,
+			testDockerComposeYmlExtendsDoesNotExist,
+		})
+		if err == nil {
+			t.Fail()
+		} else {
+			t.Log(err)
+		}
+	})
+}
+func Test_New_ExtendsDoesNotExistFile(t *testing.T) {
 	withMockFS(func() {
 		_, err := New([]string{testDockerComposeYmlExtendsDoesNotExistFile})
 		if err == nil {
@@ -654,7 +931,20 @@ func TestNew_ExtendsDoesNotExistFile(t *testing.T) {
 		}
 	})
 }
-func TestNew_ExtendsInvalidDependsOn(t *testing.T) {
+func Test_New_ExtendsDoesNotExistFileMerged(t *testing.T) {
+	withMockFS(func() {
+		_, err := New([]string{
+			testDockerComposeYmlExtendsDoesNotExistFile,
+			testDockerComposeYmlExtendsDoesNotExistFile,
+		})
+		if err == nil {
+			t.Fail()
+		} else {
+			t.Log(err)
+		}
+	})
+}
+func Test_New_ExtendsInvalidDependsOn(t *testing.T) {
 	withMockFS(func() {
 		_, err := New([]string{testDockerComposeYmlExtendsInvalidDependsOn})
 		if err == nil {
@@ -665,27 +955,27 @@ func TestNew_ExtendsInvalidDependsOn(t *testing.T) {
 	})
 }
 
-func TestNew_Success(t *testing.T) {
+func Test_New_Success(t *testing.T) {
 	withMockFS(func() {
-		_, err := New([]string{})
+		_, err := New(nil)
 		if err != nil {
 			t.Error(err)
 		}
 	})
 }
-func TestNew_StandardFileError(t *testing.T) {
-	fsOld := FS
+func Test_New_StandardFileError(t *testing.T) {
+	orig := fs.OS
 	defer func() {
-		FS = fsOld
+		fs.OS = orig
 	}()
-	FS = mockFileSystemStandardFileError
+	fs.OS = mockFileSystemStandardFileError
 	_, err := New([]string{})
 	if err == nil {
 		t.Fail()
 	}
 }
 
-func TestGetVersion_Default(t *testing.T) {
+func Test_GetVersion_Default(t *testing.T) {
 	m := genericMap{}
 	v, err := getVersion(m)
 	if err != nil {
@@ -696,7 +986,7 @@ func TestGetVersion_Default(t *testing.T) {
 	}
 }
 
-func TestGetVersion_FormatError(t *testing.T) {
+func Test_GetVersion_FormatError(t *testing.T) {
 	m := genericMap{
 		"version": "",
 	}
@@ -706,7 +996,7 @@ func TestGetVersion_FormatError(t *testing.T) {
 	}
 }
 
-func TestGetVersion_TypeError(t *testing.T) {
+func Test_GetVersion_TypeError(t *testing.T) {
 	m := genericMap{
 		"version": 0,
 	}
@@ -716,7 +1006,7 @@ func TestGetVersion_TypeError(t *testing.T) {
 	}
 }
 
-func TestGetVersion_Success(t *testing.T) {
+func Test_GetVersion_Success(t *testing.T) {
 	m := genericMap{
 		"version": "1.0",
 	}
@@ -729,8 +1019,8 @@ func TestGetVersion_Success(t *testing.T) {
 	}
 }
 
-func TestComposeFileParsedServiceClearRecStack_Success(t *testing.T) {
-	s := &composeFileParsedService{}
+func Test_ServiceInternal_ClearRecStack_Success(t *testing.T) {
+	s := &serviceInternal{}
 	s.recStack = true
 	s.clearRecStack()
 	if s.recStack {
@@ -738,47 +1028,33 @@ func TestComposeFileParsedServiceClearRecStack_Success(t *testing.T) {
 	}
 }
 
-func TestLoadFileError_Success(t *testing.T) {
-	err := loadFileError("some file", fmt.Errorf("an error occured"))
-	if err == nil {
-		t.Fail()
-	}
-}
-
-func TestParseComposeFileService_InvalidPortsError(t *testing.T) {
+func Test_ConfigLoader_ParseDockerComposeFileService_InvalidPortsError(t *testing.T) {
 	c := newTestConfigLoader(nil)
-	cfService := &composeFileService{
-		Ports: []port{
-			{
-				Value: "asdf",
+
+	dcFile := &dockerComposeFile{
+		Services: map[string]*serviceInternal{
+			"service1": {
+				Ports: []port{
+					{
+						Value: "asdf",
+					},
+				},
 			},
 		},
 	}
-	_, err := c.parseComposeFileService(cfService)
+	s := dcFile.Services["service1"]
+	err := c.parseDockerComposeFileService(dcFile, s)
 	if err == nil {
 		t.Fail()
 	}
 }
 
-func TestParseComposeFileService_InvalidHealthcheckError(t *testing.T) {
+func Test_ConfigLoader_ParseDockerComposeFile_InvalidEnvironmentError(t *testing.T) {
 	c := newTestConfigLoader(nil)
-	cfService := &composeFileService{
-		Healthcheck: &ServiceHealthcheck{
-			Timeout: util.NewString("henkie"),
-		},
-	}
-	_, err := c.parseComposeFileService(cfService)
-	if err == nil {
-		t.Fail()
-	}
-}
-
-func TestParseComposeFile_InvalidEnvironmentError(t *testing.T) {
-	c := newTestConfigLoader(nil)
-	cf := &composeFile{
-		Services: map[string]*composeFileService{
+	dcFile := &dockerComposeFile{
+		Services: map[string]*serviceInternal{
 			"service1": {
-				Environment: environment{
+				Environment: &environment{
 					Values: []environmentNameValuePair{
 						{
 							Name: "",
@@ -788,8 +1064,7 @@ func TestParseComposeFile_InvalidEnvironmentError(t *testing.T) {
 			},
 		},
 	}
-	cfParsed := &composeFileParsed{}
-	err := c.parseComposeFile(cf, cfParsed)
+	err := c.parseDockerComposeFile(dcFile)
 	if err == nil {
 		t.Fail()
 	} else {
@@ -797,14 +1072,14 @@ func TestParseComposeFile_InvalidEnvironmentError(t *testing.T) {
 	}
 }
 
-func TestGetXProperties_NotGenericMap(t *testing.T) {
+func Test_GetXProperties_NotGenericMap(t *testing.T) {
 	v := getXProperties("")
 	if v != nil {
 		t.Fail()
 	}
 }
 
-func TestGetXProperties_Success(t *testing.T) {
+func Test_GetXProperties_Success(t *testing.T) {
 	key1 := "x-key1"
 	val1 := "val1"
 	key2 := "x-key2"
@@ -822,4 +1097,106 @@ func TestGetXProperties_Success(t *testing.T) {
 	if v[key2] != val2 {
 		t.Fail()
 	}
+}
+
+func withMockFS2(vfs fs.VirtualFileSystem, cb func()) {
+	orig := fs.OS
+	defer func() {
+		fs.OS = orig
+	}()
+	fs.OS = vfs
+	cb()
+}
+
+func Test_ConfigLoader_LoadStandardFiles_GetwdError(t *testing.T) {
+	errExpected := fmt.Errorf("getwderror")
+	vfs := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{})
+	vfs.GetwdError = errExpected
+	withMockFS2(vfs, func() {
+		c := newTestConfigLoader(nil)
+		_, errActual := c.loadStandardFiles()
+		if errActual != errExpected {
+			t.Fail()
+		}
+	})
+}
+
+func Test_ConfigLoader_LoadStandardFiles_EvalSymlinksCwdError(t *testing.T) {
+	errExpected := fmt.Errorf("getwderror")
+	vfs := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{})
+	vfs.Set("/", &fs.InMemoryFile{
+		Mode:  os.ModeDir,
+		Error: errExpected,
+	})
+	withMockFS2(vfs, func() {
+		c := newTestConfigLoader(nil)
+		_, errActual := c.loadStandardFiles()
+		if errActual != errExpected {
+			t.Fail()
+		}
+	})
+}
+
+func Test_ConfigLoader_LoadStandardFiles_NotFoundError(t *testing.T) {
+	vfs := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+		"/notfounderror": {
+			Mode: os.ModeDir,
+		},
+	})
+	err := vfs.Chdir("/notfounderror")
+	if err != nil {
+		t.Error(err)
+	}
+	withMockFS2(vfs, func() {
+		c := newTestConfigLoader(nil)
+		_, err := c.loadStandardFiles()
+		if err == nil || !strings.HasPrefix(err.Error(), "could not find file ") {
+			t.Fail()
+		}
+	})
+}
+
+func Test_New_OverrideSuccess(t *testing.T) {
+	vfs := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+		"/docker-compose.yaml": {
+			Content: []byte(`s:
+  environment:
+    ENV: '1'`),
+		},
+		"/docker-compose.override.yaml": {
+			Content: []byte(`s:
+  environment:
+    ENV: '2'`),
+		},
+	})
+	withMockFS2(vfs, func() {
+		c, err := New(nil)
+		if err != nil {
+			t.Error(err)
+		} else {
+			assertServiceMapsEqual(t, c.Services, map[string]*Service{
+				"s": {
+					Environment: map[string]string{
+						"ENV": "2",
+					},
+				},
+			})
+		}
+	})
+}
+
+func Test_LoadStandardFilesTry_LoadResolvedFileError(t *testing.T) {
+	msg := "tryloadresolvedfileerror"
+	vfs := fs.NewInMemoryUnixFileSystem(map[string]fs.InMemoryFile{
+		"/docker-compose.yml": {
+			ReadError: fmt.Errorf(msg),
+		},
+	})
+	withMockFS2(vfs, func() {
+		c := newTestConfigLoader(nil)
+		_, err := c.loadStandardFilesTry("/", "/", "")
+		if !strings.Contains(err.Error(), msg) {
+			t.Fail()
+		}
+	})
 }

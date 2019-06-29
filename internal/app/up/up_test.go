@@ -3,8 +3,8 @@ package up
 import (
 	"testing"
 
-	"github.com/jbrekelmans/kube-compose/internal/app/config"
-	dockerComposeConfig "github.com/jbrekelmans/kube-compose/pkg/docker/compose/config"
+	"github.com/kube-compose/kube-compose/internal/app/config"
+	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
 	"k8s.io/client-go/rest"
 )
 
@@ -16,26 +16,31 @@ const (
 
 func newTestConfig() *config.Config {
 	cfg := &config.Config{}
-	serviceA := cfg.AddService("a", &dockerComposeConfig.Service{
+	serviceA := cfg.AddService(&dockerComposeConfig.Service{
+		Name:    "a",
 		Restart: "no",
 	})
-	cfg.AddService("b", &dockerComposeConfig.Service{
+	cfg.AddService(&dockerComposeConfig.Service{
+		Name:    "b",
 		Restart: "always",
 	})
-	serviceC := cfg.AddService("c", &dockerComposeConfig.Service{
+	cfg.AddService(&dockerComposeConfig.Service{
+		Name:    "c",
 		Restart: "on-failure",
 	})
-	serviceD := cfg.AddService("d", &dockerComposeConfig.Service{})
-	serviceA.DockerComposeService.DependsOn = map[*dockerComposeConfig.Service]dockerComposeConfig.ServiceHealthiness{}
-	serviceA.DockerComposeService.DependsOn[serviceC.DockerComposeService] = dockerComposeConfig.ServiceHealthy
-	serviceA.DockerComposeService.DependsOn[serviceD.DockerComposeService] = dockerComposeConfig.ServiceStarted
+	cfg.AddService(&dockerComposeConfig.Service{
+		Name: "d",
+	})
+	serviceA.DockerComposeService.DependsOn = map[string]dockerComposeConfig.ServiceHealthiness{}
+	serviceA.DockerComposeService.DependsOn["c"] = dockerComposeConfig.ServiceHealthy
+	serviceA.DockerComposeService.DependsOn["d"] = dockerComposeConfig.ServiceStarted
 	return cfg
 }
 
 func newTestApp(serviceName string) *app {
 	cfg := newTestConfig()
 	app := &app{
-		composeService: cfg.FindServiceByName(serviceName),
+		composeService: cfg.Services[serviceName],
 	}
 	return app
 }
