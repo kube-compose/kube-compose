@@ -41,6 +41,12 @@ var (
 		TextWidth:     13,
 		Priority:      1,
 	}
+	StatusDockerPull = &Status{
+		AnimationType: AnimationTypeDockerPull,
+		Text:          "pulling image",
+		TextWidth:     13,
+		Priority:      1,
+	}
 	StatusWaiting = &Status{
 		TextWidth: 7,
 		Text:      "waiting",

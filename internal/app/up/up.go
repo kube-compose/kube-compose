@@ -405,6 +405,8 @@ func (u *upRunner) getAppImageInfoEnsureSourceImageID(sourceImage string, source
 func (u *upRunner) getAppImageInfoPullImage(sourceImageRef dockerRef.Reference, a *app) (string, error) {
 	pt := a.reporterRow.AddProgressTask("pulling image")
 	defer pt.Done()
+	a.reporterRow.AddStatus(reporter.StatusDockerPull)
+	defer a.reporterRow.RemoveStatus(reporter.StatusDockerPull)
 	return docker.PullImage(u.opts.Context, u.dockerClient, sourceImageRef.String(), "123", func(pull *docker.PullOrPush) {
 		pt.Update(pull.Progress())
 	})
