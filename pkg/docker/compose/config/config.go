@@ -256,14 +256,14 @@ func (c *configLoader) loadStandardFiles() ([]string, error) {
 		resolvedDir = resolvedDirParent
 		dir = ".." + string(filepath.Separator) + dir
 	}
-	return nil, fmt.Errorf("could not find file docker-compose.yml or docker.compose.yaml in (parents of) the current directory %#v", cwd)
+	return nil, fmt.Errorf("could not find file docker-compose.yml or docker-compose.yaml in (parents of) the current directory %#v", cwd)
 }
 
 func (c *configLoader) loadStandardFilesTry(dir, resolvedDir, override string) (resolvedFile string, err error) {
 	for _, suffix := range []string{".yml", ".yaml"} {
 		basename := "docker-compose" + override + suffix
 		file := dir + basename
-		resolvedFile, err = fs.OS.EvalSymlinks(resolvedDir + basename)
+		resolvedFile, err = fs.OS.EvalSymlinks(resolvedDir + "/" + basename)
 		if err == nil {
 			_, err = c.loadResolvedFile(resolvedFile)
 			if err != nil {
@@ -272,7 +272,7 @@ func (c *configLoader) loadStandardFilesTry(dir, resolvedDir, override string) (
 			return resolvedFile, nil
 		}
 		if !os.IsNotExist(err) {
-			return "", errors.Wrapf(err, "error when evaluating symlinks %s (%#v)", dir+file, resolvedDir+basename)
+			return "", errors.Wrapf(err, "error when evaluating symlinks %s (%#v)", dir+file, resolvedDir+"/"+basename)
 		}
 	}
 	return "", err
