@@ -118,7 +118,11 @@ func (r *Reporter) IsTerminal() bool {
 	return r.isTerminal
 }
 
-func (r *Reporter) LogWriter() io.Writer {
+func (r *Reporter) LogSink() io.Writer {
+	return r.logWriter
+}
+
+func (r *Reporter) LogErrorSink() io.Writer {
 	return r.logWriter
 }
 
@@ -174,13 +178,14 @@ func (r *Reporter) refresh() {
 		return
 	}
 	r.buffer.Reset()
-	if r.lastRefreshNumLines == 0 {
+	switch {
+	case r.lastRefreshNumLines == 0:
 		// This is required to start on the correct line
 		r.writef("")
-	} else if offset < 0 {
+	case offset < 0:
 		// Move to first line of output
 		r.writeCmd(fmt.Sprintf("[%dA", terminalLines-1))
-	} else {
+	default:
 		// Move to first line of output
 		r.writeCmd(fmt.Sprintf("[%dA", r.lastRefreshNumLines+r.logLines))
 	}
@@ -260,17 +265,6 @@ func (r *Reporter) refresh() {
 			}
 		}
 	}
-	lfCountdown := r.lastRefreshNumLines + r.logLines
-
-	nextLine := func() {
-		lfCountdown--
-		if lfCountdown < 0 {
-			r.writef("\n")
-		} else {
-			r.writeCmd("E")
-		}
-	}
-
 	// header row
 	if offset >= 0 {
 		r.writeCmd("[2K") // Clear entire line
@@ -283,7 +277,7 @@ func (r *Reporter) refresh() {
 			r.writef(column.name)
 			r.writeRepeated(" ", width)
 		}
-		nextLine()
+		r.writeCmd("E") // Next line
 	}
 	offset++
 
@@ -295,7 +289,7 @@ func (r *Reporter) refresh() {
 			r.writef("─┼─")
 			r.writeRepeated("─", columns[i].width)
 		}
-		nextLine()
+		r.writeCmd("E") // Next line
 	}
 	offset++
 
@@ -349,7 +343,7 @@ func (r *Reporter) refresh() {
 				r.writeRepeated(" ", width-len(s))
 				r.writef("%s", s)
 			}
-			nextLine()
+			r.writeCmd("E") // Next line
 		}
 		offset++
 	}

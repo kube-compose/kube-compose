@@ -36,7 +36,7 @@ func upCommand(cmd *cobra.Command, args []string) error {
 
 	opts.Reporter = reporter.New(os.Stdout)
 	if opts.Reporter.IsTerminal() {
-		log.StandardLogger().SetOutput(opts.Reporter.LogWriter())
+		log.StandardLogger().SetOutput(opts.Reporter.LogSink())
 		go func() {
 			for {
 				opts.Reporter.Refresh()
