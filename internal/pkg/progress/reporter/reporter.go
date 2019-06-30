@@ -43,16 +43,16 @@ var (
 	}
 	StatusWaiting = &Status{
 		TextWidth: 7,
-		Text:      "waiting", // hourglass
+		Text:      "waiting",
 		Priority:  0,
 	}
 	StatusRunning = &Status{
-		Text:      "🐵⭐️ running", // monkey + star
+		Text:      "running 🐵⭐️", // monkey + star
 		TextWidth: 12,
 		Priority:  2,
 	}
 	StatusReady = &Status{
-		Text:      "🐵⭐️ ready", // monkey + star
+		Text:      "ready 🐵⭐️", // monkey + star
 		TextWidth: 10,
 		Priority:  3,
 	}
@@ -275,13 +275,13 @@ func (r *Reporter) refresh() {
 
 			status := rr.status()
 			width := columns[1].width
-			if status.AnimationType != AnimationTypeNone {
-				r.writeAnimation(status.AnimationType)
-				r.writef(" ")
-				width -= 9
-			}
 			r.writef("%s", status.Text)
 			width -= status.TextWidth
+			if status.AnimationType != AnimationTypeNone {
+				r.writef(" ")
+				r.writeAnimation(status.AnimationType)
+				width -= 9
+			}
 			r.writeRepeated(" ", width)
 
 			for i := 2; i < len(columns); i++ {

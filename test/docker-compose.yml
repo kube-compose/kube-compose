@@ -1,10 +1,16 @@
 version: '2'
 services:
+  helper:
+    image: ubuntu:latest
+    depends_on:
+      authentication-service:
+        condition: service_healthy
+      permission-service:
+        condition: service_healthy
   authentication-service:
     depends_on:
       db:
         condition: service_healthy
-    depends_on: ["db"]
     entrypoint: ["/bin/bash", "-c", "STOP=0; trap 'STOP=1' INT; while [[ $$STOP -eq 0 ]]; do sleep 1; echo 'heartbeat'; done"]
     environment:
     - ASDF=10
@@ -58,5 +64,6 @@ services:
     user: root
 x-kube-compose:
   cluster_image_storage:
-    type: docker
+    type: docker_registry
+    host: localhost:5000
   volume_init_base_image: ubuntu:latest

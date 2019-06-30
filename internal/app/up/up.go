@@ -858,7 +858,7 @@ func parsePodStatus(pod *v1.Pod) (podStatus, error) {
 			return parsePodStatusTerminatedContainer(pod.ObjectMeta.Name, containerStatus.Name, t)
 		}
 		if w := containerStatus.State.Waiting; w != nil && w.Reason == "ErrImagePull" {
-			return podStatusOther, fmt.Errorf("aborting because container %s of pod %s could not pull image: %s",
+			return podStatusOther, fmt.Errorf("container %s of pod %s could not pull image: %s",
 				containerStatus.Name,
 				pod.ObjectMeta.Name,
 				w.Message,
@@ -876,7 +876,7 @@ func parsePodStatus(pod *v1.Pod) (podStatus, error) {
 
 func parsePodStatusTerminatedContainer(podName, containerName string, t *v1.ContainerStateTerminated) (podStatus, error) {
 	if t.Reason != "Completed" {
-		return podStatusOther, fmt.Errorf("aborting because container %s of pod %s terminated abnormally (code=%d,signal=%d,reason=%s): %s",
+		return podStatusOther, fmt.Errorf("container %s of pod %s terminated abnormally (code=%d,signal=%d,reason=%s): %s",
 			containerName,
 			podName,
 			t.ExitCode,
@@ -916,6 +916,11 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 	}
 	s, err := parsePodStatus(pod)
 	if err != nil {
+		app.reporterRow.AddStatus(&reporter.Status{
+			Text:      "\x1b[31merror\x1b[0m 💣💣", // bomb+bomb
+			TextWidth: 10,
+			Priority:  4,
+		})
 		return err
 	}
 

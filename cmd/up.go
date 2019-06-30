@@ -52,6 +52,7 @@ func upCommand(cmd *cobra.Command, args []string) error {
 	err = up.Run(cfg, opts)
 	if err != nil {
 		log.Error(err)
+		opts.Reporter.Refresh()
 		os.Exit(1)
 	}
 	return nil
