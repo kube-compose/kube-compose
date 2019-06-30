@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -16,6 +18,7 @@ const (
 )
 
 func Execute() error {
+	log.SetOutput(os.Stdout)
 	rootCmd := &cobra.Command{
 		Use:               "kube-compose",
 		Short:             "k8s",
