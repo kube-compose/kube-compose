@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/kube-compose/kube-compose/internal/pkg/progress/reporter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -58,5 +59,16 @@ func setupLogging(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 	log.SetLevel(logLevel)
+	if reporter.IsTerminal(os.Stdout) {
+		log.SetFormatter(setupLogFormatter())
+	}
 	return nil
+}
+
+func setupLogFormatter() log.Formatter {
+	return &log.TextFormatter{
+		ForceColors:               true,
+		DisableTimestamp:          true,
+		EnvironmentOverrideColors: true,
+	}
 }

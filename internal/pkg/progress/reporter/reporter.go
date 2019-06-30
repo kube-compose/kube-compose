@@ -89,7 +89,7 @@ type Reporter struct {
 func New(out *os.File) *Reporter {
 	r := &Reporter{
 		buffer:     bytes.NewBuffer(make([]byte, 256)),
-		isTerminal: out != nil && terminal.IsTerminal(int(out.Fd())),
+		isTerminal: IsTerminal(out),
 		logBuffer:  bytes.NewBuffer(make([]byte, 256)),
 		out:        out,
 	}
@@ -108,6 +108,10 @@ func (r *Reporter) AddRow(name string) *Row {
 	defer r.mutex.Unlock()
 	r.rows = append(r.rows, row)
 	return row
+}
+
+func IsTerminal(f *os.File) bool {
+	return f != nil && terminal.IsTerminal(int(f.Fd()))
 }
 
 func (r *Reporter) IsTerminal() bool {
