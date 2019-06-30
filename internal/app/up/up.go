@@ -165,7 +165,7 @@ func (u *upRunner) initVolumeInfo() {
 				continue
 			}
 			u.totalVolumeCount++
-			u.initVolumeInfoWarnOnce("bind mounted volumes do not behave the same as docker-compose (see " +
+			u.initVolumeInfoWarnOnce("bind mounted volumes are not synced between containers and the host (see " +
 				"https://github.com/kube-compose/kube-compose#limitations)")
 			flag := false
 			if u.cfg.ClusterImageStorage.Docker == nil && u.cfg.ClusterImageStorage.DockerRegistry == nil {
@@ -938,7 +938,7 @@ func (u *upRunner) setAppMaxObservedPodStatus(app *app, s podStatus) {
 		app.reporterRow.RemoveStatus(reporter.StatusRunning)
 		app.reporterRow.AddStatus(reporter.StatusReady)
 	}
-	app.newLogEntry().Infof("pod status %s", &app.maxObservedPodStatus)
+	app.newLogEntry().Debugf("pod status %s", &app.maxObservedPodStatus)
 }
 
 func (u *upRunner) streamPodLogs(pod *v1.Pod, completedChannel chan interface{}, getPodLogOptions *v1.PodLogOptions, a *app) {
