@@ -102,6 +102,7 @@ type upRunner struct {
 	completedChannels     []chan interface{}
 	dockerClient          *dockerClient.Client
 	k8sClientset          *kubernetes.Clientset
+	k8sEventClient        clientV1.EventInterface
 	k8sServiceClient      clientV1.ServiceInterface
 	k8sPodClient          clientV1.PodInterface
 	hostAliases           hostAliases
@@ -117,6 +118,7 @@ func (u *upRunner) initKubernetesClientset() error {
 		return err
 	}
 	u.k8sClientset = k8sClientset
+	u.k8sEventClient = u.k8sClientset.CoreV1().Events(u.cfg.Namespace)
 	u.k8sServiceClient = u.k8sClientset.CoreV1().Services(u.cfg.Namespace)
 	u.k8sPodClient = u.k8sClientset.CoreV1().Pods(u.cfg.Namespace)
 	return nil
@@ -1038,6 +1040,10 @@ func (u *upRunner) run() error {
 	// nolint
 	go u.createServicesAndGetPodHostAliasesOnce()
 
+	err = u.watchEvents()
+	if err != nil {
+		return err
+	}
 	err = u.runStartInitialPods()
 	if err != nil {
 		return err
@@ -1132,4 +1138,53 @@ func Run(cfg *config.Config, opts *Options) error {
 	u.hostAliases.once = &sync.Once{}
 	u.localImagesCache.once = &sync.Once{}
 	return u.run()
+}
+
+func (u *upRunner) watchEvents() error {
+	listOptions := metav1.ListOptions{
+		// FieldSelector:   "involvedObject.kind==Pod,type==Warning",
+		FieldSelector:   "involvedObject.kind==Pod",
+		LabelSelector:   u.cfg.EnvironmentLabel + "=" + u.cfg.EnvironmentID,
+		ResourceVersion: "0",
+	}
+	eventList, err := u.k8sEventClient.List(listOptions)
+	if err != nil {
+		return err
+	}
+	for _, event := range eventList.Items {
+		log.WithFields(log.Fields{
+			"reason": event.Reason,
+		}).Info(event.Message)
+	}
+	log.Debugf("starting event watch with ResourceVersion %s", eventList.ResourceVersion)
+	listOptions.ResourceVersion = eventList.ResourceVersion
+	listOptions.Watch = true
+	watch, err := u.k8sEventClient.Watch(listOptions)
+	if err != nil {
+		return err
+	}
+	go func() {
+		defer watch.Stop()
+		err := u.watchEventsCore(watch.ResultChan())
+		if err != nil {
+			log.Error(err)
+		}
+	}()
+	return nil
+}
+
+func (u *upRunner) watchEventsCore(eventChannel <-chan k8swatch.Event) error {
+	for {
+		eventWrapper, ok := <-eventChannel
+		if !ok {
+			return fmt.Errorf("channel unexpectedly closed")
+		}
+		event := eventWrapper.Object.(*v1.Event)
+		if event == nil {
+			return fmt.Errorf("unexpectedly got watch.Event with an Object that is not a *v1.Event")
+		}
+		log.WithFields(log.Fields{
+			"reason": event.Reason,
+		}).Info(event.Message)
+	}
 }
