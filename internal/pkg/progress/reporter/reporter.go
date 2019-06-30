@@ -53,13 +53,13 @@ var (
 		Priority:  0,
 	}
 	StatusRunning = &Status{
-		Text:      "running 🐵⭐️", // monkey + star
-		TextWidth: 12,
+		Text:      "running ⭐️", // star
+		TextWidth: 10,
 		Priority:  2,
 	}
 	StatusReady = &Status{
-		Text:      "ready 🐵⭐️", // monkey + star
-		TextWidth: 10,
+		Text:      "ready ⭐️", // star
+		TextWidth: 8,
 		Priority:  3,
 	}
 )
