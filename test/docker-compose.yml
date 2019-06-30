@@ -13,7 +13,6 @@ services:
     image: ubuntu:latest
     ports:
     - "8080"
-    - "8080"
     working_dir: /app/test
     volumes:
     - './docker-compose.yml:/mnt/vol1/docker-compose.yml:ro'
@@ -59,5 +58,5 @@ services:
     user: root
 x-kube-compose:
   cluster_image_storage:
-    type: docker_registry
-    host: localhost:32768
+    type: docker
+  volume_init_base_image: ubuntu:latest

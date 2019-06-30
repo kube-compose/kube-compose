@@ -18,7 +18,6 @@ import (
 	"github.com/kube-compose/kube-compose/internal/pkg/progress/reporter"
 	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
-	cmdColor "github.com/logrusorgru/aurora"
 	goDigest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
@@ -30,7 +29,14 @@ import (
 	clientV1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
-var colorSupported = []cmdColor.Color{409600, 147456, 344064, 81920, 212992, 278528, 475136}
+// This doesn't deserve the name palette.
+var appColorPalette = []int{
+	37, // gray
+	36, // blue
+	35, // magenta
+	33, // yellow
+	32, // green
+}
 
 type appImageInfo struct {
 	err                error
@@ -63,8 +69,10 @@ type app struct {
 	imageInfo                            appImageInfo
 	maxObservedPodStatus                 podStatus
 	containersForWhichWeAreStreamingLogs map[string]bool
-	color                                cmdColor.Color
+	color                                int
 	reporterRow                          *reporter.ReporterRow
+	reporterRowHasStatusStarted          bool
+	reporterRowHasStatusReady            bool
 	volumes                              []*appVolume
 	volumeInitImage                      appVolumesInitImage
 }
@@ -134,8 +142,8 @@ func (u *upRunner) initAppsToBeStarted() {
 		}
 		a.reporterRow = u.opts.Reporter.AddRow(a.name())
 		u.appsToBeStarted[a] = true
-		if colorIndex < len(colorSupported) {
-			a.color = colorSupported[colorIndex]
+		a.color = appColorPalette[colorIndex]
+		if colorIndex < len(appColorPalette) {
 			colorIndex++
 		} else {
 			colorIndex = 0
@@ -258,6 +266,8 @@ func (u *upRunner) getAppVolumeInitImage(a *app) error {
 func (u *upRunner) pushImage(sourceImageID, name, tag, imageDescr string, a *app) (podImage string, err error) {
 	pt := a.reporterRow.AddProgressTask("pushing " + imageDescr)
 	defer pt.Done()
+	a.reporterRow.AddStatus(reporter.StatusDockerPush)
+	defer a.reporterRow.RemoveStatus(reporter.StatusDockerPush)
 	imagePush := fmt.Sprintf("%s/%s/%s:%s", u.cfg.ClusterImageStorage.DockerRegistry.Host, u.cfg.Namespace, name, tag)
 	err = u.dockerClient.ImageTag(u.opts.Context, sourceImageID, imagePush)
 	if err != nil {
@@ -911,6 +921,15 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 
 	if s > app.maxObservedPodStatus {
 		app.maxObservedPodStatus = s
+		if s >= podStatusStarted && !app.reporterRowHasStatusStarted {
+			app.reporterRowHasStatusStarted = true
+			app.reporterRow.AddStatus(reporter.StatusRunning)
+		}
+		if s >= podStatusReady && !app.reporterRowHasStatusReady {
+			app.reporterRowHasStatusReady = true
+			app.reporterRow.RemoveStatus(reporter.StatusRunning)
+			app.reporterRow.AddStatus(reporter.StatusReady)
+		}
 		app.newLogEntry().Infof("pod status %s", &app.maxObservedPodStatus)
 	}
 
@@ -927,7 +946,7 @@ func (u *upRunner) streamPodLogs(pod *v1.Pod, completedChannel chan interface{},
 	defer util.CloseAndLogError(bodyReader)
 	scanner := bufio.NewScanner(bodyReader)
 	for scanner.Scan() {
-		fmt.Printf("%-*s| %s\n", u.maxServiceNameLength+3, cmdColor.Colorize(a.name(), a.color), scanner.Text())
+		log.Infof("\x1b[%dm%-*s|\x1b[0m %s", a.color, u.maxServiceNameLength+3, a.name(), scanner.Text())
 	}
 	if err = scanner.Err(); err != nil {
 		log.Error(err)
@@ -1145,9 +1164,6 @@ func Run(cfg *config.Config, opts *Options) error {
 		cfg:  cfg,
 		opts: opts,
 	}
-	u.opts.Reporter.SetTaskAnimationType("pulling image", reporter.AnimationTypeDockerPull)
-	u.opts.Reporter.SetTaskAnimationType("pushing image", reporter.AnimationTypeDockerPush)
-	u.opts.Reporter.SetTaskAnimationType("pushing volume init image", reporter.AnimationTypeDockerPush)
 	u.hostAliases.once = &sync.Once{}
 	u.localImagesCache.once = &sync.Once{}
 	return u.run()

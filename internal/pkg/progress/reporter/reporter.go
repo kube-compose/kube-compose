@@ -24,11 +24,6 @@ const (
 )
 
 var (
-	defaultStatus = &Status{
-		Width:    12,
-		Text:     "🙈💣 unknown", // monkey see no evil + bomb
-		Priority: 0,
-	}
 	progressBarChars = []string{
 		" ",
 		"▏",
@@ -40,28 +35,62 @@ var (
 		"▉",
 		"█",
 	}
+	StatusDockerPush = &Status{
+		AnimationType: AnimationTypeDockerPush,
+		Text:          "pushing image",
+		TextWidth:     13,
+		Priority:      1,
+	}
+	StatusWaiting = &Status{
+		TextWidth: 7,
+		Text:      "waiting", // hourglass
+		Priority:  0,
+	}
+	StatusRunning = &Status{
+		Text:      "🐵⭐️ running", // monkey + star
+		TextWidth: 12,
+		Priority:  2,
+	}
+	StatusReady = &Status{
+		Text:      "🐵⭐️ ready", // monkey + star
+		TextWidth: 10,
+		Priority:  3,
+	}
 )
 
+type Status struct {
+	AnimationType AnimationType
+	Priority      int
+	Text          string
+	TextWidth     int
+}
+
 type Reporter struct {
-	buffer              *bytes.Buffer
-	mutex               sync.Mutex
-	isTerminal          bool
-	lastRefreshNumLines int
-	lastRefreshTime     time.Time
-	rows                []*ReporterRow
-	taskAnimationTypes  map[string]AnimationType
-	animationState      int // 0, 1 or 2
-	animationTime       time.Duration
-	out                 *os.File
+	buffer                    *bytes.Buffer
+	mutex                     sync.Mutex
+	isTerminal                bool
+	lastRefreshNumLines       int
+	lastRefreshTime           time.Time
+	logBuffer                 *bytes.Buffer
+	logLinesSinceFirstRefresh int
+	logWriter                 io.Writer
+	rows                      []*ReporterRow
+	animationState            int // 0, 1 or 2
+	animationTime             time.Duration
+	out                       *os.File
 }
 
 func New(out *os.File) *Reporter {
-	return &Reporter{
-		buffer:             bytes.NewBuffer(make([]byte, 256)),
-		isTerminal:         out != nil && terminal.IsTerminal(int(out.Fd())),
-		out:                out,
-		taskAnimationTypes: map[string]AnimationType{},
+	r := &Reporter{
+		buffer:     bytes.NewBuffer(make([]byte, 256)),
+		isTerminal: out != nil && terminal.IsTerminal(int(out.Fd())),
+		logBuffer:  bytes.NewBuffer(make([]byte, 256)),
+		out:        out,
 	}
+	r.logWriter = &reporterLogWriter{
+		r: r,
+	}
+	return r
 }
 
 func (r *Reporter) AddRow(name string) *ReporterRow {
@@ -75,10 +104,12 @@ func (r *Reporter) AddRow(name string) *ReporterRow {
 	return rr
 }
 
-func (r *Reporter) GetTaskAnimationType(taskName string) AnimationType {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	return r.taskAnimationTypes[taskName]
+func (r *Reporter) IsTerminal() bool {
+	return r.isTerminal
+}
+
+func (r *Reporter) LogWriter() io.Writer {
+	return r.logWriter
 }
 
 func (r *Reporter) Refresh() {
@@ -90,22 +121,10 @@ func (r *Reporter) Refresh() {
 	r.refresh()
 }
 
-func (r *Reporter) SetTaskAnimationType(taskName string, at AnimationType) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	if at == AnimationTypeNone {
-		delete(r.taskAnimationTypes, taskName)
-	} else {
-		r.taskAnimationTypes[taskName] = at
-	}
-}
-
 type column struct {
-	headerDesiredWidth int
-	at                 AnimationType
-	name               string
-	progressBarWidth   int
-	width              int
+	name             string
+	progressBarWidth int
+	width            int
 }
 
 func (r *Reporter) updateTime() {
@@ -116,12 +135,6 @@ func (r *Reporter) updateTime() {
 	r.animationTime -= dividend * animationSpeed
 	r.animationState = (r.animationState + int(dividend)) % 3
 	r.lastRefreshTime = now
-}
-
-type Status struct {
-	Width    int
-	Text     string
-	Priority int
 }
 
 func (r *Reporter) refresh() {
@@ -137,11 +150,20 @@ func (r *Reporter) refresh() {
 		}
 	}()
 	r.buffer.Reset()
-	for i := 0; i < r.lastRefreshNumLines; i++ {
-		r.writeCmd("[1A") // Move up one line
-		r.writeCmd("[2K") // Clear entire line
+	_, terminalLines, err := terminal.GetSize(int(r.out.Fd()))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error while getting size of terminal: %v\n", err)
+		return
 	}
-
+	offset := terminalLines - 1 - r.logLinesSinceFirstRefresh - r.lastRefreshNumLines
+	if offset+r.refreshNumLines() <= 0 {
+		return
+	}
+	if offset < 0 {
+		r.writeCmd(fmt.Sprintf("[%dA", terminalLines-1)) // Move to first line of output...
+	} else {
+		r.writeCmd(fmt.Sprintf("[%dA", r.lastRefreshNumLines+r.logLinesSinceFirstRefresh)) // Move to first line of output...
+	}
 	columns := []column{
 		column{
 			name:  "service",
@@ -159,24 +181,21 @@ func (r *Reporter) refresh() {
 			columns[0].width = width
 		}
 		status := rr.status()
-		if status.Width > columns[1].width {
-			columns[1].width = status.Width
+		width = status.TextWidth
+		if status.AnimationType != AnimationTypeNone {
+			width += 9
+		}
+		if width > columns[1].width {
+			columns[1].width = width
 		}
 		for _, pt := range rr.tasks {
 			columnIndex, ok := taskNameToColumnIndex[pt.name]
 			if !ok {
 				columnIndex = len(columns)
-				at := r.taskAnimationTypes[pt.name]
-				headerDesiredWidth := len(pt.name)
-				if at != AnimationTypeNone {
-					headerDesiredWidth += 9
-				}
 				columns = append(columns, column{
-					headerDesiredWidth: headerDesiredWidth,
-					at:                 at,
-					name:               pt.name,
-					width:              headerDesiredWidth,
-					progressBarWidth:   int(^uint(0) >> 1),
+					name:             pt.name,
+					width:            len(pt.name),
+					progressBarWidth: int(^uint(0) >> 1),
 				})
 				taskNameToColumnIndex[pt.name] = columnIndex
 			}
@@ -192,9 +211,9 @@ func (r *Reporter) refresh() {
 				width++
 			}
 			var progressBarWidth int
-			if columns[columnIndex].headerDesiredWidth > width {
+			if len(pt.name) > width {
 				// Scale progress bar width with name of task
-				progressBarWidth = columns[columnIndex].headerDesiredWidth - width
+				progressBarWidth = len(pt.name) - width
 			} else {
 				// But progress bar is at least 1
 				progressBarWidth = 1
@@ -219,75 +238,107 @@ func (r *Reporter) refresh() {
 			}
 		}
 	}
-
 	// header row
-	r.writef("%-*s", columns[0].width, columns[0].name)
-	for i := 1; i < len(columns); i++ {
-		column := &columns[i]
-		width := column.width
-		r.writef(" │ ")
-
-		width -= len(column.name)
-		r.writef(column.name)
-		if column.at != AnimationTypeNone {
-			r.writef(" ")
-			r.writeAnimation(column.at)
-			width -= 9
-		}
-		r.writeRepeated(" ", width)
-	}
-	r.writef("\n")
-	// separator row
-	r.writeRepeated("─", columns[0].width)
-	for i := 1; i < len(columns); i++ {
-		r.writef("─┼─")
-		r.writeRepeated("─", columns[i].width)
-	}
-	r.writef("\n")
-	r.lastRefreshNumLines = len(r.rows) + 2
-	for _, rr := range r.rows {
-		r.writef("%-*s", columns[0].width, rr.name)
-		r.writef(" │ ")
-		status := rr.status()
-		r.writef("%s", status.Text)
-		r.writeRepeated(" ", columns[1].width-status.Width)
-		for i := 2; i < len(columns); i++ {
-			j := 0
-			for j < len(rr.tasks) {
-				if rr.tasks[j].name == columns[i].name {
-					break
-				}
-				j++
-			}
+	if offset >= 0 {
+		r.writeCmd("[2K") // Clear entire line
+		r.writef("%-*s", columns[0].width, columns[0].name)
+		for i := 1; i < len(columns); i++ {
+			column := &columns[i]
+			width := column.width
 			r.writef(" │ ")
-			if j >= len(rr.tasks) {
-				// No value for this cell
-				r.writef("%*s", columns[i].width, "")
-				continue
-			}
-			pt := rr.tasks[j]
-			width := columns[i].width
-			progressBarWidth := columns[i].progressBarWidth
-
-			width -= progressBarWidth
-			n := float64(progressBarWidth) * pt.v
-			nInt := int(n)
-			r.writeRepeated(progressBarChars[len(progressBarChars)-1], nInt)
-			if pt.v != 1 {
-				nFrac := n - float64(nInt)
-				i := int(nFrac * float64(len(progressBarChars)))
-				r.writef(progressBarChars[i])
-				r.writeRepeated(" ", progressBarWidth-nInt-1)
-			}
-			vPercentInt := int(pt.v * 100)
-			s := fmt.Sprintf("%d%%", vPercentInt)
-			r.writeRepeated(" ", width-len(s))
-			r.writef("%s", s)
+			width -= len(column.name)
+			r.writef(column.name)
+			r.writeRepeated(" ", width)
 		}
-		r.writef("\n")
+		r.writeCmd("E") // Move next line
 	}
+	offset++
 
+	// separator row
+	if offset >= 0 {
+		r.writeCmd("[2K") // Clear entire line
+		r.writeRepeated("─", columns[0].width)
+		for i := 1; i < len(columns); i++ {
+			r.writef("─┼─")
+			r.writeRepeated("─", columns[i].width)
+		}
+		r.writeCmd("E") // Move next line
+	}
+	offset++
+
+	for _, rr := range r.rows {
+		if offset >= 0 {
+			r.writeCmd("[2K") // Clear entire line
+			r.writef("%-*s", columns[0].width, rr.name)
+			r.writef(" │ ")
+
+			status := rr.status()
+			width := columns[1].width
+			if status.AnimationType != AnimationTypeNone {
+				r.writeAnimation(status.AnimationType)
+				r.writef(" ")
+				width -= 9
+			}
+			r.writef("%s", status.Text)
+			width -= status.TextWidth
+			r.writeRepeated(" ", width)
+
+			for i := 2; i < len(columns); i++ {
+				j := 0
+				for j < len(rr.tasks) {
+					if rr.tasks[j].name == columns[i].name {
+						break
+					}
+					j++
+				}
+				r.writef(" │ ")
+				if j >= len(rr.tasks) {
+					// No value for this cell
+					r.writef("%*s", columns[i].width, "")
+					continue
+				}
+				pt := rr.tasks[j]
+				width := columns[i].width
+				progressBarWidth := columns[i].progressBarWidth
+
+				width -= progressBarWidth
+				n := float64(progressBarWidth) * pt.v
+				nInt := int(n)
+				r.writeRepeated(progressBarChars[len(progressBarChars)-1], nInt)
+				if pt.v != 1 {
+					nFrac := n - float64(nInt)
+					i := int(nFrac * float64(len(progressBarChars)))
+					r.writef(progressBarChars[i])
+					r.writeRepeated(" ", progressBarWidth-nInt-1)
+				}
+				vPercentInt := int(pt.v * 100)
+				s := fmt.Sprintf("%d%%", vPercentInt)
+				r.writeRepeated(" ", width-len(s))
+				r.writef("%s", s)
+			}
+			r.writeCmd("E") // Move next line
+		}
+		offset++
+	}
+	for i := r.refreshNumLines(); i < r.lastRefreshNumLines; i++ {
+		if offset >= 0 {
+			r.writeCmd("[2K") // Clear entire line
+			r.writeCmd("E")   // Move next line
+		}
+		offset++
+	}
+	r.writeCmd(fmt.Sprintf("[%dB", r.logLinesSinceFirstRefresh))
+	r.lastRefreshNumLines = r.refreshNumLines()
 	r.flush()
+
+	r.logLinesSinceFirstRefresh += bytes.Count(r.logBuffer.Bytes(), []byte{'\n'})
+	_, err = io.Copy(r.out, r.logBuffer)
+	handleError(err)
+	r.logBuffer.Reset()
+}
+
+func (r *Reporter) refreshNumLines() int {
+	return len(r.rows) + 2 // the number of rows to be rendered in the reporter table
 }
 
 type writeError struct {
@@ -327,6 +378,13 @@ func (r *Reporter) writeRepeated(s string, n int) {
 	for i := 0; i < n; i++ {
 		r.writef(s)
 	}
+}
+
+func (r *Reporter) writeLogs(b []byte) (n int, err error) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	n, err = r.logBuffer.Write(b)
+	return
 }
 
 func (r *Reporter) writef(format string, args ...interface{}) {
@@ -397,7 +455,7 @@ func (rr *ReporterRow) status() *Status {
 	if len(rr.statuses) > 0 {
 		return rr.statuses[len(rr.statuses)-1]
 	}
-	return defaultStatus
+	return StatusWaiting
 }
 
 func (rr *ReporterRow) statusBinarySearch(priority int) int {
@@ -457,4 +515,12 @@ func (pt *ProgressTask) Update(v float64) {
 	pt.rr.r.mutex.Lock()
 	defer pt.rr.r.mutex.Unlock()
 	pt.v = v
+}
+
+type reporterLogWriter struct {
+	r *Reporter
+}
+
+func (rlw *reporterLogWriter) Write(b []byte) (n int, err error) {
+	return rlw.r.writeLogs(b)
 }

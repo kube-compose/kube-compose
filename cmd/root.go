@@ -2,9 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -18,20 +16,12 @@ const (
 )
 
 func Execute() error {
-	log.SetOutput(os.Stdout)
 	rootCmd := &cobra.Command{
-		Use:     "kube-compose",
-		Short:   "k8s",
-		Long:    "Environments on k8s made easy",
-		Version: "0.6.1",
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			logLevel, err := getLogLevelFlag(cmd.Flags())
-			if err != nil {
-				return err
-			}
-			log.SetLevel(logLevel)
-			return nil
-		},
+		Use:               "kube-compose",
+		Short:             "k8s",
+		Long:              "Environments on k8s made easy",
+		Version:           "0.6.1",
+		PersistentPreRunE: setupLogging,
 	}
 	rootCmd.AddCommand(newDownCli(), newUpCli(), newGetCli())
 	setRootCommandFlags(rootCmd)

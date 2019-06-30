@@ -32,14 +32,23 @@ func upCommand(cmd *cobra.Command, args []string) error {
 	opts := &up.Options{}
 	opts.Context = context.Background()
 	opts.Detach, _ = cmd.Flags().GetBool("detach")
-	opts.Reporter = reporter.New(os.Stdout)
 	opts.RunAsUser, _ = cmd.Flags().GetBool("run-as-user")
-	go func() {
-		for {
-			opts.Reporter.Refresh()
-			time.Sleep(reporter.RefreshInterval)
-		}
-	}()
+
+	opts.Reporter = reporter.New(os.Stdout)
+	if opts.Reporter.IsTerminal() {
+		log.StandardLogger().SetFormatter(&log.TextFormatter{
+			ForceColors:               true,
+			EnvironmentOverrideColors: true,
+		})
+		log.StandardLogger().SetOutput(opts.Reporter.LogWriter())
+		go func() {
+			for {
+				opts.Reporter.Refresh()
+				time.Sleep(reporter.RefreshInterval)
+			}
+		}()
+	}
+
 	err = up.Run(cfg, opts)
 	if err != nil {
 		log.Error(err)
