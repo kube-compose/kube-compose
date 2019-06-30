@@ -118,7 +118,6 @@ type upRunner struct {
 	localImagesCache      localImagesCache
 	maxServiceNameLength  int
 	opts                  *Options
-	reporter              *reporter.Reporter
 	totalVolumeCount      int
 }
 
@@ -927,20 +926,23 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 	}
 
 	if s > app.maxObservedPodStatus {
-		app.maxObservedPodStatus = s
-		if s >= podStatusStarted && !app.reporterRowHasStatusStarted {
-			app.reporterRowHasStatusStarted = true
-			app.reporterRow.AddStatus(reporter.StatusRunning)
-		}
-		if s >= podStatusReady && !app.reporterRowHasStatusReady {
-			app.reporterRowHasStatusReady = true
-			app.reporterRow.RemoveStatus(reporter.StatusRunning)
-			app.reporterRow.AddStatus(reporter.StatusReady)
-		}
-		app.newLogEntry().Infof("pod status %s", &app.maxObservedPodStatus)
+		u.setAppMaxObservedPodStatus(app, s)
 	}
-
 	return nil
+}
+
+func (u *upRunner) setAppMaxObservedPodStatus(app *app, s podStatus) {
+	app.maxObservedPodStatus = s
+	if s >= podStatusStarted && !app.reporterRowHasStatusStarted {
+		app.reporterRowHasStatusStarted = true
+		app.reporterRow.AddStatus(reporter.StatusRunning)
+	}
+	if s >= podStatusReady && !app.reporterRowHasStatusReady {
+		app.reporterRowHasStatusReady = true
+		app.reporterRow.RemoveStatus(reporter.StatusRunning)
+		app.reporterRow.AddStatus(reporter.StatusReady)
+	}
+	app.newLogEntry().Infof("pod status %s", &app.maxObservedPodStatus)
 }
 
 func (u *upRunner) streamPodLogs(pod *v1.Pod, completedChannel chan interface{}, getPodLogOptions *v1.PodLogOptions, a *app) {

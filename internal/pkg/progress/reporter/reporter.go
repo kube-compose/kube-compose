@@ -159,7 +159,6 @@ func (r *Reporter) refresh() {
 			}
 		}
 	}()
-	r.buffer.Reset()
 	_, terminalLines, err := terminal.GetSize(int(r.out.Fd()))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error while getting size of terminal: %v\n", err)
@@ -174,6 +173,7 @@ func (r *Reporter) refresh() {
 		r.flushLogs()
 		return
 	}
+	r.buffer.Reset()
 	if r.lastRefreshNumLines == 0 {
 		// This is required to start on the correct line
 		r.writef("")
@@ -185,11 +185,11 @@ func (r *Reporter) refresh() {
 		r.writeCmd(fmt.Sprintf("[%dA", r.lastRefreshNumLines+r.logLines))
 	}
 	columns := []column{
-		column{
+		{
 			name:  "service",
 			width: len("service"),
 		},
-		column{
+		{
 			name:  "status",
 			width: len("status"),
 		},
@@ -223,11 +223,12 @@ func (r *Reporter) refresh() {
 			width := 2 // len(" " + "%") == 2
 			vPercentInt := int(pt.v * 100)
 			// Add number of digits of percent to width needed
-			if vPercentInt == 100 {
+			switch {
+			case vPercentInt == 100:
 				width += 3
-			} else if vPercentInt >= 10 {
+			case vPercentInt >= 10:
 				width += 2
-			} else {
+			default:
 				width++
 			}
 			var progressBarWidth int
@@ -242,11 +243,12 @@ func (r *Reporter) refresh() {
 			if width < minProgressTaskColumnWidth {
 				width = minProgressTaskColumnWidth
 				progressBarWidth = width - 2
-				if vPercentInt == 100 {
+				switch {
+				case vPercentInt == 100:
 					progressBarWidth -= 3
-				} else if vPercentInt >= 10 {
+				case vPercentInt >= 10:
 					progressBarWidth -= 2
-				} else {
+				default:
 					progressBarWidth--
 				}
 			}
@@ -503,11 +505,12 @@ func (row *Row) statusBinarySearch(priority int) int {
 	hi := len(row.statuses) - 1
 	for lo <= hi {
 		mi := lo + (hi-lo)/2
-		if row.statuses[mi].Priority > priority {
+		switch {
+		case row.statuses[mi].Priority > priority:
 			hi = mi - 1
-		} else if row.statuses[mi].Priority < priority {
-			lo = mi + 1
-		} else {
+		case row.statuses[mi].Priority < priority:
+			hi = mi + 1
+		default:
 			return lo
 		}
 	}

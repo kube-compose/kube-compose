@@ -15,7 +15,7 @@ func main() {
 		r.AddRow(fmt.Sprintf("row%d", i))
 		r.Refresh()
 		time.Sleep(1 * time.Second)
-		r.LogWriter().Write([]byte(fmt.Sprintf("log%d\n", i)))
+		_, _ = r.LogWriter().Write([]byte(fmt.Sprintf("log%d\n", i)))
 		r.Refresh()
 		time.Sleep(1 * time.Second)
 	}
