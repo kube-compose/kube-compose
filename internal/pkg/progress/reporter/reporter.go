@@ -80,7 +80,7 @@ type Reporter struct {
 	logBuffer                 *bytes.Buffer
 	logLinesSinceFirstRefresh int
 	logWriter                 io.Writer
-	rows                      []*ReporterRow
+	rows                      []*Row
 	animationState            int // 0, 1 or 2
 	animationTime             time.Duration
 	out                       *os.File
@@ -99,15 +99,15 @@ func New(out *os.File) *Reporter {
 	return r
 }
 
-func (r *Reporter) AddRow(name string) *ReporterRow {
-	rr := &ReporterRow{
+func (r *Reporter) AddRow(name string) *Row {
+	row := &Row{
 		name: name,
 		r:    r,
 	}
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	r.rows = append(r.rows, rr)
-	return rr
+	r.rows = append(r.rows, row)
+	return row
 }
 
 func (r *Reporter) IsTerminal() bool {
@@ -161,15 +161,24 @@ func (r *Reporter) refresh() {
 		fmt.Fprintf(os.Stderr, "error while getting size of terminal: %v\n", err)
 		return
 	}
+	if terminalLines == 0 {
+		r.flushLogs()
+		return
+	}
 	offset := terminalLines - 1 - r.logLinesSinceFirstRefresh - r.lastRefreshNumLines
 	if offset+r.refreshNumLines() <= 0 {
 		r.flushLogs()
 		return
 	}
-	if offset < 0 {
-		r.writeCmd(fmt.Sprintf("[%dA", terminalLines-1)) // Move to first line of output...
+	if r.lastRefreshNumLines == 0 {
+		// This is required to start on the correct line..
+		r.writef("")
+	} else if offset < 0 {
+		// Move to first line of output
+		r.writeCmd(fmt.Sprintf("[%dA", terminalLines-1))
 	} else {
-		r.writeCmd(fmt.Sprintf("[%dA", r.lastRefreshNumLines+r.logLinesSinceFirstRefresh)) // Move to first line of output...
+		// Move to first line of output
+		r.writeCmd(fmt.Sprintf("[%dA", r.lastRefreshNumLines+r.logLinesSinceFirstRefresh))
 	}
 	columns := []column{
 		column{
@@ -182,12 +191,12 @@ func (r *Reporter) refresh() {
 		},
 	}
 	taskNameToColumnIndex := map[string]int{}
-	for _, rr := range r.rows {
-		width := len(rr.name)
+	for _, row := range r.rows {
+		width := len(row.name)
 		if width > columns[0].width {
 			columns[0].width = width
 		}
-		status := rr.status()
+		status := row.status()
 		width = status.TextWidth
 		if status.AnimationType != AnimationTypeNone {
 			width += 9
@@ -195,7 +204,7 @@ func (r *Reporter) refresh() {
 		if width > columns[1].width {
 			columns[1].width = width
 		}
-		for _, pt := range rr.tasks {
+		for _, pt := range row.tasks {
 			columnIndex, ok := taskNameToColumnIndex[pt.name]
 			if !ok {
 				columnIndex = len(columns)
@@ -273,13 +282,13 @@ func (r *Reporter) refresh() {
 	}
 	offset++
 
-	for _, rr := range r.rows {
+	for _, row := range r.rows {
 		if offset >= 0 {
 			r.writeCmd("[2K") // Clear entire line
-			r.writef("%-*s", columns[0].width, rr.name)
+			r.writef("%-*s", columns[0].width, row.name)
 			r.writef(" │ ")
 
-			status := rr.status()
+			status := row.status()
 			width := columns[1].width
 			r.writef("%s", status.Text)
 			width -= status.TextWidth
@@ -292,19 +301,19 @@ func (r *Reporter) refresh() {
 
 			for i := 2; i < len(columns); i++ {
 				j := 0
-				for j < len(rr.tasks) {
-					if rr.tasks[j].name == columns[i].name {
+				for j < len(row.tasks) {
+					if row.tasks[j].name == columns[i].name {
 						break
 					}
 					j++
 				}
 				r.writef(" │ ")
-				if j >= len(rr.tasks) {
+				if j >= len(row.tasks) {
 					// No value for this cell
 					r.writef("%*s", columns[i].width, "")
 					continue
 				}
-				pt := rr.tasks[j]
+				pt := row.tasks[j]
 				width := columns[i].width
 				progressBarWidth := columns[i].progressBarWidth
 
@@ -408,75 +417,75 @@ func (r *Reporter) writeCmd(s string) {
 	handleError(err)
 }
 
-type ReporterRow struct {
+type Row struct {
 	name     string
 	r        *Reporter
 	tasks    []*ProgressTask
 	statuses []*Status
 }
 
-func (rr *ReporterRow) AddProgressTask(name string) *ProgressTask {
+func (row *Row) AddProgressTask(name string) *ProgressTask {
 	pt := &ProgressTask{
 		name: name,
-		rr:   rr,
+		row:  row,
 	}
-	rr.r.mutex.Lock()
-	defer rr.r.mutex.Unlock()
-	rr.tasks = append(rr.tasks, pt)
+	row.r.mutex.Lock()
+	defer row.r.mutex.Unlock()
+	row.tasks = append(row.tasks, pt)
 	return pt
 }
 
-func (rr *ReporterRow) AddStatus(s *Status) {
-	rr.r.mutex.Lock()
-	defer rr.r.mutex.Unlock()
-	i := rr.statusBinarySearch(s.Priority)
+func (row *Row) AddStatus(s *Status) {
+	row.r.mutex.Lock()
+	defer row.r.mutex.Unlock()
+	i := row.statusBinarySearch(s.Priority)
 	if i < 0 {
 		i = -i - 1
 	}
-	rr.statuses = append(rr.statuses[:i], append([]*Status{s}, rr.statuses[i:]...)...)
+	row.statuses = append(row.statuses[:i], append([]*Status{s}, row.statuses[i:]...)...)
 }
 
-func (rr *ReporterRow) Name() string {
-	return rr.name
+func (row *Row) Name() string {
+	return row.name
 }
 
-func (rr *ReporterRow) RemoveStatus(s *Status) {
-	rr.r.mutex.Lock()
-	defer rr.r.mutex.Unlock()
-	i := rr.statusBinarySearch(s.Priority)
+func (row *Row) RemoveStatus(s *Status) {
+	row.r.mutex.Lock()
+	defer row.r.mutex.Unlock()
+	i := row.statusBinarySearch(s.Priority)
 	if i < 0 {
 		return
 	}
-	iLast := len(rr.statuses) - 1
+	iLast := len(row.statuses) - 1
 	for {
-		if rr.statuses[i] == s {
-			copy(rr.statuses[i:], rr.statuses[i+1:])
-			rr.statuses[iLast] = nil
-			rr.statuses = rr.statuses[:iLast]
+		if row.statuses[i] == s {
+			copy(row.statuses[i:], row.statuses[i+1:])
+			row.statuses[iLast] = nil
+			row.statuses = row.statuses[:iLast]
 			return
 		}
 		i++
-		if i > iLast || rr.statuses[i].Priority != s.Priority {
+		if i > iLast || row.statuses[i].Priority != s.Priority {
 			break
 		}
 	}
 }
 
-func (rr *ReporterRow) status() *Status {
-	if len(rr.statuses) > 0 {
-		return rr.statuses[len(rr.statuses)-1]
+func (row *Row) status() *Status {
+	if len(row.statuses) > 0 {
+		return row.statuses[len(row.statuses)-1]
 	}
 	return StatusWaiting
 }
 
-func (rr *ReporterRow) statusBinarySearch(priority int) int {
+func (row *Row) statusBinarySearch(priority int) int {
 	lo := 0
-	hi := len(rr.statuses) - 1
+	hi := len(row.statuses) - 1
 	for lo <= hi {
 		mi := lo + (hi-lo)/2
-		if rr.statuses[mi].Priority > priority {
+		if row.statuses[mi].Priority > priority {
 			hi = mi - 1
-		} else if rr.statuses[mi].Priority < priority {
+		} else if row.statuses[mi].Priority < priority {
 			lo = mi + 1
 		} else {
 			return lo
@@ -488,7 +497,7 @@ func (rr *ReporterRow) statusBinarySearch(priority int) int {
 type ProgressTask struct {
 	done bool
 	name string
-	rr   *ReporterRow
+	row  *Row
 	v    float64
 }
 
@@ -496,15 +505,15 @@ func (pt *ProgressTask) Done() {
 	if pt.done {
 		return
 	}
-	pt.rr.r.mutex.Lock()
-	defer pt.rr.r.mutex.Unlock()
+	pt.row.r.mutex.Lock()
+	defer pt.row.r.mutex.Unlock()
 	pt.done = true
-	tasks := pt.rr.tasks
+	tasks := pt.row.tasks
 	iLast := len(tasks) - 1
 	for i := 0; i <= iLast; i++ {
 		if tasks[i] == pt {
 			tasks[i], tasks[iLast] = tasks[iLast], tasks[i]
-			pt.rr.tasks = tasks[0:iLast]
+			pt.row.tasks = tasks[0:iLast]
 			break
 		}
 	}
@@ -515,7 +524,7 @@ func (pt *ProgressTask) Name() string {
 }
 
 func (pt *ProgressTask) Update(v float64) {
-	if !pt.rr.r.isTerminal {
+	if !pt.row.r.isTerminal {
 		return
 	}
 	if v < 0 {
@@ -523,8 +532,8 @@ func (pt *ProgressTask) Update(v float64) {
 	} else if v > 1 {
 		v = 1
 	}
-	pt.rr.r.mutex.Lock()
-	defer pt.rr.r.mutex.Unlock()
+	pt.row.r.mutex.Lock()
+	defer pt.row.r.mutex.Unlock()
 	pt.v = v
 }
 

@@ -70,7 +70,7 @@ type app struct {
 	maxObservedPodStatus                 podStatus
 	containersForWhichWeAreStreamingLogs map[string]bool
 	color                                int
-	reporterRow                          *reporter.ReporterRow
+	reporterRow                          *reporter.Row
 	reporterRowHasStatusStarted          bool
 	reporterRowHasStatusReady            bool
 	volumes                              []*appVolume
@@ -281,7 +281,8 @@ func (u *upRunner) pushImage(sourceImageID, name, tag, imageDescr string, a *app
 	if err != nil {
 		return
 	}
-	podImage = fmt.Sprintf("docker-registry.default.svc:5000/%s/%s@%s", u.cfg.Namespace, name, digest)
+	// podImage = fmt.Sprintf("docker-registry.default.svc:5000/%s/%s@%s", u.cfg.Namespace, name, digest)
+	podImage = fmt.Sprintf("localhost:5000/%s/%s@%s", u.cfg.Namespace, name, digest)
 	return
 }
 
