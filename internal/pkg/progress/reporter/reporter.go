@@ -157,6 +157,7 @@ func (r *Reporter) refresh() {
 	}
 	offset := terminalLines - 1 - r.logLinesSinceFirstRefresh - r.lastRefreshNumLines
 	if offset+r.refreshNumLines() <= 0 {
+		r.flushLogs()
 		return
 	}
 	if offset < 0 {
@@ -331,10 +332,7 @@ func (r *Reporter) refresh() {
 	r.lastRefreshNumLines = r.refreshNumLines()
 	r.flush()
 
-	r.logLinesSinceFirstRefresh += bytes.Count(r.logBuffer.Bytes(), []byte{'\n'})
-	_, err = io.Copy(r.out, r.logBuffer)
-	handleError(err)
-	r.logBuffer.Reset()
+	r.flushLogs()
 }
 
 func (r *Reporter) refreshNumLines() int {
@@ -357,6 +355,13 @@ func handleError(err error) {
 func (r *Reporter) flush() {
 	_, err := io.Copy(r.out, r.buffer)
 	handleError(err)
+}
+
+func (r *Reporter) flushLogs() {
+	r.logLinesSinceFirstRefresh += bytes.Count(r.logBuffer.Bytes(), []byte{'\n'})
+	_, err := io.Copy(r.out, r.logBuffer)
+	handleError(err)
+	r.logBuffer.Reset()
 }
 
 func (r *Reporter) writeAnimation(at AnimationType) {
