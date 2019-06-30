@@ -125,8 +125,8 @@ func TestFormatCreatePodReason(t *testing.T) {
 	u.initApps()
 	appA := u.apps["a"]
 	s := u.formatCreatePodReason(appA)
-	if s != "its dependency conditions are met (c: ready, d: running)" &&
-		s != "its dependency conditions are met (d: running, c: ready)" {
+	if s != "all depends_on conditions satisfied (c: ready, d: running)" &&
+		s != "all depends_on conditions satisfied (d: running, c: ready)" {
 		t.Error(s)
 	}
 }

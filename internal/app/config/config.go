@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
 	"github.com/pkg/errors"
@@ -114,7 +115,7 @@ func loadXKubeCompose(cfg *Config, xPropertiesSlice []dockerComposeConfig.XPrope
 				return err
 			}
 		} else if x.XKubeCompose.PushImages != nil {
-			fmt.Println("WARNING: a docker compose file has set \"x-kube-compose\".\"push_images\", but this functionality is deprecated. " +
+			log.Warn("a docker compose file has set \"x-kube-compose\".\"push_images\", but this functionality is deprecated. " +
 				"See https://github.com/kube-compose/kube-compose.")
 			cfg.ClusterImageStorage.Docker = nil
 			cfg.ClusterImageStorage.DockerRegistry = &DockerRegistryClusterImageStorage{

@@ -559,7 +559,8 @@ func ensureNoDependsOnCycle(s1 *serviceInternal, services map[string]*serviceInt
 
 // https://github.com/docker/compose/blob/master/compose/config/config_schema_v2.1.json
 func (c *configLoader) parseDockerComposeFile(dcFile *dockerComposeFile) error {
-	for _, s := range dcFile.Services {
+	for name, s := range dcFile.Services {
+		s.name = name
 		err := c.parseDockerComposeFileService(dcFile, s)
 		if err != nil {
 			return err
