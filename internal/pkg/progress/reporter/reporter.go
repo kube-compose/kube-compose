@@ -72,18 +72,18 @@ type Status struct {
 }
 
 type Reporter struct {
-	buffer                    *bytes.Buffer
-	mutex                     sync.Mutex
-	isTerminal                bool
-	lastRefreshNumLines       int
-	lastRefreshTime           time.Time
-	logBuffer                 *bytes.Buffer
-	logLinesSinceFirstRefresh int
-	logWriter                 io.Writer
-	rows                      []*Row
-	animationState            int // 0, 1 or 2
-	animationTime             time.Duration
-	out                       *os.File
+	buffer              *bytes.Buffer
+	mutex               sync.Mutex
+	isTerminal          bool
+	lastRefreshNumLines int
+	lastRefreshTime     time.Time
+	logBuffer           *bytes.Buffer
+	logLines            int
+	logWriter           io.Writer
+	rows                []*Row
+	animationState      int // 0, 1 or 2
+	animationTime       time.Duration
+	out                 *os.File
 }
 
 func New(out *os.File) *Reporter {
@@ -165,20 +165,20 @@ func (r *Reporter) refresh() {
 		r.flushLogs()
 		return
 	}
-	offset := terminalLines - 1 - r.logLinesSinceFirstRefresh - r.lastRefreshNumLines
+	offset := terminalLines - 1 - r.logLines - r.lastRefreshNumLines
 	if offset+r.refreshNumLines() <= 0 {
 		r.flushLogs()
 		return
 	}
 	if r.lastRefreshNumLines == 0 {
-		// This is required to start on the correct line..
+		// This is required to start on the correct line
 		r.writef("")
 	} else if offset < 0 {
 		// Move to first line of output
 		r.writeCmd(fmt.Sprintf("[%dA", terminalLines-1))
 	} else {
 		// Move to first line of output
-		r.writeCmd(fmt.Sprintf("[%dA", r.lastRefreshNumLines+r.logLinesSinceFirstRefresh))
+		r.writeCmd(fmt.Sprintf("[%dA", r.lastRefreshNumLines+r.logLines))
 	}
 	columns := []column{
 		column{
@@ -254,6 +254,17 @@ func (r *Reporter) refresh() {
 			}
 		}
 	}
+	lfCountdown := r.lastRefreshNumLines + r.logLines
+
+	nextLine := func() {
+		lfCountdown--
+		if lfCountdown < 0 {
+			r.writef("\n")
+		} else {
+			r.writeCmd("E")
+		}
+	}
+
 	// header row
 	if offset >= 0 {
 		r.writeCmd("[2K") // Clear entire line
@@ -266,7 +277,7 @@ func (r *Reporter) refresh() {
 			r.writef(column.name)
 			r.writeRepeated(" ", width)
 		}
-		r.writeCmd("E") // Move next line
+		nextLine()
 	}
 	offset++
 
@@ -278,7 +289,7 @@ func (r *Reporter) refresh() {
 			r.writef("─┼─")
 			r.writeRepeated("─", columns[i].width)
 		}
-		r.writeCmd("E") // Move next line
+		nextLine()
 	}
 	offset++
 
@@ -332,18 +343,23 @@ func (r *Reporter) refresh() {
 				r.writeRepeated(" ", width-len(s))
 				r.writef("%s", s)
 			}
-			r.writeCmd("E") // Move next line
+			nextLine()
 		}
 		offset++
 	}
 	for i := r.refreshNumLines(); i < r.lastRefreshNumLines; i++ {
 		if offset >= 0 {
 			r.writeCmd("[2K") // Clear entire line
-			r.writeCmd("E")   // Move next line
+			r.writeCmd("[1B") // Move down one line
 		}
 		offset++
 	}
-	r.writeCmd(fmt.Sprintf("[%dB", r.logLinesSinceFirstRefresh))
+	r.logLines -= r.refreshNumLines() - r.lastRefreshNumLines
+	if r.logLines < 0 {
+		r.logLines = 0
+	} else if r.logLines > 0 {
+		r.writeCmd(fmt.Sprintf("[%dB", r.logLines))
+	}
 	r.lastRefreshNumLines = r.refreshNumLines()
 	r.flush()
 
@@ -373,7 +389,7 @@ func (r *Reporter) flush() {
 }
 
 func (r *Reporter) flushLogs() {
-	r.logLinesSinceFirstRefresh += bytes.Count(r.logBuffer.Bytes(), []byte{'\n'})
+	r.logLines += bytes.Count(r.logBuffer.Bytes(), []byte{'\n'})
 	_, err := io.Copy(r.out, r.logBuffer)
 	handleError(err)
 	r.logBuffer.Reset()

@@ -54,7 +54,7 @@ services:
     volumes:
     - './entrypoint.sh:/mnt/vol1/entrypoint.sh:ro'
   db:
-    image: postgres:$BLA
+    image: postgres:latest
     healthcheck:
       test:
       - CMD-SHELL

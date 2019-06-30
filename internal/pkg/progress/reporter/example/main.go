@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -10,12 +11,12 @@ import (
 func main() {
 
 	r := reporter.New(os.Stdout)
-	row1 := r.AddRow("row1")
-	row2 := r.AddRow("row2")
-	r.Refresh()
-	time.Sleep(1 * time.Second)
-	r.LogWriter().Write([]byte("log1\n"))
-	r.Refresh()
-	_ = row1
-	_ = row2
+	for i := 1; i <= 10; i++ {
+		r.AddRow(fmt.Sprintf("row%d", i))
+		r.Refresh()
+		time.Sleep(1 * time.Second)
+		r.LogWriter().Write([]byte(fmt.Sprintf("log%d\n", i)))
+		r.Refresh()
+		time.Sleep(1 * time.Second)
+	}
 }
