@@ -51,5 +51,6 @@ func upCommand(cmd *cobra.Command, args []string) error {
 		opts.Reporter.Refresh()
 		os.Exit(1)
 	}
+	opts.Reporter.Refresh()
 	return nil
 }

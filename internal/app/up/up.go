@@ -71,8 +71,6 @@ type app struct {
 	containersForWhichWeAreStreamingLogs map[string]bool
 	color                                int
 	reporterRow                          *reporter.Row
-	reporterRowHasStatusStarted          bool
-	reporterRowHasStatusReady            bool
 	volumes                              []*appVolume
 	volumeInitImage                      appVolumesInitImage
 }
@@ -933,12 +931,10 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 
 func (u *upRunner) setAppMaxObservedPodStatus(app *app, s podStatus) {
 	app.maxObservedPodStatus = s
-	if s >= podStatusStarted && !app.reporterRowHasStatusStarted {
-		app.reporterRowHasStatusStarted = true
+	switch {
+	case s == podStatusStarted:
 		app.reporterRow.AddStatus(reporter.StatusRunning)
-	}
-	if s >= podStatusReady && !app.reporterRowHasStatusReady {
-		app.reporterRowHasStatusReady = true
+	case s >= podStatusReady:
 		app.reporterRow.RemoveStatus(reporter.StatusRunning)
 		app.reporterRow.AddStatus(reporter.StatusReady)
 	}

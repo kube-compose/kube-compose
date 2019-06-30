@@ -53,19 +53,23 @@ func getLogLevelFlag(flags *pflag.FlagSet) (log.Level, error) {
 }
 
 func setupLogging(cmd *cobra.Command, _ []string) error {
-	log.SetOutput(os.Stdout)
 	logLevel, err := getLogLevelFlag(cmd.Flags())
 	if err != nil {
 		return err
 	}
 	log.SetLevel(logLevel)
+	log.SetOutput(os.Stdout)
 	if reporter.IsTerminal(os.Stdout) {
-		log.SetFormatter(setupLogFormatter())
+		log.SetFormatter(createTerminalLogFormatter())
+	} else {
+		log.SetFormatter(&log.TextFormatter{
+			DisableTimestamp: true,
+		})
 	}
 	return nil
 }
 
-func setupLogFormatter() log.Formatter {
+func createTerminalLogFormatter() log.Formatter {
 	return &log.TextFormatter{
 		ForceColors:               true,
 		DisableTimestamp:          true,
