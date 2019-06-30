@@ -2,10 +2,10 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/kube-compose/kube-compose/internal/app/up"
 	"github.com/kube-compose/kube-compose/internal/pkg/progress/reporter"
 	"github.com/spf13/cobra"
@@ -42,7 +42,7 @@ func upCommand(cmd *cobra.Command, args []string) error {
 	}()
 	err = up.Run(cfg, opts)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		log.Error(err)
 		os.Exit(1)
 	}
 	return nil

@@ -6,6 +6,8 @@ import (
 	"math"
 	"strconv"
 	"strings"
+
+	log "github.com/Sirupsen/logrus"
 )
 
 const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
@@ -59,7 +61,7 @@ func NewString(v string) *string {
 func CloseAndLogError(closer io.Closer) {
 	err := closer.Close()
 	if err != nil {
-		fmt.Println(err)
+		log.Error(err)
 	}
 }
 

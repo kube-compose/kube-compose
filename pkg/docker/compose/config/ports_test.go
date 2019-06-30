@@ -171,10 +171,10 @@ func Test_ParsePorts_Error(t *testing.T) {
 
 func Test_ParsePorts_DuplicatePortsError(t *testing.T) {
 	_, err := parsePorts([]port{
-		port{
+		{
 			Value: "8080",
 		},
-		port{
+		{
 			Value: "8080",
 		},
 	})

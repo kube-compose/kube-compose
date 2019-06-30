@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/docker/distribution/digestset"
 	dockerRef "github.com/docker/distribution/reference"
 	dockerTypes "github.com/docker/docker/api/types"
@@ -68,12 +69,18 @@ type app struct {
 	volumeInitImage                      appVolumesInitImage
 }
 
+func (a *app) hasService() bool {
+	return len(a.composeService.Ports) > 0
+}
+
 func (a *app) name() string {
 	return a.composeService.Name()
 }
 
-func (a *app) hasService() bool {
-	return len(a.composeService.Ports) > 0
+func (a *app) newLogEntry() *log.Entry {
+	return log.WithFields(log.Fields{
+		"service": a.name(),
+	})
 }
 
 type hostAliases struct {
@@ -141,7 +148,7 @@ func (u *upRunner) initAppsToBeStarted() {
 
 func (u *upRunner) initVolumeInfoWarnOnce(s string) {
 	if u.totalVolumeCount == 1 {
-		fmt.Println(s)
+		log.Warn(s)
 	}
 }
 
@@ -153,23 +160,16 @@ func (u *upRunner) initVolumeInfo() {
 				continue
 			}
 			u.totalVolumeCount++
-			if u.totalVolumeCount == 2 {
-				fmt.Printf("WARNING: the docker compose configuration potentially has a volume that is projected into the file system f1" +
-					" and f2 of containers c1 and c2, respectively, but currently changes in f1 will not be reflected in f2 (see " +
-					"https://github.com/kube-compose/kube-compose#limitations)\n")
-			}
-			u.initVolumeInfoWarnOnce("WARNING: the docker compose configuration has one or more bind volumes, but the current implementation " +
-				"cannot reflect changes on the host file system in containers (and vice versa, see " +
+			u.initVolumeInfoWarnOnce("bind mounted volumes do not behave the same as docker-compose (see " +
 				"https://github.com/kube-compose/kube-compose#limitations)")
 			flag := false
 			if u.cfg.ClusterImageStorage.Docker == nil && u.cfg.ClusterImageStorage.DockerRegistry == nil {
-				u.initVolumeInfoWarnOnce("WARNING: the docker compose configuration has one or more bind volumes, but they have been disabled " +
-					"because the configuration to push images is missing (see https://github.com/kube-compose/kube-compose#volumes)")
+				u.initVolumeInfoWarnOnce("disabling bind mounted volumes: cluster_image_storage is missing (see " +
+					"https://github.com/kube-compose/kube-compose#volumes)")
 				flag = true
 			}
 			if u.cfg.VolumeInitBaseImage == nil {
-				u.initVolumeInfoWarnOnce("WARNING: the docker compose configuration has one or more bind volumes, but they have been disabled " +
-					"because the base image of volume init containers is not configured (see " +
+				u.initVolumeInfoWarnOnce("disabling bind mounted volumes: volumes_init_base_image is missing (see " +
 					"https://github.com/kube-compose/kube-compose#volumes)")
 				flag = true
 			}
@@ -193,11 +193,8 @@ func initVolumeInfoGetAppVolume(a *app, serviceVolume dockerComposeConfig.Servic
 				r.readOnly = true
 			case "rw":
 			default:
-				fmt.Printf(
-					"app %s: docker compose service has a volume with an invalid mode %#v, ignoring this volume\n",
-					a.name(),
-					serviceVolume.Short.Mode,
-				)
+				log.Errorf("service %s has a volume with an invalid mode %#v, ignoring this volume\n", a.name(),
+					serviceVolume.Short.Mode)
 				return nil
 			}
 		}
@@ -205,9 +202,8 @@ func initVolumeInfoGetAppVolume(a *app, serviceVolume dockerComposeConfig.Servic
 			var err error
 			r.resolvedHostPath, err = resolveBindVolumeHostPath(serviceVolume.Short.HostPath)
 			if err != nil {
-				fmt.Printf(
-					"app %s: docker compose service has a volume with host path %#v, ignoring this volume because resolving the "+
-						"host path resulted in an error: %v\n",
+				log.Errorf("service %s has a volume with host path %#v, ignoring this volume because resolving the host path resulted in "+
+					"an error: %v\n",
 					a.name(),
 					serviceVolume.Short.HostPath,
 					err,
@@ -518,7 +514,7 @@ func (u *upRunner) waitForServiceClusterIPWatch(expected, remaining int, eventCh
 		remainingNew := u.waitForServiceClusterIPCountRemaining()
 		if remainingNew != remaining {
 			remaining = remainingNew
-			fmt.Printf("waiting for cluster IP assignment (%d/%d)\n", expected-remaining, expected)
+			log.Infof("waiting for cluster IP assignment (%d/%d)\n", expected-remaining, expected)
 			if remaining == 0 {
 				break
 			}
@@ -536,7 +532,7 @@ func (u *upRunner) waitForServiceClusterIP(expected int) error {
 		return err
 	}
 	remaining := u.waitForServiceClusterIPCountRemaining()
-	fmt.Printf("waiting for cluster IP assignment (%d/%d)\n", expected-remaining, expected)
+	log.Infof("waiting for cluster IP assignment (%d/%d)\n", expected-remaining, expected)
 	if remaining == 0 {
 		return nil
 	}
@@ -577,11 +573,11 @@ func (u *upRunner) createServicesAndGetPodHostAliases() ([]v1.HostAlias, error) 
 		_, err := u.k8sServiceClient.Create(service)
 		switch {
 		case k8sError.IsAlreadyExists(err):
-			fmt.Printf("app %s: service %s already exists\n", app.name(), service.ObjectMeta.Name)
+			app.newLogEntry().Debugf("k8s service %s already exists", service.ObjectMeta.Name)
 		case err != nil:
 			return nil, err
 		default:
-			fmt.Printf("app %s: service %s created\n", app.name(), service.ObjectMeta.Name)
+			app.newLogEntry().Infof("created k8s service %s", service.ObjectMeta.Name)
 		}
 	}
 	if expectedServiceCount == 0 {
@@ -823,10 +819,11 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 
 	podServer, err := u.k8sPodClient.Create(pod)
 	if k8sError.IsAlreadyExists(err) {
-		fmt.Printf("app %s: pod %s already exists\n", app.name(), pod.ObjectMeta.Name)
+		app.newLogEntry().Debugf("pod %s already exists", pod.ObjectMeta.Name)
 	} else if err != nil {
 		return nil, err
 	}
+	app.newLogEntry().Debugf("created pod %s", pod.ObjectMeta.Name)
 	u.appsThatNeedToBeReady[app] = true
 	return podServer, nil
 }
@@ -914,7 +911,7 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 
 	if s > app.maxObservedPodStatus {
 		app.maxObservedPodStatus = s
-		fmt.Printf("app %s: pod status %s\n", app.name(), &app.maxObservedPodStatus)
+		app.newLogEntry().Infof("pod status %s", &app.maxObservedPodStatus)
 	}
 
 	return nil
@@ -933,7 +930,7 @@ func (u *upRunner) streamPodLogs(pod *v1.Pod, completedChannel chan interface{},
 		fmt.Printf("%-*s| %s\n", u.maxServiceNameLength+3, cmdColor.Colorize(a.name(), a.color), scanner.Text())
 	}
 	if err = scanner.Err(); err != nil {
-		fmt.Println(err)
+		log.Error(err)
 	}
 	close(completedChannel)
 }
@@ -955,12 +952,11 @@ func (u *upRunner) createPodsIfNeeded() error {
 			}
 		}
 		if createPod {
-			pod, err := u.createPod(app1)
+			app1.newLogEntry().Debugf(u.formatCreatePodReason(app1))
+			_, err := u.createPod(app1)
 			if err != nil {
 				return err
 			}
-			reason := u.formatCreatePodReason(app1)
-			fmt.Printf("app %s: created pod %s because %s\n", app1.name(), pod.ObjectMeta.Name, reason)
 			delete(u.appsToBeStarted, app1)
 		}
 	}
@@ -969,7 +965,7 @@ func (u *upRunner) createPodsIfNeeded() error {
 
 func (u *upRunner) formatCreatePodReason(app1 *app) string {
 	reason := strings.Builder{}
-	reason.WriteString("its dependency conditions are met (")
+	reason.WriteString("all depends_on conditions satisfied (")
 	comma := false
 	for name, healthiness := range app1.composeService.DockerComposeService.DependsOn {
 		if comma {
@@ -992,11 +988,11 @@ func (u *upRunner) runStartInitialPods() error {
 		if len(app.composeService.DockerComposeService.DependsOn) != 0 {
 			continue
 		}
-		pod, err := u.createPod(app)
+		app.newLogEntry().Debug("all depends_on conditions satisfied")
+		_, err := u.createPod(app)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("app %s: created pod %s because all its dependency conditions are met\n", app.name(), pod.ObjectMeta.Name)
 		delete(u.appsToBeStarted, app)
 	}
 	return nil
@@ -1101,7 +1097,7 @@ func (u *upRunner) runWatchPodsEvent(event *k8swatch.Event) error {
 
 func (u *upRunner) runWatchPods(resourceVersion string) error {
 	if u.checkIfPodsReady() {
-		fmt.Printf("pods ready (%d/%d)\n", len(u.appsThatNeedToBeReady), len(u.appsThatNeedToBeReady))
+		log.Infof("pods ready (%d/%d)\n", len(u.appsThatNeedToBeReady), len(u.appsThatNeedToBeReady))
 		return nil
 	}
 	listOptions := metav1.ListOptions{
@@ -1128,7 +1124,7 @@ func (u *upRunner) runWatchPods(resourceVersion string) error {
 			break
 		}
 	}
-	fmt.Printf("pods ready (%d/%d)\n", len(u.appsThatNeedToBeReady), len(u.appsThatNeedToBeReady))
+	log.Infof("pods ready (%d/%d)\n", len(u.appsThatNeedToBeReady), len(u.appsThatNeedToBeReady))
 	return nil
 }
 

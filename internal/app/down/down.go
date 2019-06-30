@@ -1,8 +1,7 @@
 package down
 
 import (
-	"fmt"
-
+	log "github.com/Sirupsen/logrus"
 	"github.com/kube-compose/kube-compose/internal/app/config"
 	"github.com/kube-compose/kube-compose/internal/app/k8smeta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,7 +48,7 @@ func (d *downRunner) deleteCommon(kind string, lister lister, deleter deleter) (
 			if err != nil {
 				return false, err
 			}
-			fmt.Printf("deleted %s %s\n", kind, item.Name)
+			log.Infof("deleted %s %s\n", kind, item.Name)
 		} else {
 			deletedAll = false
 		}

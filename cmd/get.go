@@ -6,6 +6,7 @@ import (
 
 	"text/template"
 
+	log "github.com/Sirupsen/logrus"
 	details "github.com/kube-compose/kube-compose/internal/app/get"
 	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	"github.com/spf13/cobra"
@@ -38,20 +39,20 @@ func getCommand(cmd *cobra.Command, args []string) error {
 		output, _ = cmd.Flags().GetString("output")
 		tmpl, err = template.New("test").Parse(output)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
+			log.Error(err)
 			os.Exit(1)
 		}
 	}
 	service := cfg.Services[args[0]]
 	d, err := details.GetServiceDetails(cfg, service)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		log.Error(err)
 		os.Exit(1)
 	}
 	if tmpl != nil {
 		err = tmpl.Execute(os.Stdout, d)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
+			log.Error(err)
 			os.Exit(1)
 		}
 	} else {
@@ -59,7 +60,7 @@ func getCommand(cmd *cobra.Command, args []string) error {
 			{"NAME", "HOSTNAME", "CLUSTER-IP"},
 			{d.Name, d.Hostname, d.ClusterIP},
 		})
-		fmt.Print(output)
+		fmt.Println(output)
 	}
 	return nil
 }
