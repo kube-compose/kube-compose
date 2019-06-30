@@ -13,6 +13,7 @@ services:
     image: ubuntu:latest
     ports:
     - "8080"
+    - "8080"
     working_dir: /app/test
     volumes:
     - './docker-compose.yml:/mnt/vol1/docker-compose.yml:ro'
