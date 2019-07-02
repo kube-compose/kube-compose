@@ -11,16 +11,10 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-type AnimationType int
-
 const (
-	ansiiTerminalCommandEscape               = '\x1b'
-	minProgressTaskColumnWidth               = 20
-	animationSpeed                           = time.Second // length of the interval with which animation state is incremented
-	AnimationTypeNone          AnimationType = 0
-	AnimationTypeDockerPull    AnimationType = 1
-	AnimationTypeDockerPush    AnimationType = 2
-	RefreshInterval                          = 100 * time.Millisecond
+	ansiiTerminalCommandEscape = '\x1b'
+	minProgressTaskColumnWidth = 20
+	RefreshInterval            = 100 * time.Millisecond
 )
 
 var (
@@ -38,16 +32,14 @@ var (
 		"█",
 	}
 	StatusDockerPush = &Status{
-		AnimationType: AnimationTypeDockerPush,
-		Text:          "pushing image",
-		TextWidth:     13,
-		Priority:      1,
+		Text:      "pushing image",
+		TextWidth: 13,
+		Priority:  1,
 	}
 	StatusDockerPull = &Status{
-		AnimationType: AnimationTypeDockerPull,
-		Text:          "pulling image",
-		TextWidth:     13,
-		Priority:      1,
+		Text:      "pulling image",
+		TextWidth: 13,
+		Priority:  1,
 	}
 	StatusWaiting = &Status{
 		TextWidth: 7,
@@ -67,10 +59,9 @@ var (
 )
 
 type Status struct {
-	AnimationType AnimationType
-	Priority      int
-	Text          string
-	TextWidth     int
+	Priority  int
+	Text      string
+	TextWidth int
 }
 
 type Reporter struct {
@@ -78,13 +69,10 @@ type Reporter struct {
 	mutex               sync.Mutex
 	isTerminal          bool
 	lastRefreshNumLines int
-	lastRefreshTime     time.Time
 	logBuffer           *bytes.Buffer
 	logLines            int
 	logWriter           io.Writer
 	rows                []*Row
-	animationState      int // 0, 1 or 2
-	animationTime       time.Duration
 	out                 io.Writer
 }
 
@@ -156,18 +144,7 @@ type column struct {
 	width            int
 }
 
-func (r *Reporter) updateTime() {
-	now := time.Now()
-	elapsed := now.Sub(r.lastRefreshTime)
-	r.animationTime += elapsed
-	dividend := r.animationTime / animationSpeed
-	r.animationTime -= dividend * animationSpeed
-	r.animationState = (r.animationState + int(dividend)) % 3
-	r.lastRefreshTime = now
-}
-
 func (r *Reporter) refresh() {
-	r.updateTime()
 	defer func() {
 		if v := recover(); v != nil {
 			if writeError, ok := v.(*writeError); ok {
@@ -203,6 +180,7 @@ func (r *Reporter) refresh() {
 		// Move to first line of output
 		r.writeCmd(fmt.Sprintf("[%dA", r.lastRefreshNumLines+r.logLines))
 	}
+	r.writef("\r")
 	columns := []column{
 		{
 			name:  "service",
@@ -221,9 +199,6 @@ func (r *Reporter) refresh() {
 		}
 		status := row.status()
 		width = status.TextWidth
-		if status.AnimationType != AnimationTypeNone {
-			width += 9
-		}
 		if width > columns[1].width {
 			columns[1].width = width
 		}
@@ -317,11 +292,6 @@ func (r *Reporter) refresh() {
 			width := columns[1].width
 			r.writef("%s", status.Text)
 			width -= status.TextWidth
-			if status.AnimationType != AnimationTypeNone {
-				r.writef(" ")
-				r.writeAnimation(status.AnimationType)
-				width -= 9
-			}
 			r.writeRepeated(" ", width)
 
 			for i := 2; i < len(columns); i++ {
@@ -407,21 +377,6 @@ func (r *Reporter) flushLogs() {
 	_, err := io.Copy(r.out, r.logBuffer)
 	handleError(err)
 	r.logBuffer.Reset()
-}
-
-func (r *Reporter) writeAnimation(at AnimationType) {
-	switch at {
-	case AnimationTypeDockerPush:
-		r.writef("👋") // Wave
-		r.writeRepeated("  ", r.animationState)
-		r.writef("🐳") // Whale
-		r.writeRepeated("  ", 2-r.animationState)
-	case AnimationTypeDockerPull:
-		r.writef("🧲") // Magnet
-		r.writeRepeated("  ", 2-r.animationState)
-		r.writef("🐳") // Whale
-		r.writeRepeated("  ", r.animationState)
-	}
 }
 
 func (r *Reporter) writeRepeated(s string, n int) {
