@@ -445,12 +445,12 @@ func (row *Row) Name() string {
 	return row.name
 }
 
-func (row *Row) RemoveStatus(s *Status) {
+func (row *Row) RemoveStatus(s *Status) bool {
 	row.r.mutex.Lock()
 	defer row.r.mutex.Unlock()
 	i := row.statusBinarySearch(s.Priority)
 	if i < 0 {
-		return
+		return false
 	}
 	iLast := len(row.statuses) - 1
 	for {
@@ -458,13 +458,14 @@ func (row *Row) RemoveStatus(s *Status) {
 			copy(row.statuses[i:], row.statuses[i+1:])
 			row.statuses[iLast] = nil
 			row.statuses = row.statuses[:iLast]
-			return
+			return true
 		}
 		i++
 		if i > iLast || row.statuses[i].Priority != s.Priority {
 			break
 		}
 	}
+	return false
 }
 
 func (row *Row) status() *Status {
@@ -483,7 +484,7 @@ func (row *Row) statusBinarySearch(priority int) int {
 		case row.statuses[mi].Priority > priority:
 			hi = mi - 1
 		case row.statuses[mi].Priority < priority:
-			hi = mi + 1
+			lo = mi + 1
 		default:
 			return lo
 		}
@@ -521,9 +522,6 @@ func (pt *ProgressTask) Name() string {
 }
 
 func (pt *ProgressTask) Update(v float64) {
-	if !pt.row.r.isTerminal {
-		return
-	}
 	if v < 0 {
 		v = 0
 	} else if v > 1 {

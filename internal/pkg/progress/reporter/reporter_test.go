@@ -164,6 +164,139 @@ func Test_Reporter_Refresh_ShrinkSuccess(t *testing.T) {
 	})
 }
 
+func Test_Row_Name(t *testing.T) {
+	expected := "rowname"
+	row := &Row{
+		name: expected,
+	}
+	if row.Name() != expected {
+		t.Fail()
+	}
+}
+
+func Test_Row_StatusBinarySearch_SuccessNotFound(t *testing.T) {
+	row := &Row{
+		statuses: []*Status{},
+	}
+	i := row.statusBinarySearch(0)
+	if i != -1 {
+		t.Fail()
+	}
+}
+
+func Test_Row_RemoveStatus_NotFound1(t *testing.T) {
+	r := New(os.Stdout)
+	row := r.AddRow("asdf")
+	if row.RemoveStatus(StatusWaiting) {
+		t.Fail()
+	}
+}
+func Test_Row_RemoveStatus_NotFound2(t *testing.T) {
+	r := New(os.Stdout)
+	row := r.AddRow("asdf")
+	row.AddStatus(&Status{
+		Priority: StatusWaiting.Priority,
+	})
+	if row.RemoveStatus(StatusWaiting) {
+		t.Fail()
+	}
+}
+
+func Test_Row_RemoveStatus_Success(t *testing.T) {
+	r := New(os.Stdout)
+	row := r.AddRow("asdf")
+	row.AddStatus(StatusWaiting)
+	if !row.RemoveStatus(StatusWaiting) {
+		t.Fail()
+	}
+}
+
+func Test_Row_RemoveStatus_NotFound(t *testing.T) {
+	r := New(os.Stdout)
+	row := r.AddRow("asdf")
+	row.RemoveStatus(StatusWaiting)
+}
+
+func Test_Row_Status_Default(t *testing.T) {
+	row := &Row{}
+	if row.status() != StatusWaiting {
+		t.Fail()
+	}
+}
+
+func Test_ProgressTask_Done(t *testing.T) {
+	r := New(os.Stdout)
+	row := r.AddRow("progresstaskdonerow")
+	pt1 := row.AddProgressTask("progresstaskdonept")
+	row.AddProgressTask("progresstaskdonept")
+	pt1.Done()
+	pt1.Done()
+	if len(row.tasks) != 1 {
+		t.Fail()
+	}
+}
+
+func Test_ProgressTask_Name(t *testing.T) {
+	expected := "progresstaskname"
+	pt := &ProgressTask{
+		name: expected,
+	}
+	if pt.Name() != expected {
+		t.Fail()
+	}
+}
+
+func Test_ProgressTask_Update_Min(t *testing.T) {
+	r := New(os.Stdout)
+	row := r.AddRow("progresstaskupdatemin")
+	pt := &ProgressTask{
+		v:   1.0,
+		row: row,
+	}
+	pt.Update(-1.0)
+	if pt.v != 0 {
+		t.Fail()
+	}
+}
+
+func Test_ProgressTask_Update_Max(t *testing.T) {
+	r := New(os.Stdout)
+	row := r.AddRow("progresstaskupdatemax")
+	pt := &ProgressTask{
+		row: row,
+	}
+	pt.Update(2.0)
+	if pt.v != 1.0 {
+		t.Fail()
+	}
+}
+
+func Test_Row_StatusBinarySearch_SuccessFound(t *testing.T) {
+	r := &Row{
+		statuses: []*Status{
+			&Status{
+				Priority: 0,
+			},
+			&Status{
+				Priority: 1,
+			},
+			&Status{
+				Priority: 2,
+			},
+			&Status{
+				Priority: 3,
+			},
+			&Status{
+				Priority: 4,
+			},
+		},
+	}
+	i := r.statusBinarySearch(1)
+	if i != 1 {
+		t.Fail()
+	}
+}
+
 func withMockTerminal(cb func(term *mockTerminal)) {
 	term := newMockTerminal()
 	term.height = 20
