@@ -218,7 +218,7 @@ brew install golangci-lint
 ```
 Run the linter:
 ```bash
-golangci-lint run
+golangci-lint run --deadline=30m
 ```
 
 ## Unit testing

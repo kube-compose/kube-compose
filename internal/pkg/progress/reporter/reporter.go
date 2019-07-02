@@ -111,7 +111,7 @@ func (r *Reporter) DeleteRow(row *Row) {
 	}
 }
 
-func GetTerminalSize(w io.Writer) (width int, height int, err error) {
+func GetTerminalSize(w io.Writer) (width, height int, err error) {
 	if rlw, ok := w.(*reporterLogWriter); ok {
 		return GetTerminalSize(rlw.r.out)
 	}
@@ -155,6 +155,8 @@ type column struct {
 	width            int
 }
 
+// TODO https://github.com/kube-compose/kube-compose/issues/227 reduce cyclomatic complexity of this function
+//nolint
 func (r *Reporter) refresh() {
 	defer func() {
 		if v := recover(); v != nil {

@@ -37,7 +37,7 @@ func Test_GetTerminalSize(t *testing.T) {
 	rlw := &reporterLogWriter{
 		r: r,
 	}
-	getTerminalSizeFunction(rlw)
+	_, _, _ = getTerminalSizeFunction(rlw)
 }
 
 func Test_Reporter_Refresh_NotTerminalSuccess(t *testing.T) {
@@ -298,19 +298,19 @@ func Test_ProgressTask_Update_Max(t *testing.T) {
 func Test_Row_StatusBinarySearch_SuccessFound(t *testing.T) {
 	r := &Row{
 		statuses: []*Status{
-			&Status{
+			{
 				Priority: 0,
 			},
-			&Status{
+			{
 				Priority: 1,
 			},
-			&Status{
+			{
 				Priority: 2,
 			},
-			&Status{
+			{
 				Priority: 3,
 			},
-			&Status{
+			{
 				Priority: 4,
 			},
 		},
@@ -412,6 +412,8 @@ func (term *mockTerminal) writeRawChar(b byte) {
 	term.column++
 }
 
+// TODO https://github.com/kube-compose/kube-compose/issues/227 reduce cyclomatic complexity of this function
+//nolint
 func (term *mockTerminal) Write(p []byte) (int, error) {
 	if term.writeError != nil {
 		return 0, term.writeError
@@ -483,7 +485,7 @@ func mockIsTerminal(w io.Writer) bool {
 	return ok
 }
 
-func mockGetTerminalSize(w io.Writer) (width int, height int, err error) {
+func mockGetTerminalSize(w io.Writer) (width, height int, err error) {
 	term := w.(*mockTerminal)
 	if term.getSizeError != nil {
 		err = term.getSizeError
