@@ -100,6 +100,17 @@ func (r *Reporter) AddRow(name string) *Row {
 	return row
 }
 
+func (r *Reporter) DeleteRow(row *Row) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	for i := 0; i < len(r.rows); i++ {
+		if r.rows[i] == row {
+			r.rows = append(r.rows[:i], r.rows[i+1:]...)
+			return
+		}
+	}
+}
+
 func GetTerminalSize(w io.Writer) (width int, height int, err error) {
 	if rlw, ok := w.(*reporterLogWriter); ok {
 		return GetTerminalSize(rlw.r.out)

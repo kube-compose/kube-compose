@@ -102,28 +102,59 @@ func Test_Reporter_Refresh_EmptyTableSuccess(t *testing.T) {
 	})
 }
 
-func Test_Reporter_Refresh_RowsSuccess(t *testing.T) {
+func Test_Reporter_Refresh_GrowSuccess(t *testing.T) {
 	withMockTerminal(func(term *mockTerminal) {
 		r := New(term)
 		r1 := r.AddRow("row1")
 		r1.AddStatus(StatusDockerPull)
 		r1t1 := r1.AddProgressTask("pulling image")
-		r1t1.Update(0.5)
+		r1t1.Update(0.05)
 		_, _ = r.LogErrorSink().Write([]byte("log1"))
 		r.Refresh()
 
-		r2 := r.AddRow("row2")
+		r2 := r.AddRow("row_2")
 		r2.AddStatus(StatusDockerPush)
 		r2t1 := r2.AddProgressTask("pushing image")
 		r2t1.Update(0.5)
 		_, _ = r.LogErrorSink().Write([]byte("log2"))
+		r1t1.Update(1)
 		r.Refresh()
 		actual := term.String()
 		expected := "service │ status        │ pulling image        │ pushing image       \n" +
 			"────────┼───────────────┼──────────────────────┼─────────────────────\n" +
-			"row1    │ pulling image │ ████████         50% │                     \n" +
-			"row2    │ pushing image │                      │ ████████         50%\n" +
+			"row1    │ pulling image │ ███████████████ 100% │                     \n" +
+			"row_2   │ pushing image │                      │ ████████         50%\n" +
 			"log2\n"
+		if actual != expected {
+			t.Log(actual)
+			t.Log("end")
+			t.Logf("%#v", actual)
+			t.Fail()
+		}
+	})
+}
+
+func Test_Reporter_Refresh_ShrinkSuccess(t *testing.T) {
+	withMockTerminal(func(term *mockTerminal) {
+		r := New(term)
+		r1 := r.AddRow("row1")
+		r1.AddStatus(StatusDockerPull)
+		r1t1 := r1.AddProgressTask("pulling image")
+		r1t1.Update(0.05)
+		r2 := r.AddRow("row_2")
+		r2.AddStatus(StatusDockerPush)
+		r2t1 := r2.AddProgressTask("pushing image")
+		r2t1.Update(0.5)
+		_, _ = r.LogErrorSink().Write([]byte("log1"))
+		r.Refresh()
+		r.DeleteRow(r2)
+		r.Refresh()
+		actual := term.String()
+		expected := "service │ status        │ pulling image       \n" +
+			"────────┼───────────────┼─────────────────────\n" +
+			"row1    │ pulling image │ ▉                 5%\n" +
+			"\n" +
+			"log1\n"
 		if actual != expected {
 			t.Log(actual)
 			t.Log("end")
@@ -270,6 +301,9 @@ func (term *mockTerminal) Write(p []byte) (int, error) {
 					panic(fmt.Errorf("attempted to move above first line, should this be interpreted as move to line 0?"))
 				}
 				term.line -= term.dec
+				term.state = 0
+			case p[i] == 'B':
+				term.line += term.dec
 				term.state = 0
 			default:
 				panic(fmt.Errorf("unexpected escaped byte (state3) %s (0x%x) (dec=%d, decLen=%d)", string(p[i]), p[i], term.dec, term.decLen))
