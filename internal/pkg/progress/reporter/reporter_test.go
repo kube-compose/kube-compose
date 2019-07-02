@@ -164,6 +164,30 @@ func Test_Reporter_Refresh_ShrinkSuccess(t *testing.T) {
 	})
 }
 
+func Test_Reporter_Refresh_WriteError(t *testing.T) {
+	withMockTerminal(func(term *mockTerminal) {
+		r := New(term)
+		term.writeError = fmt.Errorf("reporterrefreshwriteerror")
+		_, _ = r.LogSink().Write([]byte("reporterrefreshwriteerrorlog"))
+		r.Refresh()
+	})
+}
+
+func Test_Reporter_Refresh_Panic(t *testing.T) {
+	withMockTerminal(func(term *mockTerminal) {
+		expected := fmt.Errorf("reporterrefreshpanic")
+		defer func() {
+			if v := recover(); v != expected {
+				t.Fail()
+			}
+		}()
+		r := New(term)
+		term.panic = expected
+		_, _ = r.LogSink().Write([]byte("reporterrefreshpaniclog"))
+		r.Refresh()
+	})
+}
+
 func Test_Row_Name(t *testing.T) {
 	expected := "rowname"
 	row := &Row{
@@ -312,6 +336,8 @@ func withMockTerminal(cb func(term *mockTerminal)) {
 type mockTerminal struct {
 	height       int
 	getSizeError error
+	writeError   error
+	panic        interface{}
 	line         int
 	column       int
 	state        int
@@ -387,6 +413,12 @@ func (term *mockTerminal) writeRawChar(b byte) {
 }
 
 func (term *mockTerminal) Write(p []byte) (int, error) {
+	if term.writeError != nil {
+		return 0, term.writeError
+	}
+	if term.panic != nil {
+		panic(term.panic)
+	}
 	for i := 0; i < len(p); i++ {
 		switch term.state {
 		case 0:
