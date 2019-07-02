@@ -112,7 +112,7 @@ func Test_Reporter_Refresh_GrowSuccess(t *testing.T) {
 		_, _ = r.LogErrorSink().Write([]byte("log1"))
 		r.Refresh()
 
-		r2 := r.AddRow("row_2")
+		r2 := r.AddRow("longrowname")
 		r2.AddStatus(StatusDockerPush)
 		r2t1 := r2.AddProgressTask("pushing image")
 		r2t1.Update(0.5)
@@ -120,10 +120,10 @@ func Test_Reporter_Refresh_GrowSuccess(t *testing.T) {
 		r1t1.Update(1)
 		r.Refresh()
 		actual := term.String()
-		expected := "service │ status        │ pulling image        │ pushing image       \n" +
-			"────────┼───────────────┼──────────────────────┼─────────────────────\n" +
-			"row1    │ pulling image │ ███████████████ 100% │                     \n" +
-			"row_2   │ pushing image │                      │ ████████         50%\n" +
+		expected := "service     │ status        │ pulling image        │ pushing image       \n" +
+			"────────────┼───────────────┼──────────────────────┼─────────────────────\n" +
+			"row1        │ pulling image │ ███████████████ 100% │                     \n" +
+			"longrowname │ pushing image │                      │ ████████         50%\n" +
 			"log2\n"
 		if actual != expected {
 			t.Log(actual)
@@ -143,7 +143,7 @@ func Test_Reporter_Refresh_ShrinkSuccess(t *testing.T) {
 		r1t1.Update(0.05)
 		r2 := r.AddRow("row_2")
 		r2.AddStatus(StatusDockerPush)
-		r2t1 := r2.AddProgressTask("pushing image")
+		r2t1 := r2.AddProgressTask("x")
 		r2t1.Update(0.5)
 		_, _ = r.LogErrorSink().Write([]byte("log1"))
 		r.Refresh()
