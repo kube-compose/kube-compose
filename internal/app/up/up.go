@@ -15,9 +15,9 @@ import (
 	"github.com/kube-compose/kube-compose/internal/app/config"
 	"github.com/kube-compose/kube-compose/internal/app/k8smeta"
 	"github.com/kube-compose/kube-compose/internal/pkg/docker"
+	"github.com/kube-compose/kube-compose/internal/pkg/progress/reporter"
 	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
-	cmdColor "github.com/logrusorgru/aurora"
 	goDigest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
@@ -29,7 +29,14 @@ import (
 	clientV1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
-var colorSupported = []cmdColor.Color{409600, 147456, 344064, 81920, 212992, 278528, 475136}
+// This doesn't deserve the name palette.
+var appColorPalette = []int{
+	37, // gray
+	36, // blue
+	35, // magenta
+	33, // yellow
+	32, // green
+}
 
 type appImageInfo struct {
 	err                error
@@ -62,7 +69,8 @@ type app struct {
 	imageInfo                            appImageInfo
 	maxObservedPodStatus                 podStatus
 	containersForWhichWeAreStreamingLogs map[string]bool
-	color                                cmdColor.Color
+	color                                int
+	reporterRow                          *reporter.Row
 	volumes                              []*appVolume
 	volumeInitImage                      appVolumesInitImage
 }
@@ -125,19 +133,20 @@ func (u *upRunner) initKubernetesClientset() error {
 func (u *upRunner) initAppsToBeStarted() {
 	u.appsToBeStarted = map[*app]bool{}
 	colorIndex := 0
-	for _, app := range u.apps {
-		if !u.cfg.MatchesFilter(app.composeService) {
+	for _, a := range u.apps {
+		if !u.cfg.MatchesFilter(a.composeService) {
 			continue
 		}
-		u.appsToBeStarted[app] = true
-		if colorIndex < len(colorSupported) {
-			app.color = colorSupported[colorIndex]
+		a.reporterRow = u.opts.Reporter.AddRow(a.name())
+		u.appsToBeStarted[a] = true
+		a.color = appColorPalette[colorIndex]
+		if colorIndex < len(appColorPalette) {
 			colorIndex++
 		} else {
 			colorIndex = 0
 		}
-		if len(app.name()) > u.maxServiceNameLength {
-			u.maxServiceNameLength = len(app.name())
+		if len(a.name()) > u.maxServiceNameLength {
+			u.maxServiceNameLength = len(a.name())
 		}
 	}
 }
@@ -156,7 +165,7 @@ func (u *upRunner) initVolumeInfo() {
 				continue
 			}
 			u.totalVolumeCount++
-			u.initVolumeInfoWarnOnce("bind mounted volumes do not behave the same as docker-compose (see " +
+			u.initVolumeInfoWarnOnce("bind mounted volumes are not synced between containers and the host (see " +
 				"https://github.com/kube-compose/kube-compose#limitations)")
 			flag := false
 			if u.cfg.ClusterImageStorage.Docker == nil && u.cfg.ClusterImageStorage.DockerRegistry == nil {
@@ -252,14 +261,20 @@ func (u *upRunner) getAppVolumeInitImage(a *app) error {
 }
 
 func (u *upRunner) pushImage(sourceImageID, name, tag, imageDescr string, a *app) (podImage string, err error) {
+	pt := a.reporterRow.AddProgressTask("pushing " + imageDescr)
+	defer pt.Done()
+	a.reporterRow.AddStatus(reporter.StatusDockerPush)
+	defer a.reporterRow.RemoveStatus(reporter.StatusDockerPush)
 	imagePush := fmt.Sprintf("%s/%s/%s:%s", u.cfg.ClusterImageStorage.DockerRegistry.Host, u.cfg.Namespace, name, tag)
 	err = u.dockerClient.ImageTag(u.opts.Context, sourceImageID, imagePush)
 	if err != nil {
 		return
 	}
 	var digest string
-	digest, err = pushImageWithLogging(u.opts.Context, u.dockerClient, a.name(), imagePush, u.cfg.KubeConfig.BearerToken,
-		imageDescr)
+	registryAuth := docker.EncodeRegistryAuth("unused", u.cfg.KubeConfig.BearerToken)
+	digest, err = docker.PushImage(u.opts.Context, u.dockerClient, imagePush, registryAuth, func(push *docker.PullOrPush) {
+		pt.Update(push.Progress())
+	})
 	if err != nil {
 		return
 	}
@@ -366,7 +381,7 @@ func (u *upRunner) getAppImageInfoEnsureSourceImageID(sourceImage string, source
 		if !sourceImageIsNamed {
 			return fmt.Errorf("could not find image %#v locally, and building images is not supported", sourceImage)
 		}
-		digest, err := pullImageWithLogging(u.opts.Context, u.dockerClient, a.name(), sourceImageRef.String())
+		digest, err := u.getAppImageInfoPullImage(sourceImageRef, a)
 		if err != nil {
 			return err
 		}
@@ -382,6 +397,16 @@ func (u *upRunner) getAppImageInfoEnsureSourceImageID(sourceImage string, source
 	}
 	// len(podImage) > 0 by definition of resolveLocalImageAfterPull
 	return nil
+}
+
+func (u *upRunner) getAppImageInfoPullImage(sourceImageRef dockerRef.Reference, a *app) (string, error) {
+	pt := a.reporterRow.AddProgressTask("pulling image")
+	defer pt.Done()
+	a.reporterRow.AddStatus(reporter.StatusDockerPull)
+	defer a.reporterRow.RemoveStatus(reporter.StatusDockerPull)
+	return docker.PullImage(u.opts.Context, u.dockerClient, sourceImageRef.String(), "123", func(pull *docker.PullOrPush) {
+		pt.Update(pull.Progress())
+	})
 }
 
 func (u *upRunner) getAppImageInfoUser(a *app, inspect *dockerTypes.ImageInspect, sourceImage string) error {
@@ -832,7 +857,7 @@ func parsePodStatus(pod *v1.Pod) (podStatus, error) {
 			return parsePodStatusTerminatedContainer(pod.ObjectMeta.Name, containerStatus.Name, t)
 		}
 		if w := containerStatus.State.Waiting; w != nil && w.Reason == "ErrImagePull" {
-			return podStatusOther, fmt.Errorf("aborting because container %s of pod %s could not pull image: %s",
+			return podStatusOther, fmt.Errorf("container %s of pod %s could not pull image: %s",
 				containerStatus.Name,
 				pod.ObjectMeta.Name,
 				w.Message,
@@ -850,7 +875,7 @@ func parsePodStatus(pod *v1.Pod) (podStatus, error) {
 
 func parsePodStatusTerminatedContainer(podName, containerName string, t *v1.ContainerStateTerminated) (podStatus, error) {
 	if t.Reason != "Completed" {
-		return podStatusOther, fmt.Errorf("aborting because container %s of pod %s terminated abnormally (code=%d,signal=%d,reason=%s): %s",
+		return podStatusOther, fmt.Errorf("container %s of pod %s terminated abnormally (code=%d,signal=%d,reason=%s): %s",
 			containerName,
 			podName,
 			t.ExitCode,
@@ -890,15 +915,30 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 	}
 	s, err := parsePodStatus(pod)
 	if err != nil {
+		app.reporterRow.AddStatus(&reporter.Status{
+			Text:      "\x1b[31merror\x1b[0m 💣💣", // bomb+bomb
+			TextWidth: 10,
+			Priority:  4,
+		})
 		return err
 	}
 
 	if s > app.maxObservedPodStatus {
-		app.maxObservedPodStatus = s
-		app.newLogEntry().Infof("pod status %s", &app.maxObservedPodStatus)
+		u.setAppMaxObservedPodStatus(app, s)
 	}
-
 	return nil
+}
+
+func (u *upRunner) setAppMaxObservedPodStatus(app *app, s podStatus) {
+	app.maxObservedPodStatus = s
+	switch {
+	case s == podStatusStarted:
+		app.reporterRow.AddStatus(reporter.StatusRunning)
+	case s >= podStatusReady:
+		app.reporterRow.RemoveStatus(reporter.StatusRunning)
+		app.reporterRow.AddStatus(reporter.StatusReady)
+	}
+	app.newLogEntry().Debugf("pod status %s", &app.maxObservedPodStatus)
 }
 
 func (u *upRunner) streamPodLogs(pod *v1.Pod, completedChannel chan interface{}, getPodLogOptions *v1.PodLogOptions, a *app) {
@@ -911,7 +951,7 @@ func (u *upRunner) streamPodLogs(pod *v1.Pod, completedChannel chan interface{},
 	defer util.CloseAndLogError(bodyReader)
 	scanner := bufio.NewScanner(bodyReader)
 	for scanner.Scan() {
-		fmt.Printf("%-*s| %s\n", u.maxServiceNameLength+3, cmdColor.Colorize(a.name(), a.color), scanner.Text())
+		log.Infof("\x1b[%dm%-*s|\x1b[0m %s", a.color, u.maxServiceNameLength+3, a.name(), scanner.Text())
 	}
 	if err = scanner.Err(); err != nil {
 		log.Error(err)

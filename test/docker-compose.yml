@@ -1,11 +1,17 @@
 version: '2'
 services:
+  helper:
+    image: ubuntu:latest
+    depends_on:
+      authentication-service:
+        condition: service_healthy
+      permission-service:
+        condition: service_healthy
   authentication-service:
     depends_on:
       db:
         condition: service_healthy
-    depends_on: ["db"]
-    entrypoint: ["/bin/bash", "-c", "STOP=0; trap 'STOP=1' INT; while [[ $$STOP -eq 0 ]]; do sleep 1; echo 'heartbeat'; done"]
+    entrypoint: ["/mnt/vol2/entrypoint.sh"]
     environment:
     - ASDF=10
     - DB_URL=postgresql://db:5432
@@ -13,19 +19,18 @@ services:
     image: ubuntu:latest
     ports:
     - "8080"
-    - "8080"
     working_dir: /app/test
     volumes:
     - './docker-compose.yml:/mnt/vol1/docker-compose.yml:ro'
-    - './data:/mnt/vol2/root:ro'
+    - './entrypoint.sh:/mnt/vol2/entrypoint.sh:ro'
   generic-service:
-    image: ubuntu:latest2
+    image: ubuntu:latest
     environment:
       ENVVAR_EXTENDS: test
     ports:
       - 8236:8234
   permission-service:
-    entrypoint: ["/bin/bash", "-c", "STOP=0; trap 'STOP=1' INT; while [[ $$STOP -eq 0 ]]; do sleep 1; echo 'heartbeat'; done"]
+    entrypoint: ["/mnt/vol1/entrypoint.sh"]
     image: ubuntu:latest
     extends:
       service: generic-service
@@ -46,8 +51,10 @@ services:
     - 8082:8082
     - 8236:8234
     working_dir: /app/test
+    volumes:
+    - './entrypoint.sh:/mnt/vol1/entrypoint.sh:ro'
   db:
-    image: postgres:$BLA
+    image: postgres:latest
     healthcheck:
       test:
       - CMD-SHELL
@@ -57,3 +64,8 @@ services:
       timeout: 5s
       retries: 5
     user: root
+x-kube-compose:
+  cluster_image_storage:
+    type: docker_registry
+    host: localhost:5000
+  volume_init_base_image: ubuntu:latest

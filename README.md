@@ -6,6 +6,8 @@
 
 kube-compose creates and destroys environments in Kubernetes based on docker compose files with an emphasis on CI use cases.
 
+![example](cli_example.gif)
+
 # Contents
 
 * [Installation](#Installation)
@@ -216,7 +218,7 @@ brew install golangci-lint
 ```
 Run the linter:
 ```bash
-golangci-lint run
+golangci-lint run --deadline=30m
 ```
 
 ## Unit testing

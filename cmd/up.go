@@ -3,9 +3,11 @@ package cmd
 import (
 	"context"
 	"os"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/kube-compose/kube-compose/internal/app/up"
+	"github.com/kube-compose/kube-compose/internal/pkg/progress/reporter"
 	"github.com/spf13/cobra"
 )
 
@@ -31,10 +33,24 @@ func upCommand(cmd *cobra.Command, args []string) error {
 	opts.Context = context.Background()
 	opts.Detach, _ = cmd.Flags().GetBool("detach")
 	opts.RunAsUser, _ = cmd.Flags().GetBool("run-as-user")
+
+	opts.Reporter = reporter.New(os.Stdout)
+	if opts.Reporter.IsTerminal() {
+		log.StandardLogger().SetOutput(opts.Reporter.LogSink())
+		go func() {
+			for {
+				opts.Reporter.Refresh()
+				time.Sleep(reporter.RefreshInterval)
+			}
+		}()
+	}
+
 	err = up.Run(cfg, opts)
 	if err != nil {
 		log.Error(err)
+		opts.Reporter.Refresh()
 		os.Exit(1)
 	}
+	opts.Reporter.Refresh()
 	return nil
 }

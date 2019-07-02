@@ -20,18 +20,11 @@ const (
 func Execute() error {
 	log.SetOutput(os.Stdout)
 	rootCmd := &cobra.Command{
-		Use:     "kube-compose",
-		Short:   "k8s",
-		Long:    "Environments on k8s made easy",
-		Version: "0.6.1",
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			logLevel, err := getLogLevelFlag(cmd.Flags())
-			if err != nil {
-				return err
-			}
-			log.SetLevel(logLevel)
-			return nil
-		},
+		Use:               "kube-compose",
+		Short:             "k8s",
+		Long:              "Environments on k8s made easy",
+		Version:           "0.6.1",
+		PersistentPreRunE: setupLogging,
 	}
 	rootCmd.AddCommand(newDownCli(), newUpCli(), newGetCli())
 	setRootCommandFlags(rootCmd)
@@ -46,5 +39,5 @@ func setRootCommandFlags(rootCmd *cobra.Command) {
 		"by (1) using this value as a suffix of pod and service names and (2) using this value to isolate selectors. Either this flag or "+
 		fmt.Sprintf("the environment variable %s must be set", envIDEnvVarName))
 	rootCmd.PersistentFlags().StringP(logLevelFlagName, "l", "", fmt.Sprintf("Set to one of %s. Can also be set via environment variable "+
-		"%s. Defaults to warn", formattedLogLevelList, logLevelEnvVarName))
+		"%s. Defaults to %s", formattedLogLevelList, logLevelEnvVarName, logLevelDefault.String()))
 }
