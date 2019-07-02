@@ -112,7 +112,7 @@ func (r *Reporter) AddRow(name string) *Row {
 	return row
 }
 
-func GetTerminalSize(w io.Writer) (int, int, error) {
+func GetTerminalSize(w io.Writer) (width int, height int, err error) {
 	if rlw, ok := w.(*reporterLogWriter); ok {
 		return GetTerminalSize(rlw.r.out)
 	}

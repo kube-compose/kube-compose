@@ -49,7 +49,7 @@ func Test_Reporter_Refresh_FlushesLogsIfTerminalHeightIsZero(t *testing.T) {
 		term.height = 0
 		expected := "FlushesLogsIfTerminalHeightIsZero"
 		r := New(term)
-		r.LogSink().Write([]byte(expected))
+		_, _ = r.LogSink().Write([]byte(expected))
 		r.Refresh()
 		actual := term.String()
 		if actual != expected+"\n" {
@@ -67,7 +67,7 @@ func Test_Reporter_Refresh_FlushesLogsIfNoRowsAreRendered(t *testing.T) {
 		expected := "FlushesLogsIfNoRowsAreRendered"
 		r := New(term)
 		r.logLines = 2
-		r.LogSink().Write([]byte(expected))
+		_, _ = r.LogSink().Write([]byte(expected))
 		r.Refresh()
 		actual := term.String()
 		if actual != expected+"\n" {
@@ -150,7 +150,7 @@ func (term *mockTerminal) writeRawChar(b byte) {
 	if term.line >= len(term.data) {
 		c := cap(term.data)
 		if term.line >= c {
-			c = c * 2
+			c *= 2
 			if c == 0 {
 				c = 4
 			}
@@ -167,7 +167,7 @@ func (term *mockTerminal) writeRawChar(b byte) {
 	if term.column >= len(lineData) {
 		c := cap(lineData)
 		if term.column >= c {
-			c = c * 2
+			c *= 2
 			if c == 0 {
 				c = 64
 			}
@@ -239,7 +239,8 @@ func mockIsTerminal(w io.Writer) bool {
 	return ok
 }
 
-func mockGetTerminalSize(w io.Writer) (int, int, error) {
+func mockGetTerminalSize(w io.Writer) (width int, height int, err error) {
 	term := w.(*mockTerminal)
-	return 0, term.height, nil
+	height = term.height
+	return
 }
