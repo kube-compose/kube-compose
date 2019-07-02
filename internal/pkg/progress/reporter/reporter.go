@@ -14,7 +14,7 @@ import (
 type AnimationType int
 
 const (
-	ansiiTerminalCommandEscape               = "\x1b"
+	ansiiTerminalCommandEscape               = '\x1b'
 	minProgressTaskColumnWidth               = 20
 	animationSpeed                           = time.Second // length of the interval with which animation state is incremented
 	AnimationTypeNone          AnimationType = 0
@@ -24,7 +24,9 @@ const (
 )
 
 var (
-	progressBarChars = []string{
+	isTerminalFunction      = IsTerminal
+	getTerminalSizeFunction = GetTerminalSize
+	progressBarChars        = []string{
 		" ",
 		"▏",
 		"▎",
@@ -83,14 +85,14 @@ type Reporter struct {
 	rows                []*Row
 	animationState      int // 0, 1 or 2
 	animationTime       time.Duration
-	out                 *os.File
+	out                 io.Writer
 }
 
-func New(out *os.File) *Reporter {
+func New(out io.Writer) *Reporter {
 	r := &Reporter{
-		buffer:     bytes.NewBuffer(make([]byte, 256)),
-		isTerminal: IsTerminal(out),
-		logBuffer:  bytes.NewBuffer(make([]byte, 256)),
+		buffer:     bytes.NewBuffer([]byte{}),
+		isTerminal: isTerminalFunction(out),
+		logBuffer:  bytes.NewBuffer([]byte{}),
 		out:        out,
 	}
 	r.logWriter = &reporterLogWriter{
@@ -110,8 +112,21 @@ func (r *Reporter) AddRow(name string) *Row {
 	return row
 }
 
-func IsTerminal(f *os.File) bool {
-	return f != nil && terminal.IsTerminal(int(f.Fd()))
+func GetTerminalSize(w io.Writer) (int, int, error) {
+	if rlw, ok := w.(*reporterLogWriter); ok {
+		return GetTerminalSize(rlw.r.out)
+	}
+	return terminal.GetSize(int(w.(*os.File).Fd()))
+}
+
+func IsTerminal(w io.Writer) bool {
+	if rlw, ok := w.(*reporterLogWriter); ok {
+		return IsTerminal(rlw.r.out)
+	}
+	if file, ok := w.(*os.File); ok {
+		return terminal.IsTerminal(int(file.Fd()))
+	}
+	return false
 }
 
 func (r *Reporter) IsTerminal() bool {
@@ -155,15 +170,14 @@ func (r *Reporter) refresh() {
 	r.updateTime()
 	defer func() {
 		if v := recover(); v != nil {
-			writeError := v.(*writeError)
-			if writeError != nil {
+			if writeError, ok := v.(*writeError); ok {
 				fmt.Fprintln(os.Stderr, writeError.Error)
 			} else {
 				panic(v)
 			}
 		}
 	}()
-	_, terminalLines, err := terminal.GetSize(int(r.out.Fd()))
+	_, terminalLines, err := getTerminalSizeFunction(r.out)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error while getting size of terminal: %v\n", err)
 		return
@@ -429,7 +443,7 @@ func (r *Reporter) writef(format string, args ...interface{}) {
 }
 
 func (r *Reporter) writeCmd(s string) {
-	_, err := fmt.Fprintf(r.buffer, "%s%s", ansiiTerminalCommandEscape, s)
+	_, err := fmt.Fprintf(r.buffer, "%s%s", string(ansiiTerminalCommandEscape), s)
 	handleError(err)
 }
 
