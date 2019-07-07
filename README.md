@@ -194,7 +194,7 @@ x-kube-compose:
 ```
 The `volume_init_base_image` configuration item specifies the base image of helper images built to implement bind mounted volumes. This option is useful for corporate networks that do not have a proxy or docker registry mirror available. The base image must have `bash` and `cp` installed.
 
-The `cluster_image_storage` configuration item includes the field `type` which must be either `docker` or `docker_registry`, denoting a docker daemon or a docker registry. The former can be used when deploying to [Docker Dekstop's cluster](https://docs.docker.com/docker-for-mac/kubernetes/). The latter also implies that a field `host` (the host of the docker registry) must be included.
+The `cluster_image_storage` configuration item includes the field `type` which must be either `docker` or `docker_registry`, denoting a docker daemon or a docker registry. The former can be used when deploying to [Docker Desktop's cluster](https://docs.docker.com/docker-for-mac/kubernetes/). The latter also implies that a field `host` (the host of the docker registry) must be included.
 
 Currently `kube-compose` can only push to docker registries that are configured like OpenShift's default docker registry. In particular, `kube-compose` makes the following assumptions when the image storage location is a docker registry:
 1. Within the cluster the hostname of the docker registry is assumed to be `docker-registry.default.svc:5000`.
