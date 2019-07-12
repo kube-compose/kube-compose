@@ -3,6 +3,7 @@ package docker
 import (
 	"bytes"
 	"context"
+	sha256 "crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
@@ -293,6 +294,8 @@ func Test_ResolveLocalImageID_ImageIDFound(t *testing.T) {
 	}
 	localImageIDSet := digestset.NewSet()
 
+	// Since go lazily registers Hash algorithms in the "crypto" module, digestPackage.Parse will fail unless we load the sha256 package.
+	_ = sha256.New()
 	d, err := digestPackage.Parse(testDigest)
 	if err != nil {
 		t.Error(err)
@@ -304,7 +307,7 @@ func Test_ResolveLocalImageID_ImageIDFound(t *testing.T) {
 		},
 	}
 	imageIDActual := ResolveLocalImageID(ref, localImageIDSet, localImagesCache)
-	if imageIDActual != imageIDExpected {
+	if imageIDActual != "sha256:"+imageIDExpected {
 		t.Fail()
 	}
 }
