@@ -95,14 +95,21 @@ func (cfg *Config) GetContainerService(ctx context.Context) (containerService.Co
 	}
 	_, err = dc.Ping(ctx)
 	if err == nil {
-		log.Warn("using docker daemon container service")
+		log.Info("using docker daemon container service")
 		return dockerContainerService.New(dc), nil
 	}
 	if !dockerClient.IsErrConnectionFailed(err) {
 		return nil, err
 	}
-	log.Warn("could not connect to docker daemon, falling back to Buildah container service")
-	return buildahContainerService.New(), nil
+	sc, err := buildahContainerService.New()
+	if err == nil {
+		log.Info("using Buildah container service")
+		return sc, nil
+	}
+	if !buildahContainerService.IsErrNotSupported(err) {
+		return nil, err
+	}
+	return nil, fmt.Errorf("could not connect to docker daemon (is one running?), and cannot currently fall back to Buildah on non-Linux")
 }
 
 type clusterImageStorage struct {
