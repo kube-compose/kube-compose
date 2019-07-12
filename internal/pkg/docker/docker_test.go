@@ -3,13 +3,16 @@ package docker
 import (
 	"bytes"
 	"context"
+	sha256 "crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
 	"testing"
 
+	"github.com/docker/distribution/digestset"
 	dockerRef "github.com/docker/distribution/reference"
 	dockerTypes "github.com/docker/docker/api/types"
+	digestPackage "github.com/opencontainers/go-digest"
 )
 
 // The encoded form of user:password to be used as docker registry authentication header value

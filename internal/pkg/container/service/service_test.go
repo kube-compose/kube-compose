@@ -111,3 +111,16 @@ func Test_ResolveLocalImageID_ImageIDFound(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func Test_ResolveLocalImageID_ImageIDNotFound(t *testing.T) {
+	ref, err := dockerRef.ParseAnyReference(testDigest)
+	if err != nil {
+		t.Error(err)
+	}
+	localImageIDSet := digestset.NewSet()
+	localImagesCache := []dockerTypes.ImageSummary{}
+	imageID := ResolveLocalImageID(ref, localImageIDSet, localImagesCache)
+	if imageID != "" {
+		t.Fail()
+	}
+}
