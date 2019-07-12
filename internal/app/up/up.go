@@ -1058,6 +1058,7 @@ func (u *upRunner) run() error {
 		return err
 	}
 	u.dockerClient = dc
+	defer util.CloseAndLogError(u.dockerClient)
 
 	for app := range u.appsToBeStarted {
 		// Begin pulling and pushing images immediately...

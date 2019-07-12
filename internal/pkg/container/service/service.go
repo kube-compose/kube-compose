@@ -13,6 +13,10 @@ type Progress interface {
 }
 
 type ContainerService interface {
+	ImageList(
+		ctx context.Context,
+		listOptions dockerTypes.ImageListOptions,
+	) ([]dockerTypes.ImageSummary, error)
 	PullImage(
 		ctx context.Context,
 		image, registryAuth string,
