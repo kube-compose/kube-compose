@@ -1,9 +1,14 @@
 package config
 
 import (
+	"context"
 	"fmt"
 
 	log "github.com/Sirupsen/logrus"
+	dockerClient "github.com/docker/docker/client"
+	containerService "github.com/kube-compose/kube-compose/internal/pkg/container/service"
+	buildahContainerService "github.com/kube-compose/kube-compose/internal/pkg/container/service/buildah"
+	dockerContainerService "github.com/kube-compose/kube-compose/internal/pkg/container/service/docker"
 	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
 	"github.com/pkg/errors"
@@ -81,6 +86,23 @@ func New(files []string) (*Config, error) {
 		return nil, err
 	}
 	return cfg, nil
+}
+
+func (cfg *Config) GetContainerService(ctx context.Context) (containerService.ContainerService, error) {
+	dc, err := dockerClient.NewEnvClient()
+	if err != nil {
+		return nil, err
+	}
+	_, err = dc.Ping(ctx)
+	if err == nil {
+		log.Warn("using docker daemon container service")
+		return dockerContainerService.New(dc), nil
+	}
+	if !dockerClient.IsErrConnectionFailed(err) {
+		return nil, err
+	}
+	log.Warn("could not connect to docker daemon, falling back to Buildah container service")
+	return buildahContainerService.New(), nil
 }
 
 type clusterImageStorage struct {

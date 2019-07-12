@@ -10,7 +10,10 @@ import (
 	"github.com/kube-compose/kube-compose/internal/pkg/util"
 )
 
-const EtcPasswd = "/etc/passwd"
+const (
+	EtcGroup  = "/etc/group"
+	EtcPasswd = "/etc/passwd"
+)
 
 // FindUIDByNameInPasswd finds the UID of a user by name in an /etc/passwd file. It can also find the GID of a group by name in an
 // /etc/group file.

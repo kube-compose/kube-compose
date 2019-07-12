@@ -3,16 +3,13 @@ package docker
 import (
 	"bytes"
 	"context"
-	sha256 "crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
 	"testing"
 
-	"github.com/docker/distribution/digestset"
 	dockerRef "github.com/docker/distribution/reference"
 	dockerTypes "github.com/docker/docker/api/types"
-	digestPackage "github.com/opencontainers/go-digest"
 )
 
 // The encoded form of user:password to be used as docker registry authentication header value
@@ -215,99 +212,6 @@ func Test_OfficialRepoName(t *testing.T) {
 	// In case our logic is broken, or the default domain changes: fail CI.
 	s := OfficialRepoName()
 	if s != "library" {
-		t.Fail()
-	}
-}
-
-func Test_ResolveLocalImageID_FoundRepoTag(t *testing.T) {
-	imageIDExpected := testImageID
-	familiarNameTag := "myimage:tag"
-	ref, _ := dockerRef.ParseNormalizedNamed(familiarNameTag)
-	localImageIDSet := digestset.NewSet()
-	localImagesCache := []dockerTypes.ImageSummary{
-		{
-			ID: imageIDExpected,
-			RepoTags: []string{
-				familiarNameTag,
-			},
-		},
-	}
-	imageIDActual := ResolveLocalImageID(ref, localImageIDSet, localImagesCache)
-	if imageIDActual != imageIDExpected {
-		t.Fail()
-	}
-}
-
-func Test_ResolveLocalImageID_RepoDigestNotFound(t *testing.T) {
-	named, err := dockerRef.ParseNormalizedNamed("imgrepodigestnotfound")
-	if err != nil {
-		t.Error(err)
-	}
-	ref, err := dockerRef.WithDigest(named, digestPackage.Digest(testDigest))
-	if err != nil {
-		t.Error(err)
-	}
-	localImageIDSet := digestset.NewSet()
-	localImagesCache := []dockerTypes.ImageSummary{
-		{
-			ID: testImageID,
-		},
-	}
-	imageID := ResolveLocalImageID(ref, localImageIDSet, localImagesCache)
-	if imageID != "" {
-		t.Fail()
-	}
-}
-
-func Test_ResolveLocalImageID_RepoDigestFound(t *testing.T) {
-	imageIDExpected := testImageID
-	digest := testDigest
-	imageName := "imgrepodigestfound"
-	named, err := dockerRef.ParseNormalizedNamed(imageName)
-	if err != nil {
-		t.Error(err)
-	}
-	ref, err := dockerRef.WithDigest(named, digestPackage.Digest(digest))
-	if err != nil {
-		t.Error(err)
-	}
-	localImageIDSet := digestset.NewSet()
-	localImagesCache := []dockerTypes.ImageSummary{
-		{
-			ID: imageIDExpected,
-			RepoDigests: []string{
-				imageName + "@" + digest,
-			},
-		},
-	}
-	imageIDActual := ResolveLocalImageID(ref, localImageIDSet, localImagesCache)
-	if imageIDActual != imageIDExpected {
-		t.Fail()
-	}
-}
-
-func Test_ResolveLocalImageID_ImageIDFound(t *testing.T) {
-	imageIDExpected := testImageID
-	ref, err := dockerRef.ParseAnyReference(imageIDExpected)
-	if err != nil {
-		t.Error(err)
-	}
-	localImageIDSet := digestset.NewSet()
-
-	// Since go lazily registers Hash algorithms in the "crypto" module, digestPackage.Parse will fail unless we load the sha256 package.
-	_ = sha256.New()
-	d, err := digestPackage.Parse(testDigest)
-	if err != nil {
-		t.Error(err)
-	}
-	_ = localImageIDSet.Add(d)
-	localImagesCache := []dockerTypes.ImageSummary{
-		{
-			ID: imageIDExpected,
-		},
-	}
-	imageIDActual := ResolveLocalImageID(ref, localImageIDSet, localImagesCache)
-	if imageIDActual != "sha256:"+imageIDExpected {
 		t.Fail()
 	}
 }

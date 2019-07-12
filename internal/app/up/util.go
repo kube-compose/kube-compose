@@ -11,15 +11,10 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	dockerTypes "github.com/docker/docker/api/types"
-	dockerContainers "github.com/docker/docker/api/types/container"
-	dockerClient "github.com/docker/docker/client"
-	dockerArchive "github.com/docker/docker/pkg/archive"
+	containerService "github.com/kube-compose/kube-compose/internal/pkg/container/service"
 	"github.com/kube-compose/kube-compose/internal/pkg/docker"
 	"github.com/kube-compose/kube-compose/internal/pkg/unix"
-	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
-	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -113,41 +108,18 @@ func inspectImageRawParseHealthcheck(inspectRaw []byte) (*dockerComposeConfig.He
 	return healthcheck, nil
 }
 
-func copyFileFromContainer(ctx context.Context, dc *dockerClient.Client, containerID, srcFile, dstFile string) error {
-	readCloser, stat, err := dc.CopyFromContainer(ctx, containerID, srcFile)
-	if err != nil {
-		return err
-	}
-	defer util.CloseAndLogError(readCloser)
-	if (stat.Mode & os.ModeType) != 0 {
-		// TODO https://github.com/kube-compose/kube-compose/issues/70 we should follow symlinks
-		return fmt.Errorf("could not copy %#v because it is not a regular file", srcFile)
-	}
-	srcInfo := dockerArchive.CopyInfo{
-		Path:       srcFile,
-		Exists:     true,
-		IsDir:      false,
-		RebaseName: "",
-	}
-	err = dockerArchive.CopyTo(readCloser, srcInfo, dstFile)
-	if err != nil {
-		return errors.Wrapf(err, "error while copying image file %#v to local file %#v", srcFile, dstFile)
-	}
-	return nil
-}
-
-func getUserinfoFromImage(ctx context.Context, dc *dockerClient.Client, image string, user *docker.Userinfo) error {
-	containerConfig := &dockerContainers.Config{
-		Entrypoint: []string{"sh"},
-		Image:      image,
-		WorkingDir: "/",
-	}
-	resp, err := dc.ContainerCreate(ctx, containerConfig, nil, nil, "")
+func getUserinfoFromImage(
+	ctx context.Context,
+	cs containerService.ContainerService,
+	image string,
+	user *docker.Userinfo,
+) error {
+	containerID, err := cs.ContainerCreateForCopyFromContainer(ctx, image)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		err = dc.ContainerRemove(ctx, resp.ID, dockerTypes.ContainerRemoveOptions{})
+		err = cs.ContainerRemove(ctx, containerID)
 		if err != nil {
 			log.Error(err)
 		}
@@ -162,17 +134,22 @@ func getUserinfoFromImage(ctx context.Context, dc *dockerClient.Client, image st
 			log.Error(err)
 		}
 	}()
-	err = getUserinfoFromImageUID(ctx, dc, resp.ID, tmpDir, user)
+	err = getUserinfoFromImageUID(ctx, cs, containerID, tmpDir, user)
 	if err != nil {
 		return err
 	}
-	return getUserinfoFromImageGID(ctx, dc, resp.ID, tmpDir, user)
+	return getUserinfoFromImageGID(ctx, cs, containerID, tmpDir, user)
 }
 
-func getUserinfoFromImageUID(ctx context.Context, dc *dockerClient.Client, containerID, tmpDir string, user *docker.Userinfo) error {
+func getUserinfoFromImageUID(
+	ctx context.Context,
+	cs containerService.ContainerService,
+	containerID, tmpDir string,
+	user *docker.Userinfo,
+) error {
 	// TODO https://github.com/kube-compose/kube-compose/issues/70 this is not correct for non-Linux containers
 	if user.UID == nil {
-		err := copyFileFromContainer(ctx, dc, containerID, unix.EtcPasswd, tmpDir)
+		err := cs.CopyFromContainerToFile(ctx, containerID, unix.EtcPasswd, tmpDir)
 		if err != nil {
 			return err
 		}
@@ -189,10 +166,15 @@ func getUserinfoFromImageUID(ctx context.Context, dc *dockerClient.Client, conta
 	return nil
 }
 
-func getUserinfoFromImageGID(ctx context.Context, dc *dockerClient.Client, containerID, tmpDir string, user *docker.Userinfo) error {
+func getUserinfoFromImageGID(
+	ctx context.Context,
+	cs containerService.ContainerService,
+	containerID, tmpDir string,
+	user *docker.Userinfo,
+) error {
 	// TODO https://github.com/kube-compose/kube-compose/issues/70 this is not correct for non-Linux containers
 	if user.GID == nil && user.Group != "" {
-		err := copyFileFromContainer(ctx, dc, containerID, "/etc/group", tmpDir)
+		err := cs.CopyFromContainerToFile(ctx, containerID, unix.EtcGroup, tmpDir)
 		if err != nil {
 			return err
 		}
