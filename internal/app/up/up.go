@@ -242,7 +242,7 @@ func (u *upRunner) getAppVolumeInitImage(a *app) error {
 	a.volumeInitImage.sourceImageID = r.imageID
 	tag := u.cfg.EnvironmentID + "-volumeinit"
 	if u.cfg.ClusterImageStorage.Docker != nil {
-		imageRef := fmt.Sprintf("%s/%s/%s:%s", docker.DefaultDomain, docker.OfficialRepoName, a.composeService.NameEscaped, tag)
+		imageRef := fmt.Sprintf("%s/%s/%s:%s", docker.DefaultDomain(), docker.OfficialRepoName(), a.composeService.NameEscaped, tag)
 		err = u.dockerClient.ImageTag(u.opts.Context, a.volumeInitImage.sourceImageID, imageRef)
 		if err != nil {
 			return err
@@ -346,7 +346,7 @@ func (u *upRunner) getAppImageEnsureCorrectPodImage(a *app, sourceImageRef docke
 	tag := u.cfg.EnvironmentID + "-main"
 	switch {
 	case u.cfg.ClusterImageStorage.Docker != nil:
-		imageRef := fmt.Sprintf("%s/%s/%s:%s", docker.DefaultDomain, docker.OfficialRepoName, a.composeService.NameEscaped, tag)
+		imageRef := fmt.Sprintf("%s/%s/%s:%s", docker.DefaultDomain(), docker.OfficialRepoName(), a.composeService.NameEscaped, tag)
 		err := u.dockerClient.ImageTag(u.opts.Context, a.imageInfo.sourceImageID, imageRef)
 		if err != nil {
 			return err
@@ -376,7 +376,7 @@ func (u *upRunner) getAppImageInfoEnsureSourceImageID(sourceImage string, source
 	localImageIDSet *digestset.Set) error {
 	// We need the image locally always, so we can parse its healthcheck
 	sourceImageNamed, sourceImageIsNamed := sourceImageRef.(dockerRef.Named)
-	a.imageInfo.sourceImageID = resolveLocalImageID(sourceImageRef, localImageIDSet, u.localImagesCache.images)
+	a.imageInfo.sourceImageID = docker.ResolveLocalImageID(sourceImageRef, localImageIDSet, u.localImagesCache.images)
 	if a.imageInfo.sourceImageID == "" {
 		if !sourceImageIsNamed {
 			return fmt.Errorf("could not find image %#v locally, and building images is not supported", sourceImage)
@@ -385,7 +385,7 @@ func (u *upRunner) getAppImageInfoEnsureSourceImageID(sourceImage string, source
 		if err != nil {
 			return err
 		}
-		a.imageInfo.sourceImageID, a.imageInfo.podImage, err = resolveLocalImageAfterPull(
+		a.imageInfo.sourceImageID, a.imageInfo.podImage, err = docker.ResolveLocalImageAfterPull(
 			u.opts.Context, u.dockerClient, sourceImageNamed, digest)
 		if err != nil {
 			return err
