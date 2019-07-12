@@ -648,11 +648,9 @@ func (u *upRunner) initLocalImages() error {
 				_ = imageIDSet.Add(goDigest.Digest(imageSummarySlice[i].ID))
 			}
 		}
-		u.localImagesCache = localImagesCache{
-			imageIDSet: imageIDSet,
-			images:     imageSummarySlice,
-			err:        err,
-		}
+		u.localImagesCache.imageIDSet = imageIDSet
+		u.localImagesCache.images = imageSummarySlice
+		u.localImagesCache.err = err
 	})
 	return u.localImagesCache.err
 }
