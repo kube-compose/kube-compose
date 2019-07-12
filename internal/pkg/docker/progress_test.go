@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-const testDigest = "sha256:f0b6db8bb4b757d0c3c9e120f4ac091286be5815ad576fbd48d8b953e8d2b06d"
-
 func TestPullProgress_Done(t *testing.T) {
 	// If there is 1 layer that is only observed to be pulled then there should be 1 progress update of 100%.
 	reader := bytes.NewReader([]byte(`{"id":"layer1","status":"Pull complete"}`))
@@ -24,6 +22,7 @@ func TestPullProgress_Done(t *testing.T) {
 		t.Fail()
 	}
 }
+
 func TestPullProgress_Empty(t *testing.T) {
 	// If there is 1 layer that is only observed to be pulled then there should be 1 progress update of 100%.
 	reader := bytes.NewReader([]byte(`{"id":"layer1","status":"Pull complete"}`))

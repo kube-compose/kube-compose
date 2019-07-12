@@ -17,7 +17,11 @@ import (
 // The encoded form of user:password to be used as docker registry authentication header value
 // This is a test password, so ignore linting issue.
 // nolint
-const testToken = "eyJ1c2VybmFtZSI6InVzZXIiLCJwYXNzd29yZCI6InBhc3N3b3JkIn0="
+const (
+	testToken   = "eyJ1c2VybmFtZSI6InVzZXIiLCJwYXNzd29yZCI6InBhc3N3b3JkIn0="
+	testDigest  = "sha256:" + testImageID
+	testImageID = "18cd47570b4fd77db3c0d9be067f82b1aeb2299ff6df7e765c9d087b7549d24d"
+)
 
 func Test_EncodeRegistryAuth(t *testing.T) {
 	ret := EncodeRegistryAuth("user", "password")
@@ -152,8 +156,7 @@ func (t *testImageLister) ImageList(ctx context.Context, listOptions dockerTypes
 func Test_ResolveLocalImageAfterPull_SuccessNotFound(t *testing.T) {
 	lister := &testImageLister{}
 	named, _ := dockerRef.ParseNormalizedNamed("myimage")
-	digest := "sha256:18cd47570b4fd77db3c0d9be067f82b1aeb2299ff6df7e765c9d087b7549d24d"
-	imageID, repoDigest, err := ResolveLocalImageAfterPull(context.Background(), lister, named, digest)
+	imageID, repoDigest, err := ResolveLocalImageAfterPull(context.Background(), lister, named, testDigest)
 	if err != nil {
 		t.Error(err)
 	} else if imageID != "" || repoDigest != "" {
@@ -167,21 +170,19 @@ func Test_ResolveLocalImageAfterPull_Error(t *testing.T) {
 		err: errExpected,
 	}
 	named, _ := dockerRef.ParseNormalizedNamed("myimage")
-	digest := "sha256:18cd47570b4fd77db3c0d9be067f82b1aeb2299ff6df7e765c9d087b7549d24d"
-	_, _, errActual := ResolveLocalImageAfterPull(context.Background(), lister, named, digest)
+	_, _, errActual := ResolveLocalImageAfterPull(context.Background(), lister, named, testDigest)
 	if errActual != errExpected {
 		t.Error(errActual)
 	}
 }
 
 func Test_ResolveLocalImageAfterPull_SuccessFound(t *testing.T) {
-	digest := "sha256:18cd47570b4fd77db3c0d9be067f82b1aeb2299ff6df7e765c9d087b7549d24d"
-	imageIDExpected := "18cd47570b4fd77db3c0d9be067f82b1aeb2299ff6df7e765c9d087b7549d24d"
+	imageIDExpected := testImageID
 	imageName := "myimage"
-	repoDigestExpected := imageName + "@" + digest
+	repoDigestExpected := imageName + "@" + testDigest
 	lister := &testImageLister{
 		imageSummaries: []dockerTypes.ImageSummary{
-			dockerTypes.ImageSummary{
+			{
 				ID: imageIDExpected,
 				RepoDigests: []string{
 					repoDigestExpected,
@@ -190,33 +191,40 @@ func Test_ResolveLocalImageAfterPull_SuccessFound(t *testing.T) {
 		},
 	}
 	named, _ := dockerRef.ParseNormalizedNamed(imageName)
-	imageIDActual, repoDigestActual, err := ResolveLocalImageAfterPull(context.Background(), lister, named, digest)
-	if err != nil {
+	imageIDActual, repoDigestActual, err := ResolveLocalImageAfterPull(context.Background(), lister, named, testDigest)
+	switch {
+	case err != nil:
 		t.Error(err)
-	} else if imageIDActual != imageIDExpected {
+	case imageIDActual != imageIDExpected:
 		t.Fail()
-	} else if repoDigestActual != repoDigestExpected {
+	case repoDigestActual != repoDigestExpected:
 		t.Fail()
 	}
 }
 
-// Coverage only
 func Test_DefaultDomain(t *testing.T) {
-	DefaultDomain()
+	// In case our logic is broken, or the default domain changes: fail CI.
+	s := DefaultDomain()
+	if s != "docker.io" {
+		t.Fail()
+	}
 }
 
-// Coverage only
 func Test_OfficialRepoName(t *testing.T) {
-	OfficialRepoName()
+	// In case our logic is broken, or the default domain changes: fail CI.
+	s := OfficialRepoName()
+	if s != "library" {
+		t.Fail()
+	}
 }
 
 func Test_ResolveLocalImageID_FoundRepoTag(t *testing.T) {
-	imageIDExpected := "18cd47570b4fd77db3c0d9be067f82b1aeb2299ff6df7e765c9d087b7549d24d"
+	imageIDExpected := testImageID
 	familiarNameTag := "myimage:tag"
 	ref, _ := dockerRef.ParseNormalizedNamed(familiarNameTag)
 	localImageIDSet := digestset.NewSet()
 	localImagesCache := []dockerTypes.ImageSummary{
-		dockerTypes.ImageSummary{
+		{
 			ID: imageIDExpected,
 			RepoTags: []string{
 				familiarNameTag,
@@ -230,19 +238,18 @@ func Test_ResolveLocalImageID_FoundRepoTag(t *testing.T) {
 }
 
 func Test_ResolveLocalImageID_RepoDigestNotFound(t *testing.T) {
-	digest := "sha256:18cd47570b4fd77db3c0d9be067f82b1aeb2299ff6df7e765c9d087b7549d24d"
-	named, err := dockerRef.ParseNormalizedNamed("myimage")
+	named, err := dockerRef.ParseNormalizedNamed("imgrepodigestnotfound")
 	if err != nil {
 		t.Error(err)
 	}
-	ref, err := dockerRef.WithDigest(named, digestPackage.Digest(digest))
+	ref, err := dockerRef.WithDigest(named, digestPackage.Digest(testDigest))
 	if err != nil {
 		t.Error(err)
 	}
 	localImageIDSet := digestset.NewSet()
 	localImagesCache := []dockerTypes.ImageSummary{
-		dockerTypes.ImageSummary{
-			ID: "18cd47570b4fd77db3c0d9be067f82b1aeb2299ff6df7e765c9d087b7549d24d",
+		{
+			ID: testImageID,
 		},
 	}
 	imageID := ResolveLocalImageID(ref, localImageIDSet, localImagesCache)
@@ -252,9 +259,9 @@ func Test_ResolveLocalImageID_RepoDigestNotFound(t *testing.T) {
 }
 
 func Test_ResolveLocalImageID_RepoDigestFound(t *testing.T) {
-	imageIDExpected := "18cd47570b4fd77db3c0d9be067f82b1aeb2299ff6df7e765c9d087b7549d24d"
-	digest := "sha256:18cd47570b4fd77db3c0d9be067f82b1aeb2299ff6df7e765c9d087b7549d24d"
-	imageName := "myimage"
+	imageIDExpected := testImageID
+	digest := testDigest
+	imageName := "imgrepodigestfound"
 	named, err := dockerRef.ParseNormalizedNamed(imageName)
 	if err != nil {
 		t.Error(err)
@@ -265,7 +272,7 @@ func Test_ResolveLocalImageID_RepoDigestFound(t *testing.T) {
 	}
 	localImageIDSet := digestset.NewSet()
 	localImagesCache := []dockerTypes.ImageSummary{
-		dockerTypes.ImageSummary{
+		{
 			ID: imageIDExpected,
 			RepoDigests: []string{
 				imageName + "@" + digest,
@@ -279,20 +286,20 @@ func Test_ResolveLocalImageID_RepoDigestFound(t *testing.T) {
 }
 
 func Test_ResolveLocalImageID_ImageIDFound(t *testing.T) {
-	imageIDExpected := "18cd47570b4fd77db3c0d9be067f82b1aeb2299ff6df7e765c9d087b7549d24d"
+	imageIDExpected := testImageID
 	ref, err := dockerRef.ParseAnyReference(imageIDExpected)
 	if err != nil {
 		t.Error(err)
 	}
 	localImageIDSet := digestset.NewSet()
 
-	d, err := digestPackage.Parse("sha256:" + imageIDExpected)
+	d, err := digestPackage.Parse(testDigest)
 	if err != nil {
 		t.Error(err)
 	}
 	_ = localImageIDSet.Add(d)
 	localImagesCache := []dockerTypes.ImageSummary{
-		dockerTypes.ImageSummary{
+		{
 			ID: imageIDExpected,
 		},
 	}

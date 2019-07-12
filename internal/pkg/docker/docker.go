@@ -21,6 +21,9 @@ var (
 	officialRepoName string
 )
 
+// To avoid hardcoding docker official repository name and domain name we extract them by using
+// "github.com/docker/distribution/reference".ParseNormalizedName.
+// nolint
 func init() {
 	named, _ := dockerRef.ParseNormalizedNamed("m")
 	parts := strings.Split(named.String(), "/")
