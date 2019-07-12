@@ -124,3 +124,19 @@ func Test_ResolveLocalImageID_ImageIDNotFound(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func Test_DefaultDomain(t *testing.T) {
+	// In case our logic is broken, or the default domain changes: fail CI.
+	s := DefaultDomain()
+	if s != "docker.io" {
+		t.Fail()
+	}
+}
+
+func Test_OfficialRepoName(t *testing.T) {
+	// In case our logic is broken, or the default domain changes: fail CI.
+	s := OfficialRepoName()
+	if s != "library" {
+		t.Fail()
+	}
+}

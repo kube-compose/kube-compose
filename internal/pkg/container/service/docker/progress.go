@@ -113,7 +113,7 @@ func init() {
 	}
 }
 
-type PullOrPush struct {
+type pullOrPush struct {
 	isPull                    bool
 	maxWeight                 float64
 	reader                    io.Reader
@@ -126,8 +126,8 @@ type status struct {
 	progress   *jsonmessage.JSONProgress
 }
 
-func NewPull(r io.Reader) *PullOrPush {
-	return &PullOrPush{
+func newPull(r io.Reader) *pullOrPush {
+	return &pullOrPush{
 		isPull:                    true,
 		maxWeight:                 maxPullWeight,
 		staticStatusInfoFromLabel: staticPullStatusInfoFromLabel,
@@ -136,8 +136,8 @@ func NewPull(r io.Reader) *PullOrPush {
 	}
 }
 
-func NewPush(r io.Reader) *PullOrPush {
-	return &PullOrPush{
+func newPush(r io.Reader) *pullOrPush {
+	return &pullOrPush{
 		maxWeight:                 maxPushWeight,
 		staticStatusInfoFromLabel: staticPushStatusInfoFromLabel,
 		statusFromLayer:           map[string]*status{},
@@ -145,7 +145,7 @@ func NewPush(r io.Reader) *PullOrPush {
 	}
 }
 
-func (d *PullOrPush) Progress() float64 {
+func (d *pullOrPush) Progress() float64 {
 	if len(d.statusFromLayer) == 0 {
 		return 0
 	}
@@ -168,10 +168,10 @@ func (d *PullOrPush) Progress() float64 {
 type pullOrPushWaiter struct {
 	digest    string
 	lastError string
-	onUpdate  func(*PullOrPush)
+	onUpdate  func(*pullOrPush)
 }
 
-func (waiter *pullOrPushWaiter) handleMessage(d *PullOrPush, msg *jsonmessage.JSONMessage) {
+func (waiter *pullOrPushWaiter) handleMessage(d *pullOrPush, msg *jsonmessage.JSONMessage) {
 	statusEnum := d.staticStatusInfoFromLabel[msg.Status]
 	if statusEnum != nil {
 		s := d.statusFromLayer[msg.ID]
@@ -200,7 +200,7 @@ func FindDigest(s string) string {
 	return s[loc[0] : loc[0]+i]
 }
 
-func (waiter *pullOrPushWaiter) end(d *PullOrPush) (string, error) {
+func (waiter *pullOrPushWaiter) end(d *pullOrPush) (string, error) {
 	if waiter.digest == "" {
 		verb := "pushing"
 		if d.isPull {
@@ -217,7 +217,7 @@ func (waiter *pullOrPushWaiter) end(d *PullOrPush) (string, error) {
 // Wait processes a JSON stream (the body of an image pull docker HTTP response) and returns an error as soon as an error is encountered in
 // the stream, or the digest could not be parsd aftere processing the entire stream. Otherwise, it returns the digest string and a no error.
 // onUpdate is called whenever d.Progress() may return a different value from the previous call.
-func (d *PullOrPush) Wait(onUpdate func(*PullOrPush)) (string, error) {
+func (d *pullOrPush) Wait(onUpdate func(*pullOrPush)) (string, error) {
 	waiter := pullOrPushWaiter{
 		onUpdate: onUpdate,
 	}

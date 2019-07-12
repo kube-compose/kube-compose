@@ -50,15 +50,7 @@ func (b *buildahContainerService) ImageTag(ctx context.Context, source, target s
 	return fmt.Errorf("tagging images in local storage (pulled via Buildah) is not supported")
 }
 
-func (b *buildahContainerService) PullImage(
-	ctx context.Context,
-	image, registryAuth string,
-	onUpdate func(service.Progress),
-) (digest string, err error) {
-	return "", fmt.Errorf("pulling images via Buildah and local storage is not supported")
-}
-
-func (b *buildahContainerService) PushImage(
+func (b *buildahContainerService) ImagePush(
 	ctx context.Context,
 	image, registryAuth string,
 	onUpdate func(service.Progress),
@@ -66,7 +58,7 @@ func (b *buildahContainerService) PushImage(
 	return "", fmt.Errorf("pushing images via Buildah and local storage is not supported")
 }
 
-func (b *buildahContainerService) ResolveLocalImageAfterPull(
+func (b *buildahContainerService) ImagePullResolve(
 	ctx context.Context,
 	named dockerRef.Named,
 	digest string,

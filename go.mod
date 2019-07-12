@@ -6,6 +6,7 @@ require (
 	github.com/Sirupsen/logrus v0.0.0-00010101000000-000000000000
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v1.13.1
+	github.com/docker/engine-api v0.4.0
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/gogo/protobuf v1.2.1 // indirect

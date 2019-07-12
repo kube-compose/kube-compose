@@ -14,7 +14,6 @@ import (
 	dockerArchive "github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/kube-compose/kube-compose/internal/pkg/container/service"
-	dockerInternal "github.com/kube-compose/kube-compose/internal/pkg/docker"
 	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	"github.com/pkg/errors"
 )
@@ -101,7 +100,7 @@ func (d *dockerContainerService) ImageBuild(opts *service.ImageBuildOptions) (st
 			return "", err
 		}
 
-		if imageID := dockerInternal.FindDigest(msg.Stream); imageID != "" {
+		if imageID := FindDigest(msg.Stream); imageID != "" {
 			lastImageID = imageID
 		}
 	}
@@ -127,30 +126,30 @@ func (d *dockerContainerService) ImageTag(ctx context.Context, source, target st
 	return d.dc.ImageTag(ctx, source, target)
 }
 
-func (d *dockerContainerService) PullImage(
+func (d *dockerContainerService) ImagePull(
 	ctx context.Context,
 	image, registryAuth string,
 	onUpdate func(service.Progress),
 ) (digest string, err error) {
-	return dockerInternal.PullImage(ctx, d.dc, image, registryAuth, func(pull *dockerInternal.PullOrPush) {
+	return imagePull(ctx, d.dc, image, registryAuth, func(pull *pullOrPush) {
 		onUpdate(pull)
 	})
 }
 
-func (d *dockerContainerService) PushImage(
+func (d *dockerContainerService) ImagePush(
 	ctx context.Context,
 	image, registryAuth string,
 	onUpdate func(service.Progress),
 ) (digest string, err error) {
-	return dockerInternal.PushImage(ctx, d.dc, image, registryAuth, func(push *dockerInternal.PullOrPush) {
+	return imagePush(ctx, d.dc, image, registryAuth, func(push *pullOrPush) {
 		onUpdate(push)
 	})
 }
 
-func (d *dockerContainerService) ResolveLocalImageAfterPull(
+func (d *dockerContainerService) ImagePullResolve(
 	ctx context.Context,
 	named dockerRef.Named,
 	digest string,
 ) (imageID, repoDigest string, err error) {
-	return dockerInternal.ResolveLocalImageAfterPull(ctx, d.dc, named, digest)
+	return imagePullResolve(ctx, d.dc, named, digest)
 }

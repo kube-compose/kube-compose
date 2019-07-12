@@ -11,10 +11,10 @@ import (
 func TestPullProgress_Done(t *testing.T) {
 	// If there is 1 layer that is only observed to be pulled then there should be 1 progress update of 100%.
 	reader := bytes.NewReader([]byte(`{"id":"layer1","status":"Pull complete"}`))
-	pull := NewPull(reader)
+	pull := newPull(reader)
 	var progress float64
 	count := 0
-	_, _ = pull.Wait(func(_ *PullOrPush) {
+	_, _ = pull.Wait(func(_ *pullOrPush) {
 		progress = pull.Progress()
 		count++
 	})
@@ -26,7 +26,7 @@ func TestPullProgress_Done(t *testing.T) {
 func TestPullProgress_Empty(t *testing.T) {
 	// If there is 1 layer that is only observed to be pulled then there should be 1 progress update of 100%.
 	reader := bytes.NewReader([]byte(`{"id":"layer1","status":"Pull complete"}`))
-	pull := NewPull(reader)
+	pull := newPull(reader)
 	progress := pull.Progress()
 	if progress != 0.0 {
 		t.Fail()
@@ -36,8 +36,8 @@ func TestPullProgress_Empty(t *testing.T) {
 func TestPullWait_KnownError(t *testing.T) {
 	// If the server returns an error then it should be forwarded by Wait (pull).
 	reader := bytes.NewReader([]byte(`{"errorDetail":{"message":"asdf"}}`))
-	pull := NewPull(reader)
-	_, err := pull.Wait(func(_ *PullOrPush) {})
+	pull := newPull(reader)
+	_, err := pull.Wait(func(_ *pullOrPush) {})
 	if err == nil {
 		t.Fail()
 	} else if !strings.Contains(err.Error(), "asdf") {
@@ -55,10 +55,10 @@ func (e *errorReader) Read(p []byte) (n int, err error) {
 
 func TestPushWait_ReaderError(t *testing.T) {
 	errExpected := errors.New("readerroroops")
-	push := NewPush(&errorReader{
+	push := newPush(&errorReader{
 		err: errExpected,
 	})
-	_, err := push.Wait(func(_ *PullOrPush) {})
+	_, err := push.Wait(func(_ *pullOrPush) {})
 	if err != errExpected {
 		t.Error(err)
 	}
@@ -67,8 +67,8 @@ func TestPushWait_ReaderError(t *testing.T) {
 func TestPushWait_KnownError(t *testing.T) {
 	// If the server returns an error then it should be forwarded by Wait (push).
 	reader := bytes.NewReader([]byte(`{"errorDetail":{"message":"asdf"}}`))
-	push := NewPush(reader)
-	_, err := push.Wait(func(_ *PullOrPush) {})
+	push := newPush(reader)
+	_, err := push.Wait(func(_ *pullOrPush) {})
 	if err == nil {
 		t.Fail()
 	} else if !strings.Contains(err.Error(), "asdf") {
@@ -78,8 +78,8 @@ func TestPushWait_KnownError(t *testing.T) {
 func TestPullWait_UnknownError(t *testing.T) {
 	// If there is no digest then we expect an error.
 	reader := bytes.NewReader([]byte(`{"id":"layer1","status":"Pull complete"}`))
-	pull := NewPull(reader)
-	_, err := pull.Wait(func(_ *PullOrPush) {})
+	pull := newPull(reader)
+	_, err := pull.Wait(func(_ *pullOrPush) {})
 	if err == nil {
 		t.Fail()
 	}
@@ -88,8 +88,8 @@ func TestPullWait_UnknownError(t *testing.T) {
 func TestPullWait_Digest(t *testing.T) {
 	// Wait should return the image digest.
 	reader := bytes.NewReader([]byte(fmt.Sprintf(`{"status":"%s "}`, testDigest)))
-	pull := NewPull(reader)
-	digest, err := pull.Wait(func(_ *PullOrPush) {})
+	pull := newPull(reader)
+	digest, err := pull.Wait(func(_ *pullOrPush) {})
 	if err != nil {
 		t.Error(err)
 	}
@@ -100,11 +100,11 @@ func TestPullWait_Digest(t *testing.T) {
 
 func TestPushProgress_Done(t *testing.T) {
 	reader := bytes.NewReader([]byte(`{"id":"layer1","status":"Pushed"}`))
-	push := NewPush(reader)
+	push := newPush(reader)
 	// If there is 1 layer that is only observed to be already pushed then there should be 1 progress update of 100%.
 	var progress float64
 	count := 0
-	_, _ = push.Wait(func(_ *PullOrPush) {
+	_, _ = push.Wait(func(_ *pullOrPush) {
 		progress = push.Progress()
 		count++
 	})
@@ -115,11 +115,11 @@ func TestPushProgress_Done(t *testing.T) {
 
 func TestPushProgress_Partial(t *testing.T) {
 	reader := bytes.NewReader([]byte(`{"id":"layer1","status":"Pushing","progressDetail":{"current":1,"total":2}}`))
-	push := NewPush(reader)
+	push := newPush(reader)
 	// If there is 1 layer that is only observed to be already pushed then there should be 1 progress update of 100%.
 	var progress float64
 	count := 0
-	_, err := push.Wait(func(_ *PullOrPush) {
+	_, err := push.Wait(func(_ *pullOrPush) {
 		progress = push.Progress()
 		count++
 	})

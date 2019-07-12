@@ -12,7 +12,6 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	containerService "github.com/kube-compose/kube-compose/internal/pkg/container/service"
-	"github.com/kube-compose/kube-compose/internal/pkg/docker"
 	"github.com/kube-compose/kube-compose/internal/pkg/unix"
 	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
 	v1 "k8s.io/api/core/v1"
@@ -112,7 +111,7 @@ func getUserinfoFromImage(
 	ctx context.Context,
 	cs containerService.ContainerService,
 	image string,
-	user *docker.Userinfo,
+	user *Userinfo,
 ) error {
 	containerID, err := cs.ContainerCreateForCopyFromContainer(ctx, image)
 	if err != nil {
@@ -145,7 +144,7 @@ func getUserinfoFromImageUID(
 	ctx context.Context,
 	cs containerService.ContainerService,
 	containerID, tmpDir string,
-	user *docker.Userinfo,
+	user *Userinfo,
 ) error {
 	// TODO https://github.com/kube-compose/kube-compose/issues/70 this is not correct for non-Linux containers
 	if user.UID == nil {
@@ -170,7 +169,7 @@ func getUserinfoFromImageGID(
 	ctx context.Context,
 	cs containerService.ContainerService,
 	containerID, tmpDir string,
-	user *docker.Userinfo,
+	user *Userinfo,
 ) error {
 	// TODO https://github.com/kube-compose/kube-compose/issues/70 this is not correct for non-Linux containers
 	if user.GID == nil && user.Group != "" {

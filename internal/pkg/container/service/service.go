@@ -3,11 +3,39 @@ package service
 import (
 	"context"
 	"io"
+	"strings"
 
 	"github.com/docker/distribution/digestset"
 	dockerRef "github.com/docker/distribution/reference"
 	dockerTypes "github.com/docker/docker/api/types"
 )
+
+// Defaults useful when constructing fully qualified image refs.
+// Sourced from https://github.com/moby/moby/blob/master/vendor/github.com/docker/distribution/reference/normalize.go#L14
+var (
+	defaultDomain    string
+	officialRepoName string
+)
+
+// To avoid hardcoding docker official repository name and domain name we extract them by using
+// "github.com/docker/distribution/reference".ParseNormalizedName.
+// nolint
+func init() {
+	named, _ := dockerRef.ParseNormalizedNamed("m")
+	parts := strings.Split(named.String(), "/")
+	defaultDomain = parts[0]
+	officialRepoName = parts[1]
+}
+
+// DefaultDomain returns the default domain (hostname) when constructing fully qualified image refs.
+func DefaultDomain() string {
+	return defaultDomain
+}
+
+// OfficialRepoName returns the default parent path when constructing fully qualified image refs from names without slashes.
+func OfficialRepoName() string {
+	return officialRepoName
+}
 
 type Progress interface {
 	Progress() float64
@@ -32,21 +60,21 @@ type ContainerService interface {
 		listOptions dockerTypes.ImageListOptions,
 	) ([]dockerTypes.ImageSummary, error)
 	ImageTag(ctx context.Context, source, target string) error
-	PullImage(
+	ImagePull(
 		ctx context.Context,
 		image, registryAuth string,
 		onUpdate func(Progress),
 	) (digest string, err error)
-	PushImage(
-		ctx context.Context,
-		image, registryAuth string,
-		onUpdate func(Progress),
-	) (digest string, err error)
-	ResolveLocalImageAfterPull(
+	ImagePullResolve(
 		ctx context.Context,
 		named dockerRef.Named,
 		digest string,
 	) (imageID, repoDigest string, err error)
+	ImagePush(
+		ctx context.Context,
+		image, registryAuth string,
+		onUpdate func(Progress),
+	) (digest string, err error)
 }
 
 // ResolveLocalImageID resolves an image ID against a cached list (like the one output by the command "docker images").

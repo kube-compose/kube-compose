@@ -14,7 +14,6 @@ import (
 	"github.com/kube-compose/kube-compose/internal/app/config"
 	"github.com/kube-compose/kube-compose/internal/app/k8smeta"
 	containerService "github.com/kube-compose/kube-compose/internal/pkg/container/service"
-	dockerInternal "github.com/kube-compose/kube-compose/internal/pkg/docker"
 	"github.com/kube-compose/kube-compose/internal/pkg/progress/reporter"
 	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
@@ -46,7 +45,7 @@ type appImageInfo struct {
 	podImagePullPolicy v1.PullPolicy
 	sourceImageID      string
 	cmd                []string
-	user               *dockerInternal.Userinfo
+	user               *Userinfo
 }
 
 type appVolume struct {
@@ -249,8 +248,8 @@ func (u *upRunner) getAppVolumeInitImage(a *app) error {
 	if u.cfg.ClusterImageStorage.Docker != nil {
 		imageRef := fmt.Sprintf(
 			"%s/%s/%s:%s",
-			dockerInternal.DefaultDomain(),
-			dockerInternal.OfficialRepoName(),
+			containerService.DefaultDomain(),
+			containerService.OfficialRepoName(),
 			a.composeService.NameEscaped,
 			tag,
 		)
@@ -282,8 +281,8 @@ func (u *upRunner) pushImage(sourceImageID, name, tag, imageDescr string, a *app
 		return
 	}
 	var digest string
-	registryAuth := dockerInternal.EncodeRegistryAuth("unused", u.cfg.KubeConfig.BearerToken)
-	digest, err = u.containerService.PushImage(u.opts.Context, imagePush, registryAuth, func(p containerService.Progress) {
+	registryAuth := containerService.EncodeRegistryAuth("unused", u.cfg.KubeConfig.BearerToken)
+	digest, err = u.containerService.ImagePush(u.opts.Context, imagePush, registryAuth, func(p containerService.Progress) {
 		pt.Update(p.Progress())
 	})
 	if err != nil {
@@ -359,8 +358,8 @@ func (u *upRunner) getAppImageEnsureCorrectPodImage(a *app, sourceImageRef docke
 	case u.cfg.ClusterImageStorage.Docker != nil:
 		imageRef := fmt.Sprintf(
 			"%s/%s/%s:%s",
-			dockerInternal.DefaultDomain(),
-			dockerInternal.OfficialRepoName(),
+			containerService.DefaultDomain(),
+			containerService.OfficialRepoName(),
 			a.composeService.NameEscaped,
 			tag,
 		)
@@ -402,7 +401,7 @@ func (u *upRunner) getAppImageInfoEnsureSourceImageID(sourceImage string, source
 		if err != nil {
 			return err
 		}
-		a.imageInfo.sourceImageID, a.imageInfo.podImage, err = u.containerService.ResolveLocalImageAfterPull(
+		a.imageInfo.sourceImageID, a.imageInfo.podImage, err = u.containerService.ImagePullResolve(
 			u.opts.Context,
 			sourceImageNamed,
 			digest,
@@ -424,22 +423,22 @@ func (u *upRunner) getAppImageInfoPullImage(sourceImageRef dockerRef.Reference, 
 	defer pt.Done()
 	a.reporterRow.AddStatus(reporter.StatusDockerPull)
 	defer a.reporterRow.RemoveStatus(reporter.StatusDockerPull)
-	return u.containerService.PullImage(u.opts.Context, sourceImageRef.String(), "123", func(p containerService.Progress) {
+	return u.containerService.ImagePull(u.opts.Context, sourceImageRef.String(), "123", func(p containerService.Progress) {
 		pt.Update(p.Progress())
 	})
 }
 
 func (u *upRunner) getAppImageInfoUser(a *app, inspect *dockerTypes.ImageInspect, sourceImage string) error {
-	var user *dockerInternal.Userinfo
+	var user *Userinfo
 	var err error
 	userRaw := a.composeService.DockerComposeService.User
 	if userRaw == nil {
-		user, err = dockerInternal.ParseUserinfo(inspect.Config.User)
+		user, err = ParseUserinfo(inspect.Config.User)
 		if err != nil {
 			return errors.Wrapf(err, "image %#v has an invalid user %#v", sourceImage, inspect.Config.User)
 		}
 	} else {
-		user, err = dockerInternal.ParseUserinfo(*userRaw)
+		user, err = ParseUserinfo(*userRaw)
 		if err != nil {
 			return errors.Wrapf(err, "docker compose service %s has an invalid user %#v", a.name(), *userRaw)
 		}
