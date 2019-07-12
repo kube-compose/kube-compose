@@ -164,6 +164,26 @@ func Test_Reporter_Refresh_ShrinkSuccess(t *testing.T) {
 	})
 }
 
+func Test_Reporter_Refresh_NegativeOffsetSuccess(t *testing.T) {
+	withMockTerminal(func(term *mockTerminal) {
+		term.height = 3
+		r := New(term)
+		_, _ = r.LogErrorSink().Write([]byte("log1\n"))
+		r.Refresh()
+		r.Refresh()
+		actual := term.String()
+		expected := "service │ status\n" +
+			"────────┼───────\n" +
+			"log1\n"
+		if actual != expected {
+			t.Log(actual)
+			t.Log("end")
+			t.Logf("%#v", actual)
+			t.Fail()
+		}
+	})
+}
+
 func Test_Reporter_Refresh_WriteError(t *testing.T) {
 	withMockTerminal(func(term *mockTerminal) {
 		r := New(term)
