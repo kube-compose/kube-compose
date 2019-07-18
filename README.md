@@ -107,14 +107,14 @@ services:
 ```bash
 kube-compose up -d 'helper'
 ```
-...will create the environment and wait for the environment to be fully started. The service `helper` is used to to make sure that `web` is healthy as soon as `kube-compose` returns, so that the environment can be immediately used (e.g. to run system testing).
+...will create the environment and wait for the environment to be fully started. The service `helper` is used to to make sure that `web` is healthy as soon as `kube-compose` returns, so that the environment can be immediately used after the `up` command returns (e.g. to run system testing).
 
 NOTE: in the background `kube-compose` converts [Docker healthchecks](https://docs.docker.com/engine/reference/builder/#healthcheck) to [readiness probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/) and will only start service `web` when the pod of `db` is ready, and will only start `helper` when the pod of `web` is ready. The pod of `helper` exits immediately, but this pattern is simple and useful. 
 
 ## Volumes
 `kube-compose` currently supports a basic simulation of `docker-compose`'s bind mounted volumes. This supports the use case of mounting configuration files into containers, which is a common way of parameterising containers (in CI).
 
-For examle, consider the following docker compose file:
+For example, consider the following docker compose file:
 ```yaml
 version: '2.4'
 services:
@@ -140,7 +140,7 @@ It describes a service that prints the contents of the host file `./docker-compo
 
 The additional `x-kube-compose` configuration is required so that:
 1. `kube-compose` knows where to store docker images so that the Kubernetes cluster can run them.
-2. `kube-compose` knowns which base image to use for helper images.
+2. `kube-compose` knows which base image to use for helper images.
 
 NOTE: a `cluster_image_storage` with `type: docker` typically only works with [Docker Desktop](https://www.docker.com/products/docker-desktop)'s Kubernetes cluster. See [this section](#x-kube-compose) on how to configure other clusters.
 
