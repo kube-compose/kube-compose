@@ -160,10 +160,12 @@ This will set each pod's `runAsUser` (and `runAsGroup`) based on the [`user` pro
 
 NOTE1: if a Dockerfile does not have a `USER` instruction, then the user is inherited from the base image. This makes it very easy to run images as root.
 
-NOTE2: this may seem like a useless feature, since the deployer can have permissions to create pods running as any user. But the `user` property of a `docker-compose` service can only be properly implemented by setting runAsUser (and runAsGroup).
+NOTE2: this may seem like a useless feature, since the deployer can have permissions to create pods running as any user, in which case the user of the image is respected already. But the `user` property of a `docker-compose` service can only be properly implemented by setting runAsUser (and runAsGroup) and the `--run-as-user` flag will enable early errors when the deployer has insufficient permissions.
 
 ## Dynamic test configuration
-When running tests against a dynamic environment, the test configuration will need to be generated. Suppose for example that a `docker-compose` service named `my-service` has been deployed to a Kubernetes namespace named `mynamespace`, and the environment id was set to `myenv`. Then the command...
+When running tests against a dynamic environment that runs in a shared namespace, the test configuration will need to be generated. `kube-compose` has a `get` command that could be used to retrieve the `.svc` hostnames of services, but some engineers may prefer using environment variables and templated strings to achieve this.
+
+Nevertheless, suppose for example that a `docker-compose` service named `my-service` has been deployed to a Kubernetes namespace named `mynamespace`, and the environment id was set to `myenv`. Then the command...
 ```bash
 kube-compose -e'myenv' get 'my-service' -o'{{.Hostname}}'
 ```
@@ -171,8 +173,7 @@ kube-compose -e'myenv' get 'my-service' -o'{{.Hostname}}'
 ```bash
 my-service-myenv.mynamespace.svc.cluster.local
 ```
-
-The `get` subcommand of `kube-compose` allows dynamic test configuration to be generated through simple Shell scripts.
+NOTE: a Kubernetes service will only be created for `docker-compose` services that have ports.
 
 # User guide
 ## Known limitations
