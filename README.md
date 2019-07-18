@@ -48,7 +48,7 @@ Download the binary from https://github.com/kube-compose/kube-compose/releases, 
 1. [Docker Desktop](https://www.docker.com/products/docker-desktop)
 2. [Minikube](https://kubernetes.io/docs/setup/minikube/)
 
-`kube-compose` loads Kubernetes configuration the same way [`kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl/) does, and it is recommended you use `kubectl` to manage Kubernetes configuration.
+`kube-compose` loads Kubernetes configuration the same way [`kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl/) does.
 
 To run `kube-compose` with [the test docker-compose.yml](test/docker-compose.yml):
 ```bash
@@ -84,7 +84,7 @@ This section shows several examples of how `kube-compose` supports common CI use
 4. Stop environmnent
 
 ## Waiting for startup and startup order
-When performing system testing in CI, waiting until an application and any stubs/dependencies are ready is common task. `kube-compose` supports ordered startup and can readiness waiting through [depends_on](https://docs.docker.com/compose/compose-file/compose-file-v2/#depends_on) with `condition: service_healthy` and healthchecks. This approach is powerful, because it does not require writing complicated startup scripts. NOTE: version 3 docker compose files do not support `depends_on` conditions anymore (see https://docs.docker.com/compose/startup-order/).
+When performing system testing in CI, waiting until an application and any stubs/dependencies are ready is common task. `kube-compose` supports ordered startup and readiness waiting through [depends_on](https://docs.docker.com/compose/compose-file/compose-file-v2/#depends_on) with `condition: service_healthy` and healthchecks. This approach is powerful, because it does not require writing complicated startup scripts. NOTE: version 3 docker compose files do not support `depends_on` conditions anymore (see https://docs.docker.com/compose/startup-order/).
 
 For example, if `docker-compose.yml` is...
 ```yaml
