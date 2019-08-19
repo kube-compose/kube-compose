@@ -1,0 +1,112 @@
+﻿Feature;Compose on Kubernetes;kube-compose
+build;;
+- context;;
+- dockerfile;;
+- args;;
+- cache_from;;
+- labels;;
+cap_add;Yes;
+cap_drop;Yes;
+command;Yes;Yes
+configs;Yes;
+- external;Yes;
+- file;Yes;
+- mode;Yes;
+cgroup_parent;;
+container_name;;
+credential_spec;;
+deploy;;
+- endpoint_mode: vip;Yes;
+- endpoint_mode: dnsrr;;
+- labels;Yes;
+- mode;Yes;
+- placement;Partial;
+- replicas;Yes;
+- resources;Yes;
+-- limits;Yes;
+-- reservations;Yes;
+- restart_policy;Yes;Yes (not under deploy but on root, though)
+-- condition: none;Yes;
+-- condition: on-failure;Yes;
+-- condition: any;Yes;
+-- delay;;
+-- max_attempts;;
+-- window;;
+- update_config;;
+-- parallelism;Yes;
+-- delay;;
+-- failure_action;;
+-- monitor;;
+-- max_failure_ratio;;
+- devices;;
+- depends_on;;Yes (v2 and v3)
+- dns;;
+- dns_search;;
+- tmpfs;Yes;
+- entrypoint;Yes;Yes
+- env_file;Yes;
+- environment;Yes;Yes
+-- key=value;Yes;Yes
+-- key;;Yes
+- expose;Yes;
+- external_links;;
+- extra_hosts;Yes;
+- healthcheck;Yes;Yes
+-- test;Yes;Yes
+-- test: NONE;Yes;Yes
+-- interval;Yes;Yes
+-- timeout;Yes;Yes
+-- retries;Yes;Yes
+-- disable;Yes;Yes
+- image;Yes;Yes
+- isolation;;
+- labels;Yes;
+- links;;
+- logging;;Yes
+-- driver;;
+-- options;;
+- network_mode;;
+- networks;;
+-- aliases;;
+-- ipv4_address;;
+-- ipv6_address;;
+- pid: host;Yes;
+- ports;Yes;Yes
+-- target;Yes;
+-- published;Yes;
+-- protocol;Yes;
+-- mode: host;Not sure;
+-- mode: ingress;Not sure;
+- secrets;Yes;
+-- source;Yes;
+-- target;Yes;
+-- uid;;
+-- gid;;
+-- mode;Yes;
+- security_opt;;
+- stop_grace_period;Yes;
+- stop_signal;;
+- sysctls;;
+- ulimits;;
+- userns_mode;;
+- volumes;Yes;Yes
+-- type: volume;Yes;
+-- type: bind;Yes;Yes (simulated, see README.md of kube-compose)
+-- source;Yes;Yes
+-- target;Yes;Yes
+-- read_only;Yes;Yes
+-- bind/propagation;;
+-- volume/nocopy;;
+- restart;;Yes
+- domainname;;
+- hostname;Yes;
+- ipc;Yes;
+- mac_address;;
+- privileged;Yes;Yes
+- read_only;Yes;
+- shm_size;;
+- stdin_open;Yes;
+- tty;Yes;
+- user: numerical;Yes;Yes
+- user: name;;Yes
+- working_dir;Yes;Yes
