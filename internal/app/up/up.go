@@ -898,7 +898,7 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 	//			// use app.containersForWhichWeAreStreamingLogs to determine the following condition
 	// 			if we are not already streaming logs for the container
 	//				start streaming logs for the container
-	if !u.opts.Detach {
+	if !u.opts.Detach && u.cfg.MatchesFilter(app.composeService) {
 		for _, containerStatus := range pod.Status.ContainerStatuses {
 			_, ok := app.containersForWhichWeAreStreamingLogs[containerStatus.Name]
 			if !ok && containerStatus.State.Running != nil {
