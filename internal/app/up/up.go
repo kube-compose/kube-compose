@@ -915,11 +915,13 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 	}
 	s, err := parsePodStatus(pod)
 	if err != nil {
-		app.reporterRow.AddStatus(&reporter.Status{
-			Text:      "\x1b[31merror\x1b[0m 💣💣", // bomb+bomb
-			TextWidth: 10,
-			Priority:  4,
-		})
+		if app.reporterRow != nil {
+			app.reporterRow.AddStatus(&reporter.Status{
+				Text:      "\x1b[31merror\x1b[0m 💣💣", // bomb+bomb
+				TextWidth: 10,
+				Priority:  4,
+			})
+		}
 		return err
 	}
 
@@ -931,12 +933,14 @@ func (u *upRunner) updateAppMaxObservedPodStatus(pod *v1.Pod) error {
 
 func (u *upRunner) setAppMaxObservedPodStatus(app *app, s podStatus) {
 	app.maxObservedPodStatus = s
-	switch {
-	case s == podStatusStarted:
-		app.reporterRow.AddStatus(reporter.StatusRunning)
-	case s >= podStatusReady:
-		app.reporterRow.RemoveStatus(reporter.StatusRunning)
-		app.reporterRow.AddStatus(reporter.StatusReady)
+	if app.reporterRow != nil {
+		switch {
+		case s == podStatusStarted:
+			app.reporterRow.AddStatus(reporter.StatusRunning)
+		case s >= podStatusReady:
+			app.reporterRow.RemoveStatus(reporter.StatusRunning)
+			app.reporterRow.AddStatus(reporter.StatusReady)
+		}
 	}
 	app.newLogEntry().Debugf("pod status %s", &app.maxObservedPodStatus)
 }
