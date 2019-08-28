@@ -17,10 +17,11 @@ type DockerRegistryClusterImageStorage struct {
 }
 
 type Service struct {
-	DockerComposeService *dockerComposeConfig.Service
-	matchesFilter        bool
-	NameEscaped          string
-	Ports                []Port
+	DockerComposeService  *dockerComposeConfig.Service
+	matchesFilter         bool
+	matchesFilterDirectly bool
+	NameEscaped           string
+	Ports                 []Port
 }
 
 func (s *Service) Name() string {
@@ -169,24 +170,31 @@ func (cfg *Config) AddService(dockerComposeService *dockerComposeConfig.Service)
 	return service
 }
 
-// MatchesFilter determines whether a service (by name) matches the current filter.
+// MatchesFilter determines whether a service matches the current filter (indirectly or directly).
 func (cfg *Config) MatchesFilter(service *Service) bool {
 	return service.matchesFilter
+}
+
+// MatchesFilterDirectly determines whether a service matches the current filter directly (e.g. service was passed to AddToFilter).
+func (cfg *Config) MatchesFilterDirectly(service *Service) bool {
+	return service.matchesFilterDirectly
 }
 
 // ClearFilter sets the current filter to match no service.
 func (cfg *Config) ClearFilter() {
 	for _, service := range cfg.Services {
 		service.matchesFilter = false
+		service.matchesFilterDirectly = false
 	}
 }
 
 // AddToFilter adds service and its (in)direct dependencies (based on depends_on) to the set of services matched by
-// the current filter.
+// the current filter. After a AddToFilter(service), MatchesFilterDirectly(service) will return true unless ClearFilter was called.
 func (cfg *Config) AddToFilter(service *Service) {
 	queue := []*Service{
 		service,
 	}
+	service.matchesFilterDirectly = true
 	n := 1
 	for n > 0 {
 		n--
