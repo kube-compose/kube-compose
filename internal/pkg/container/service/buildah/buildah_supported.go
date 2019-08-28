@@ -65,7 +65,7 @@ func (b *buildahContainerService) ImagePull(
 	ctx context.Context,
 	image, registryAuth string,
 	onUpdate func(Progress),
-) (digest string, err error) {
+) (imageID string, err error) {
 
 	// SystemContext:       systemContext,
 	// BlobDirectory:       iopts.blobCache,
@@ -85,8 +85,7 @@ func (b *buildahContainerService) ImagePull(
 	if err != nil {
 		return "", err
 	}
-	_ = imageID
-	return "", fmt.Errorf("pulling images via Buildah and local storage is not supported")
+	return imageID, nil
 }
 
 func (b *buildahContainerService) ImagePush(
@@ -95,12 +94,4 @@ func (b *buildahContainerService) ImagePush(
 	onUpdate func(service.Progress),
 ) (digest string, err error) {
 	return "", fmt.Errorf("pushing images via Buildah and local storage is not supported")
-}
-
-func (b *buildahContainerService) ImagePullResolve(
-	ctx context.Context,
-	named dockerRef.Named,
-	digest string,
-) (imageID, repoDigest string, err error) {
-	return "", "", fmt.Errorf("resolving images after Buildah pull (based a local storage) is not supported")
 }

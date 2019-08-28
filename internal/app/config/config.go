@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/github.com/sirupsen/logrus/logrus"
 	dockerClient "github.com/docker/docker/client"
 	containerService "github.com/kube-compose/kube-compose/internal/pkg/container/service"
 	buildahContainerService "github.com/kube-compose/kube-compose/internal/pkg/container/service/buildah"

@@ -10,7 +10,7 @@ import (
 	"path"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/github.com/sirupsen/logrus/logrus"
 	containerService "github.com/kube-compose/kube-compose/internal/pkg/container/service"
 	"github.com/kube-compose/kube-compose/internal/pkg/unix"
 	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"

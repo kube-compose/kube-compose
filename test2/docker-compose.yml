@@ -1,0 +1,50 @@
+version: '2'
+services:
+  helper:
+    image: ubuntu:latest
+    environment:
+    - BASE=1
+  authentication-service:
+    entrypoint: ["/mnt/vol2/entrypoint.sh"]
+    environment:
+    - ASDF=10
+    - DB_URL=postgresql://db:5432
+    - HENK
+    image: ubuntu:latest
+    ports:
+    - "8080"
+    working_dir: /app/test
+    volumes:
+    - './docker-compose.yml:/mnt/vol1/docker-compose.yml:ro'
+    - './entrypoint.sh:/mnt/vol2/entrypoint.sh:ro'
+  generic-service:
+    image: ubuntu:latest
+    environment:
+      ENVVAR_EXTENDS: test
+    ports:
+      - 8236:8234
+  permission-service:
+    entrypoint: ["/mnt/vol1/entrypoint.sh"]
+    image: ubuntu:latest
+    extends:
+      service: generic-service
+    environment:
+      ENVVAR_STR: str
+      ENVVAR_INT: 23
+      ENVVAR_FLOAT1: 23.15
+      ENVVAR_FLOAT2: 2312934891234981234.15123412384718237481723412341234
+      ENVVAR_NULL:
+    extends:
+      service: generic-service
+    image: ubuntu:latest
+    ports:
+    - "8080"
+    - 8081
+    - 8082:8082
+    - 8236:8234
+    working_dir: /app/test
+    volumes:
+    - './entrypoint.sh:/mnt/vol1/entrypoint.sh:ro'
+  db:
+    image: postgres:latest
+    user: root

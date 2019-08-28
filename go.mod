@@ -1,14 +1,8 @@
 module github.com/kube-compose/kube-compose
 
 require (
-	github.com/14rcole/gopopulate v0.0.0-20180821133914-b175b219e774 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 // indirect
-	github.com/BurntSushi/toml v0.3.1 // indirect
-	github.com/DataDog/zstd v1.4.0 // indirect
 	github.com/Microsoft/go-winio v0.4.12 // indirect
-	github.com/Microsoft/hcsshim v0.8.6 // indirect
-	github.com/Sirupsen/logrus v0.0.0-00010101000000-000000000000
-	github.com/containers/storage v1.12.13
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v1.13.1
 	github.com/docker/go-connections v0.4.0 // indirect
@@ -17,7 +11,6 @@ require (
 	github.com/golang/mock v1.3.1 // indirect
 	github.com/golang/protobuf v1.3.1 // indirect
 	github.com/google/btree v1.0.0 // indirect
-	github.com/google/go-cmp v0.3.0 // indirect
 	github.com/google/gofuzz v1.0.0 // indirect
 	github.com/googleapis/gnostic v0.2.0 // indirect
 	github.com/gregjones/httpcache v0.0.0-20190212212710-3befbb6ad0cc // indirect
@@ -25,28 +18,16 @@ require (
 	github.com/imdario/mergo v0.3.7 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.6 // indirect
-	github.com/klauspost/compress v1.7.2 // indirect
-	github.com/klauspost/cpuid v1.2.1 // indirect
-	github.com/klauspost/pgzip v1.2.1 // indirect
-	github.com/mattn/go-shellwords v1.0.5 // indirect
-	github.com/mistifyio/go-zfs v2.1.1+incompatible // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0-rc1
 	github.com/opencontainers/runc v0.1.1 // indirect
-	github.com/opencontainers/selinux v1.2.2 // indirect
-	github.com/ostreedev/ostree-go v0.0.0-20190702140239-759a8c1ac913 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/errors v0.8.1
-	github.com/pquerna/ffjson v0.0.0-20181028064349-e517b90714f7 // indirect
-	github.com/sirupsen/logrus v1.4.2 // indirect
+	github.com/sirupsen/logrus v1.4.1
 	github.com/spf13/cobra v0.0.3
 	github.com/spf13/pflag v1.0.3
-	github.com/stretchr/testify v1.3.0 // indirect
-	github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2 // indirect
-	github.com/tchap/go-patricia v2.3.0+incompatible // indirect
 	github.com/uber-go/mapdecode v1.0.0
-	github.com/vbatts/tar-split v0.11.1 // indirect
 	go.uber.org/atomic v1.4.0 // indirect
 	go.uber.org/multierr v1.1.0 // indirect
 	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
@@ -55,7 +36,6 @@ require (
 	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.2.2
-	gotest.tools v2.2.0+incompatible // indirect
 	k8s.io/api v0.0.0-20190111032252-67edc246be36
 	k8s.io/apimachinery v0.0.0-20190216013122-f05b8decd79c
 	k8s.io/client-go v10.0.0+incompatible

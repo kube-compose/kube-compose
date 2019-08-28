@@ -1,0 +1,31 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert --controller deployment --file docker-compose.yml
+      --file docker-compose.override.yml
+    kompose.version: 1.17.0 (a74acad)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: helper
+  name: helper
+spec:
+  replicas: 1
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        io.kompose.service: helper
+    spec:
+      containers:
+      - env:
+        - name: BASE
+          value: "1"
+        - name: OVERRIDDEN
+          value: "1"
+        image: ubuntu:bionic
+        name: helper
+        resources: {}
+      restartPolicy: Always
+status: {}

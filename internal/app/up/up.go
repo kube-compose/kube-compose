@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/github.com/sirupsen/logrus/logrus"
 	"github.com/docker/distribution/digestset"
 	dockerRef "github.com/docker/distribution/reference"
 	dockerTypes "github.com/docker/docker/api/types"

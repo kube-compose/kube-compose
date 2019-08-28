@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/github.com/sirupsen/logrus/logrus"
 )
 
 const chars = "abcdefghijklmnopqrstuvwxyz0123456789"

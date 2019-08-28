@@ -19,7 +19,7 @@ func imagePullResolve(
 	ctx context.Context,
 	lister ImageLister,
 	named dockerRef.Named,
-	digest string) (imageID, repoDigest string, err error) {
+	digest string) (imageID string, err error) {
 	filters := dockerFilters.NewArgs()
 	familiarName := dockerRef.FamiliarName(named)
 	filters.Add("reference", familiarName)
@@ -28,15 +28,15 @@ func imagePullResolve(
 		Filters: filters,
 	})
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 	repoDigest = familiarName + "@" + digest
 	for i := 0; i < len(imageSummaries); i++ {
 		for _, repoDigest2 := range imageSummaries[i].RepoDigests {
 			if repoDigest == repoDigest2 {
-				return imageSummaries[i].ID, repoDigest, nil
+				return imageSummaries[i].ID, nil
 			}
 		}
 	}
-	return "", "", nil
+	return "", nil
 }

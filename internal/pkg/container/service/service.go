@@ -64,12 +64,7 @@ type ContainerService interface {
 		ctx context.Context,
 		image, registryAuth string,
 		onUpdate func(Progress),
-	) (digest string, err error)
-	ImagePullResolve(
-		ctx context.Context,
-		named dockerRef.Named,
-		digest string,
-	) (imageID, repoDigest string, err error)
+	) (imageID string, err error)
 	ImagePush(
 		ctx context.Context,
 		image, registryAuth string,

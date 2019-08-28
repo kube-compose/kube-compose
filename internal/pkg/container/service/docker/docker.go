@@ -130,10 +130,21 @@ func (d *dockerContainerService) ImagePull(
 	ctx context.Context,
 	image, registryAuth string,
 	onUpdate func(service.Progress),
-) (digest string, err error) {
-	return imagePull(ctx, d.dc, image, registryAuth, func(pull *pullOrPush) {
+) (imageID string, err error) {
+	digest, err := imagePull(ctx, d.dc, image, registryAuth, func(pull *pullOrPush) {
 		onUpdate(pull)
 	})
+	if err != nil {
+		return
+	}
+	var named dockerRef.Named
+	named, err = dockerRef.ParseNormalizedNamed(image)
+	if err != nil {
+		panic(errors.Wrapf(err, "could not image %#v as named image but docker pull succeeded, please report this as a bug at " +
+			"https://github.com/kube-compose/kube-compose", image))
+	}
+	imageID, err = imagePullResolve(ctx, d.dc, named, digest)
+	return
 }
 
 func (d *dockerContainerService) ImagePush(
