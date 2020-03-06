@@ -54,14 +54,16 @@ To run `kube-compose` with [the test docker-compose.yml](test/docker-compose.yml
 ```bash
 kube-compose -f'test/docker-compose.yml' -e'myuniquelabel' up
 ```
-The `-e` flag sets a unique identifier that is used to isolate [labels and selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) and ensure names are unique when deploying to shared namespaces. This is ideal for CI, because there may be many jobs and test environments running at the same time. The above command will also attach to any pods created and stream logs to stdout. When run on a terminal, <kbd>ctrl</kbd> + <kbd>c</kbd> can be used to interrupt the process and return control to the terminal.
+The `-e` flag sets a unique identifier that is used to isolate [labels and selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) and ensure names are unique when deploying to shared namespaces. This is ideal for CI where many jobs and test environments run simultaneously. The command will wait for pods and stream their logs to stdout. When run on a terminal, use <kbd>ctrl</kbd> + <kbd>c</kbd> to return control to the terminal.
 
 Similar to `docker-compose`, an environment can be stopped and destroyed using the `down` command: 
 ```bash
 kube-compose -f'test/docker-compose.yml' -e'myuniquelabel' down
 ```
 
-The CLI of `kube-compose` mirrors `docker-compose` as much as possible, but has some differences. To avoid repeating the `-e` flag you can use the environment variable `KUBECOMPOSE_ENVID`. The above example can also be written as:
+The CLI of `kube-compose` mirrors `docker-compose` as much as possible, but has some differences.
+
+To avoid repeating the `-e` flag you can use the environment variable `KUBECOMPOSE_ENVID`. The above two commands can also be written as:
 ```bash
 cd test
 export KUBECOMPOSE_ENVID='myuniquelabel'
@@ -71,6 +73,7 @@ and
 ```bash
 kube-compose -f'test/docker-compose.yml' down
 ```
+
 For a full list of options and commands, run the help command:
 ```bash
 kube-compose --help
@@ -112,7 +115,7 @@ kube-compose up -d 'helper'
 NOTE: in the background `kube-compose` converts [Docker healthchecks](https://docs.docker.com/engine/reference/builder/#healthcheck) to [readiness probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/) and will only start service `web` when the pod of `db` is ready, and will only start `helper` when the pod of `web` is ready. The pod of `helper` exits immediately, but this pattern is simple and useful. 
 
 ## Volumes
-`kube-compose` currently supports a basic simulation of `docker-compose`'s bind mounted volumes. This supports the use case of mounting configuration files into containers, which is a common way of parameterising containers (in CI).
+`kube-compose` currently supports basic simulation of docker's bind mounted volumes. This supports the use case of mounting configuration files into containers, which is a common way of parameterising containers.
 
 For example, consider the following docker compose file:
 ```yaml
@@ -133,7 +136,7 @@ x-kube-compose:
     type: 'docker'
   volume_init_base_image: 'ubuntu:latest'
 ```
-It describes a service that prints the contents of the host file `./docker-compose.yaml`, using a bind mounted volume. When `kube-compose`'s `up` command is run against the above file, `kube-compose` simulates the bind mounted volume by:
+It describes a service that prints the contents of the host file `./docker-compose.yml`, using a bind mounted volume. When `kube-compose`'s `up` command is run against the above file, `kube-compose` simulates the bind mounted volume by:
 1. Building a helper image with the relevant host files (in this case only `./docker-compose.yaml`);
 1. Running the helper image as an [initContainer](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/) that initialises an [emptyDir](https://kubernetes.io/docs/concepts/storage/volumes/) volume; -and
 1. Mounting the emptyDir volume into the main container at the configured mount path.
@@ -142,7 +145,9 @@ The additional `x-kube-compose` configuration is required so that:
 1. `kube-compose` knows where to store docker images so that the Kubernetes cluster can run them.
 2. `kube-compose` knows which base image to use for helper images.
 
-NOTE: a `cluster_image_storage` with `type: docker` typically only works with [Docker Desktop](https://www.docker.com/products/docker-desktop)'s Kubernetes cluster. See [this section](#x-kube-compose) on how to configure other clusters.
+NOTE1: the `x-` is the prefix for extensions, standardized in docker-compose.
+
+NOTE2: a `cluster_image_storage` with `type: docker` typically only works with [Docker Desktop](https://www.docker.com/products/docker-desktop)'s Kubernetes cluster. See [this section](#x-kube-compose) on how to configure other clusters.
 
 ### Limitations
 1. Volumes that are not bind mounted volumes are ignored.
@@ -152,7 +157,7 @@ NOTE: a `cluster_image_storage` with `type: docker` typically only works with [D
 The third limitation implies that sharing volumes between two docker compose services is not supported, even though this could be implemented through persistent volumes.
 
 ## Running containers as specific users
-Images and stubs run in CI often cannot be easily modified because they are provided by a third party, and the cluster's pod security policy can deny images from being run with the correct user. For this reason, `kube-compose` allows you to use the `--run-as-user` flag:
+Docker images and stubs run in CI often cannot be easily modified because they are provided by a third party, and the cluster's pod security policy can deny images from being run with the correct user. For this reason, `kube-compose` allows you to use the `--run-as-user` flag:
 ```bash
 kube-compose up --run-as-user
 ```
@@ -160,12 +165,12 @@ This will set each pod's `runAsUser` (and `runAsGroup`) based on the [`user` pro
 
 NOTE1: if a Dockerfile does not have a `USER` instruction, then the user is inherited from the base image. This makes it very easy to run images as root.
 
-NOTE2: this may seem like a useless feature, since the deployer can have permissions to create pods running as any user, in which case the user of the image is respected already. But the `user` property of a `docker-compose` service can only be properly implemented by setting runAsUser (and runAsGroup) and the `--run-as-user` flag will enable early errors when the deployer has insufficient permissions.
+NOTE2: at first glance this is a useless feature, because if the deployer has permissions to create pods running as any user then the user of the image is respected already. But the `user` property of a `docker-compose` service can only be properly implemented by setting `runAsUser` (and `runAsGroup`), and the `--run-as-user` flag will enable early errors when the deployer has insufficient permissions.
 
 ## Dynamic test configuration
-When running tests against a dynamic environment that runs in a shared namespace, the test configuration will need to be generated. `kube-compose` has a `get` command that could be used to retrieve the `.svc` hostnames of services, but some engineers may prefer using environment variables and templated strings to achieve this.
+When running tests against a dynamic environment that runs in a shared namespace, the test configuration will need to be generated. `kube-compose` has a `get` command that prints the `.svc` hostnames of services.
 
-Nevertheless, suppose for example that a `docker-compose` service named `my-service` has been deployed to a Kubernetes namespace named `mynamespace`, and the environment id was set to `myenv`. Then the command...
+Suppose for example that a `docker-compose` service named `my-service` has been deployed to a Kubernetes namespace named `mynamespace`, and the environment id was set to `myenv`. Then the command...
 ```bash
 kube-compose -e'myenv' get 'my-service' -o'{{.Hostname}}'
 ```
