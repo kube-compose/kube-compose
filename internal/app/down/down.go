@@ -1,7 +1,7 @@
 package down
 
 import (
-	log "github.com/Sirupsen/logrus"
+	log "github.com/github.com/sirupsen/logrus/logrus"
 	"github.com/kube-compose/kube-compose/internal/app/config"
 	"github.com/kube-compose/kube-compose/internal/app/k8smeta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

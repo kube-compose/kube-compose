@@ -10,19 +10,10 @@ import (
 	"path"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
-	"github.com/docker/distribution/digestset"
-	dockerRef "github.com/docker/distribution/reference"
-	dockerTypes "github.com/docker/docker/api/types"
-	dockerContainers "github.com/docker/docker/api/types/container"
-	dockerFilters "github.com/docker/docker/api/types/filters"
-	dockerClient "github.com/docker/docker/client"
-	dockerArchive "github.com/docker/docker/pkg/archive"
-	"github.com/kube-compose/kube-compose/internal/pkg/docker"
+	log "github.com/github.com/sirupsen/logrus/logrus"
+	containerService "github.com/kube-compose/kube-compose/internal/pkg/container/service"
 	"github.com/kube-compose/kube-compose/internal/pkg/unix"
-	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
-	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -69,14 +60,11 @@ func createReadinessProbeFromDockerHealthcheck(healthcheck *dockerComposeConfig.
 
 		PeriodSeconds:  int32(math.RoundToEven(healthcheck.Interval.Seconds())),
 		TimeoutSeconds: int32(math.RoundToEven(healthcheck.Timeout.Seconds())),
+
 		// This is the default value.
 		// SuccessThreshold: 1,
 	}
 	return probe
-}
-
-type hasTag interface {
-	Tag() string
 }
 
 func inspectImageRawParseHealthcheck(inspectRaw []byte) (*dockerComposeConfig.Healthcheck, error) {
@@ -119,41 +107,18 @@ func inspectImageRawParseHealthcheck(inspectRaw []byte) (*dockerComposeConfig.He
 	return healthcheck, nil
 }
 
-func copyFileFromContainer(ctx context.Context, dc *dockerClient.Client, containerID, srcFile, dstFile string) error {
-	readCloser, stat, err := dc.CopyFromContainer(ctx, containerID, srcFile)
-	if err != nil {
-		return err
-	}
-	defer util.CloseAndLogError(readCloser)
-	if (stat.Mode & os.ModeType) != 0 {
-		// TODO https://github.com/kube-compose/kube-compose/issues/70 we should follow symlinks
-		return fmt.Errorf("could not copy %#v because it is not a regular file", srcFile)
-	}
-	srcInfo := dockerArchive.CopyInfo{
-		Path:       srcFile,
-		Exists:     true,
-		IsDir:      false,
-		RebaseName: "",
-	}
-	err = dockerArchive.CopyTo(readCloser, srcInfo, dstFile)
-	if err != nil {
-		return errors.Wrapf(err, "error while copying image file %#v to local file %#v", srcFile, dstFile)
-	}
-	return nil
-}
-
-func getUserinfoFromImage(ctx context.Context, dc *dockerClient.Client, image string, user *docker.Userinfo) error {
-	containerConfig := &dockerContainers.Config{
-		Entrypoint: []string{"sh"},
-		Image:      image,
-		WorkingDir: "/",
-	}
-	resp, err := dc.ContainerCreate(ctx, containerConfig, nil, nil, "")
+func getUserinfoFromImage(
+	ctx context.Context,
+	cs containerService.ContainerService,
+	image string,
+	user *Userinfo,
+) error {
+	containerID, err := cs.ContainerCreateForCopyFromContainer(ctx, image)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		err = dc.ContainerRemove(ctx, resp.ID, dockerTypes.ContainerRemoveOptions{})
+		err = cs.ContainerRemove(ctx, containerID)
 		if err != nil {
 			log.Error(err)
 		}
@@ -168,17 +133,22 @@ func getUserinfoFromImage(ctx context.Context, dc *dockerClient.Client, image st
 			log.Error(err)
 		}
 	}()
-	err = getUserinfoFromImageUID(ctx, dc, resp.ID, tmpDir, user)
+	err = getUserinfoFromImageUID(ctx, cs, containerID, tmpDir, user)
 	if err != nil {
 		return err
 	}
-	return getUserinfoFromImageGID(ctx, dc, resp.ID, tmpDir, user)
+	return getUserinfoFromImageGID(ctx, cs, containerID, tmpDir, user)
 }
 
-func getUserinfoFromImageUID(ctx context.Context, dc *dockerClient.Client, containerID, tmpDir string, user *docker.Userinfo) error {
+func getUserinfoFromImageUID(
+	ctx context.Context,
+	cs containerService.ContainerService,
+	containerID, tmpDir string,
+	user *Userinfo,
+) error {
 	// TODO https://github.com/kube-compose/kube-compose/issues/70 this is not correct for non-Linux containers
 	if user.UID == nil {
-		err := copyFileFromContainer(ctx, dc, containerID, unix.EtcPasswd, tmpDir)
+		err := cs.CopyFromContainerToFile(ctx, containerID, unix.EtcPasswd, tmpDir)
 		if err != nil {
 			return err
 		}
@@ -195,10 +165,15 @@ func getUserinfoFromImageUID(ctx context.Context, dc *dockerClient.Client, conta
 	return nil
 }
 
-func getUserinfoFromImageGID(ctx context.Context, dc *dockerClient.Client, containerID, tmpDir string, user *docker.Userinfo) error {
+func getUserinfoFromImageGID(
+	ctx context.Context,
+	cs containerService.ContainerService,
+	containerID, tmpDir string,
+	user *Userinfo,
+) error {
 	// TODO https://github.com/kube-compose/kube-compose/issues/70 this is not correct for non-Linux containers
 	if user.GID == nil && user.Group != "" {
-		err := copyFileFromContainer(ctx, dc, containerID, "/etc/group", tmpDir)
+		err := cs.CopyFromContainerToFile(ctx, containerID, unix.EtcGroup, tmpDir)
 		if err != nil {
 			return err
 		}
@@ -213,85 +188,4 @@ func getUserinfoFromImageGID(ctx context.Context, dc *dockerClient.Client, conta
 		user.GID = gid
 	}
 	return nil
-}
-
-// resolveLocalImageID resolves an image ID against a cached list (like the one output by the command "docker images").
-// ref is assumed not to be a partial image ID.
-func resolveLocalImageID(ref dockerRef.Reference, localImageIDSet *digestset.Set, localImagesCache []dockerTypes.ImageSummary) string {
-	named, isNamed := ref.(dockerRef.Named)
-	digested, isDigested := ref.(dockerRef.Digested)
-	// By definition of dockerRef.ParseAnyReferenceWithSet isNamed or isDigested is true
-	if !isNamed {
-		imageID := digested.String()
-		if _, err := localImageIDSet.Lookup(imageID); err == digestset.ErrDigestNotFound {
-			return ""
-		}
-		// The only other error returned by Lookup is a digestset.ErrDigestAmbiguous, which cannot
-		// happen by our assumption that ref cannot be a partial image ID
-		return imageID
-	}
-	familiarName := dockerRef.FamiliarName(named)
-	// The source image must be named
-	if isDigested {
-		// docker images returns RepoDigests as a familiar name with a digest
-		repoDigest := familiarName + "@" + string(digested.Digest())
-		for i := 0; i < len(localImagesCache); i++ {
-			for _, repoDigest2 := range localImagesCache[i].RepoDigests {
-				if repoDigest == repoDigest2 {
-					return localImagesCache[i].ID
-				}
-			}
-		}
-	}
-	return resolveLocalImageIDTag(ref, familiarName, localImagesCache)
-}
-
-func resolveLocalImageIDTag(ref dockerRef.Reference, familiarName string, localImagesCache []dockerTypes.ImageSummary) string {
-	tag := getTag(ref)
-	if len(tag) > 0 {
-		// docker images returns RepoTags as a familiar name with a tag
-		repoTag := familiarName + ":" + tag
-		for i := 0; i < len(localImagesCache); i++ {
-			for _, repoTag2 := range localImagesCache[i].RepoTags {
-				if repoTag == repoTag2 {
-					return localImagesCache[i].ID
-				}
-			}
-		}
-	}
-	return ""
-}
-
-// resolveLocalImageAfterPull resolves an image based on a repository and digest by querying the docker daemon.
-// This is exactly the information we have available after pulling an image.
-// Returns the image ID, repo digest and optionally an error.
-func resolveLocalImageAfterPull(ctx context.Context, dc *dockerClient.Client, named dockerRef.Named, digest string) (
-	imageID, repoDigest string, err error) {
-	filters := dockerFilters.NewArgs()
-	familiarName := dockerRef.FamiliarName(named)
-	filters.Add("reference", familiarName)
-	imageSummaries, err := dc.ImageList(ctx, dockerTypes.ImageListOptions{
-		All:     false,
-		Filters: filters,
-	})
-	if err != nil {
-		return "", "", err
-	}
-	repoDigest = familiarName + "@" + digest
-	for i := 0; i < len(imageSummaries); i++ {
-		for _, repoDigest2 := range imageSummaries[i].RepoDigests {
-			if repoDigest == repoDigest2 {
-				return imageSummaries[i].ID, repoDigest, nil
-			}
-		}
-	}
-	return "", "", nil
-}
-
-func getTag(ref dockerRef.Reference) string {
-	refWithTag, ok := ref.(hasTag)
-	if !ok {
-		return ""
-	}
-	return refWithTag.Tag()
 }

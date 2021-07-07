@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/github.com/sirupsen/logrus/logrus"
 	"github.com/kube-compose/kube-compose/internal/pkg/progress/reporter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"

@@ -1,0 +1,57 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert --controller deployment --file docker-compose.yml
+      --file docker-compose.override.yml
+    kompose.version: 1.17.0 (a74acad)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: permission-service
+  name: permission-service
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        io.kompose.service: permission-service
+    spec:
+      containers:
+      - command:
+        - /mnt/vol1/entrypoint.sh
+        env:
+        - name: ENVVAR_EXTENDS
+          value: test
+        - name: ENVVAR_FLOAT1
+          value: "23.15"
+        - name: ENVVAR_FLOAT2
+          value: "2312934900000000000"
+        - name: ENVVAR_INT
+          value: "23"
+        - name: ENVVAR_NULL
+        - name: ENVVAR_STR
+          value: str
+        image: ubuntu:latest
+        name: permission-service
+        ports:
+        - containerPort: 8234
+        - containerPort: 8080
+        - containerPort: 8081
+        - containerPort: 8082
+        - containerPort: 8234
+        resources: {}
+        volumeMounts:
+        - mountPath: /mnt/vol1/entrypoint.sh
+          name: permission-service-claim0
+          readOnly: true
+        workingDir: /app/test
+      restartPolicy: Always
+      volumes:
+      - name: permission-service-claim0
+        persistentVolumeClaim:
+          claimName: permission-service-claim0
+          readOnly: true
+status: {}

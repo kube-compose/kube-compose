@@ -7,14 +7,13 @@ import (
 	"strings"
 	"sync"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/github.com/sirupsen/logrus/logrus"
 	"github.com/docker/distribution/digestset"
 	dockerRef "github.com/docker/distribution/reference"
 	dockerTypes "github.com/docker/docker/api/types"
-	dockerClient "github.com/docker/docker/client"
 	"github.com/kube-compose/kube-compose/internal/app/config"
 	"github.com/kube-compose/kube-compose/internal/app/k8smeta"
-	"github.com/kube-compose/kube-compose/internal/pkg/docker"
+	containerService "github.com/kube-compose/kube-compose/internal/pkg/container/service"
 	"github.com/kube-compose/kube-compose/internal/pkg/progress/reporter"
 	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	dockerComposeConfig "github.com/kube-compose/kube-compose/pkg/docker/compose/config"
@@ -46,7 +45,7 @@ type appImageInfo struct {
 	podImagePullPolicy v1.PullPolicy
 	sourceImageID      string
 	cmd                []string
-	user               *docker.Userinfo
+	user               *Userinfo
 }
 
 type appVolume struct {
@@ -108,7 +107,7 @@ type upRunner struct {
 	appsToBeStarted       map[*app]bool
 	cfg                   *config.Config
 	completedChannels     []chan interface{}
-	dockerClient          *dockerClient.Client
+	containerService      containerService.ContainerService
 	k8sClientset          *kubernetes.Clientset
 	k8sServiceClient      clientV1.ServiceInterface
 	k8sPodClient          clientV1.PodInterface
@@ -235,15 +234,26 @@ func (u *upRunner) getAppVolumeInitImage(a *app) error {
 	for _, volume := range a.volumes {
 		bindMountHostFiles = append(bindMountHostFiles, volume.resolvedHostPath)
 	}
-	r, err := buildVolumeInitImage(u.opts.Context, u.dockerClient, bindMountHostFiles, *u.cfg.VolumeInitBaseImage)
+	var err error
+	a.volumeInitImage.sourceImageID, err = buildVolumeInitImage(
+		u.opts.Context,
+		u.containerService,
+		bindMountHostFiles,
+		*u.cfg.VolumeInitBaseImage,
+	)
 	if err != nil {
 		return err
 	}
-	a.volumeInitImage.sourceImageID = r.imageID
 	tag := u.cfg.EnvironmentID + "-volumeinit"
 	if u.cfg.ClusterImageStorage.Docker != nil {
-		imageRef := fmt.Sprintf("%s/%s/%s:%s", docker.DefaultDomain, docker.OfficialRepoName, a.composeService.NameEscaped, tag)
-		err = u.dockerClient.ImageTag(u.opts.Context, a.volumeInitImage.sourceImageID, imageRef)
+		imageRef := fmt.Sprintf(
+			"%s/%s/%s:%s",
+			containerService.DefaultDomain(),
+			containerService.OfficialRepoName(),
+			a.composeService.NameEscaped,
+			tag,
+		)
+		err = u.containerService.ImageTag(u.opts.Context, a.volumeInitImage.sourceImageID, imageRef)
 		if err != nil {
 			return err
 		}
@@ -266,14 +276,14 @@ func (u *upRunner) pushImage(sourceImageID, name, tag, imageDescr string, a *app
 	a.reporterRow.AddStatus(reporter.StatusDockerPush)
 	defer a.reporterRow.RemoveStatus(reporter.StatusDockerPush)
 	imagePush := fmt.Sprintf("%s/%s/%s:%s", u.cfg.ClusterImageStorage.DockerRegistry.Host, u.cfg.Namespace, name, tag)
-	err = u.dockerClient.ImageTag(u.opts.Context, sourceImageID, imagePush)
+	err = u.containerService.ImageTag(u.opts.Context, sourceImageID, imagePush)
 	if err != nil {
 		return
 	}
 	var digest string
-	registryAuth := docker.EncodeRegistryAuth("unused", u.cfg.KubeConfig.BearerToken)
-	digest, err = docker.PushImage(u.opts.Context, u.dockerClient, imagePush, registryAuth, func(push *docker.PullOrPush) {
-		pt.Update(push.Progress())
+	registryAuth := containerService.EncodeRegistryAuth("unused", u.cfg.KubeConfig.BearerToken)
+	digest, err = u.containerService.ImagePush(u.opts.Context, imagePush, registryAuth, func(p containerService.Progress) {
+		pt.Update(p.Progress())
 	})
 	if err != nil {
 		return
@@ -322,7 +332,7 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 	if err != nil {
 		return err
 	}
-	inspect, inspectRaw, err := u.dockerClient.ImageInspectWithRaw(u.opts.Context, app.imageInfo.sourceImageID)
+	inspect, inspectRaw, err := u.containerService.ImageInspectWithRaw(u.opts.Context, app.imageInfo.sourceImageID)
 	if err != nil {
 		return err
 	}
@@ -346,8 +356,14 @@ func (u *upRunner) getAppImageEnsureCorrectPodImage(a *app, sourceImageRef docke
 	tag := u.cfg.EnvironmentID + "-main"
 	switch {
 	case u.cfg.ClusterImageStorage.Docker != nil:
-		imageRef := fmt.Sprintf("%s/%s/%s:%s", docker.DefaultDomain, docker.OfficialRepoName, a.composeService.NameEscaped, tag)
-		err := u.dockerClient.ImageTag(u.opts.Context, a.imageInfo.sourceImageID, imageRef)
+		imageRef := fmt.Sprintf(
+			"%s/%s/%s:%s",
+			containerService.DefaultDomain(),
+			containerService.OfficialRepoName(),
+			a.composeService.NameEscaped,
+			tag,
+		)
+		err := u.containerService.ImageTag(u.opts.Context, a.imageInfo.sourceImageID, imageRef)
 		if err != nil {
 			return err
 		}
@@ -376,7 +392,7 @@ func (u *upRunner) getAppImageInfoEnsureSourceImageID(sourceImage string, source
 	localImageIDSet *digestset.Set) error {
 	// We need the image locally always, so we can parse its healthcheck
 	sourceImageNamed, sourceImageIsNamed := sourceImageRef.(dockerRef.Named)
-	a.imageInfo.sourceImageID = resolveLocalImageID(sourceImageRef, localImageIDSet, u.localImagesCache.images)
+	a.imageInfo.sourceImageID = containerService.ResolveLocalImageID(sourceImageRef, localImageIDSet, u.localImagesCache.images)
 	if a.imageInfo.sourceImageID == "" {
 		if !sourceImageIsNamed {
 			return fmt.Errorf("could not find image %#v locally, and building images is not supported", sourceImage)
@@ -385,15 +401,18 @@ func (u *upRunner) getAppImageInfoEnsureSourceImageID(sourceImage string, source
 		if err != nil {
 			return err
 		}
-		a.imageInfo.sourceImageID, a.imageInfo.podImage, err = resolveLocalImageAfterPull(
-			u.opts.Context, u.dockerClient, sourceImageNamed, digest)
+		a.imageInfo.sourceImageID, a.imageInfo.podImage, err = u.containerService.ImagePullResolve(
+			u.opts.Context,
+			sourceImageNamed,
+			digest,
+		)
 		if err != nil {
 			return err
 		}
 	}
 	if a.imageInfo.sourceImageID == "" {
-		return fmt.Errorf("could get ID of image %#v, this is either a bug or images were removed by an external process (please try again)",
-			sourceImage)
+		return fmt.Errorf("could get ID of image %#v, this is either a bug or images were removed by an external process (please try "+
+			"again)", sourceImage)
 	}
 	// len(podImage) > 0 by definition of resolveLocalImageAfterPull
 	return nil
@@ -404,30 +423,30 @@ func (u *upRunner) getAppImageInfoPullImage(sourceImageRef dockerRef.Reference, 
 	defer pt.Done()
 	a.reporterRow.AddStatus(reporter.StatusDockerPull)
 	defer a.reporterRow.RemoveStatus(reporter.StatusDockerPull)
-	return docker.PullImage(u.opts.Context, u.dockerClient, sourceImageRef.String(), "123", func(pull *docker.PullOrPush) {
-		pt.Update(pull.Progress())
+	return u.containerService.ImagePull(u.opts.Context, sourceImageRef.String(), "123", func(p containerService.Progress) {
+		pt.Update(p.Progress())
 	})
 }
 
 func (u *upRunner) getAppImageInfoUser(a *app, inspect *dockerTypes.ImageInspect, sourceImage string) error {
-	var user *docker.Userinfo
+	var user *Userinfo
 	var err error
 	userRaw := a.composeService.DockerComposeService.User
 	if userRaw == nil {
-		user, err = docker.ParseUserinfo(inspect.Config.User)
+		user, err = ParseUserinfo(inspect.Config.User)
 		if err != nil {
 			return errors.Wrapf(err, "image %#v has an invalid user %#v", sourceImage, inspect.Config.User)
 		}
 	} else {
-		user, err = docker.ParseUserinfo(*userRaw)
+		user, err = ParseUserinfo(*userRaw)
 		if err != nil {
-			return errors.Wrapf(err, "docker-compose service %s has an invalid user %#v", a.name(), *userRaw)
+			return errors.Wrapf(err, "docker compose service %s has an invalid user %#v", a.name(), *userRaw)
 		}
 	}
 	if user.UID == nil || (user.Group != "" && user.GID == nil) {
 		// TODO https://github.com/kube-compose/kube-compose/issues/70 confirm whether docker and our pod spec will produce the same default
 		// group if a UID is set but no GID
-		err := getUserinfoFromImage(u.opts.Context, u.dockerClient, a.imageInfo.sourceImageID, user)
+		err := getUserinfoFromImage(u.opts.Context, u.containerService, a.imageInfo.sourceImageID, user)
 		if err != nil {
 			return errors.Wrapf(err, "error getting uid/gid from image %#v", sourceImage)
 		}
@@ -618,7 +637,7 @@ func (u *upRunner) getPodHostAliasesCore(expectedServiceCount int) ([]v1.HostAli
 
 func (u *upRunner) initLocalImages() error {
 	u.localImagesCache.once.Do(func() {
-		imageSummarySlice, err := u.dockerClient.ImageList(u.opts.Context, dockerTypes.ImageListOptions{
+		imageSummarySlice, err := u.containerService.ImageList(u.opts.Context, dockerTypes.ImageListOptions{
 			All: true,
 		})
 		var imageIDSet *digestset.Set
@@ -628,11 +647,9 @@ func (u *upRunner) initLocalImages() error {
 				_ = imageIDSet.Add(goDigest.Digest(imageSummarySlice[i].ID))
 			}
 		}
-		u.localImagesCache = localImagesCache{
-			imageIDSet: imageIDSet,
-			images:     imageSummarySlice,
-			err:        err,
-		}
+		u.localImagesCache.imageIDSet = imageIDSet
+		u.localImagesCache.images = imageSummarySlice
+		u.localImagesCache.err = err
 	})
 	return u.localImagesCache.err
 }
@@ -1056,12 +1073,11 @@ func (u *upRunner) run() error {
 		return err
 	}
 	// Initialize docker client
-	var dc *dockerClient.Client
-	dc, err = dockerClient.NewEnvClient()
+	u.containerService, err = u.cfg.GetContainerService(u.opts.Context)
 	if err != nil {
 		return err
 	}
-	u.dockerClient = dc
+	defer util.CloseAndLogError(u.containerService)
 
 	for app := range u.appsToBeStarted {
 		// Begin pulling and pushing images immediately...

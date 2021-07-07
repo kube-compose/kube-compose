@@ -4,17 +4,13 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
-	dockerTypes "github.com/docker/docker/api/types"
-	dockerClient "github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/jsonmessage"
-	"github.com/kube-compose/kube-compose/internal/pkg/docker"
+	containerService "github.com/kube-compose/kube-compose/internal/pkg/container/service"
 	"github.com/kube-compose/kube-compose/internal/pkg/fs"
 	"github.com/kube-compose/kube-compose/internal/pkg/util"
 	"github.com/pkg/errors"
@@ -255,51 +251,23 @@ func buildVolumeInitImageGetBuildContext(bindVolumeHostPaths []string) ([]byte, 
 	return tarBuffer.Bytes(), nil
 }
 
-type buildVolumeInitImageResult struct {
-	imageID string
-}
-
 func buildVolumeInitImage(
 	ctx context.Context,
-	dc *dockerClient.Client,
+	cs containerService.ContainerService,
 	bindVolumeHostPaths []string,
-	volumeInitBaseImage string) (*buildVolumeInitImageResult, error) {
+	volumeInitBaseImage string) (string, error) {
 	buildContextBytes, err := buildVolumeInitImageGetBuildContext(bindVolumeHostPaths)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	buildContext := bytes.NewReader(buildContextBytes)
-	response, err := dc.ImageBuild(ctx, buildContext, dockerTypes.ImageBuildOptions{
+	return cs.ImageBuild(&containerService.ImageBuildOptions{
 		BuildArgs: map[string]*string{
 			"BASE_IMAGE": util.NewString(volumeInitBaseImage),
 		},
-		// Only the image ID is output when SupressOutput is true.
-		SuppressOutput: true,
-		Remove:         true,
+		BuildContext: buildContext,
+		Context:      ctx,
 	})
-	if err != nil {
-		return nil, err
-	}
-	r := &buildVolumeInitImageResult{}
-	decoder := json.NewDecoder(response.Body)
-	for {
-		var msg jsonmessage.JSONMessage
-		err = decoder.Decode(&msg)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return nil, err
-		}
-
-		if imageID := docker.FindDigest(msg.Stream); imageID != "" {
-			r.imageID = imageID
-		}
-	}
-	if r.imageID == "" {
-		return nil, fmt.Errorf("could not parse image ID from docker build output stream")
-	}
-	return r, nil
 }
 
 func resolveBindVolumeHostPath(name string) (string, error) {

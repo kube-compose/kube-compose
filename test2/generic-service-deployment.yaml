@@ -1,0 +1,31 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert --controller deployment --file docker-compose.yml
+      --file docker-compose.override.yml
+    kompose.version: 1.17.0 (a74acad)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: generic-service
+  name: generic-service
+spec:
+  replicas: 1
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        io.kompose.service: generic-service
+    spec:
+      containers:
+      - env:
+        - name: ENVVAR_EXTENDS
+          value: test
+        image: ubuntu:latest
+        name: generic-service
+        ports:
+        - containerPort: 8234
+        resources: {}
+      restartPolicy: Always
+status: {}
