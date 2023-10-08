@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"sync"
 
@@ -271,7 +272,9 @@ func (u *upRunner) pushImage(sourceImageID, name, tag, imageDescr string, a *app
 		return
 	}
 	var digest string
-	registryAuth := docker.EncodeRegistryAuth("unused", u.cfg.KubeConfig.BearerToken)
+	var user string = os.Getenv("DOCKER_REGISTRY_USER")
+	var pass string = os.Getenv("DOCKER_REGISTRY_PASS")
+	registryAuth := docker.EncodeRegistryAuth(user, pass)
 	digest, err = docker.PushImage(u.opts.Context, u.dockerClient, imagePush, registryAuth, func(push *docker.PullOrPush) {
 		pt.Update(push.Progress())
 	})
