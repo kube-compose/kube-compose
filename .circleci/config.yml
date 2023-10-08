@@ -9,7 +9,7 @@ jobs:
   build_and_test: # this can be any name you choose
     executor:
       name: go/default # Use the default executor from the orb
-      tag: '1.19.2' # Specify a version tag
+      tag: '1.12' # Specify a version tag
     steps:
       - checkout # checkout source code
       - go/load-cache # Load cached Go modules.
