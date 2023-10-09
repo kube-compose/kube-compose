@@ -53,7 +53,7 @@ jobs:
             ghr -t ${GITHUB_TOKEN} \
                 -u ${CIRCLE_PROJECT_USERNAME} \
                 -r ${CIRCLE_PROJECT_REPONAME} \
-                -c ${CIRCLE_SHA 1} \
+                -c ${CIRCLE_SHA1} \
                 -delete ${VERSION} \
                 /tmp/workspace/artifacts/ 
   lint:
@@ -68,13 +68,16 @@ jobs:
             # binary will be $(go env GOPATH)/bin/golangci-lint
             curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
             golangci-lint --version
+            export CGO_ENABLED=0
+            export GOOS
+            export GOPROXY=https://proxy.golang.org
             # https://golangci-lint.run/usage/quick-start 
             golangci-lint run
 
   test:
     executor:
       name: go/default
-      tag: '1.12'
+      tag: '1.18'
     steps:
       - checkout
       - go/load-cache
