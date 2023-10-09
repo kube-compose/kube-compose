@@ -34,17 +34,35 @@ jobs:
               )
             done
             ls -la artifacts/
+      - persist_to_workspace:
+          root: .
+          paths: artifacts
+  deploy:
+    executor:
+      name: go/default # Use the default executor from the orb
+      tag: '1.18'
+    steps:
+      - attach_workspace
+          at: /tmp/workspace 
       - run:
           name: "Publish Release on GitHub"
           command: |
+            ls -la /tmp/workspace/artifacts/ 
             export GOPROXY=https://proxy.golang.org 
             go get github.com/tcnksm/ghr
             VERSION=0.0.1
-            ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA 1} -delete ${VERSION} ./artifacts/ 
+            ghr -t ${GITHUB_TOKEN} \
+                -u ${CIRCLE_PROJECT_USERNAME} \
+                -r ${CIRCLE_PROJECT_REPONAME} \
+                -c ${CIRCLE_SHA 1} \
+                -delete ${VERSION} \
+                /tmp/workspace/artifacts/ 
       - run:
           name: "golangci-lint"
           command: |
-            curl -skfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b "$(go env GOPATH)"/bin v1.16.0 || true 
+            # binary will be $(go env GOPATH)/bin/golangci-lint
+            curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
+            golangci-lint --version 
       # go get github.com/mattn/goveralls 
       - go/test: # Runs 'go test ./...' but includes extensive parameterization for finer tuning.
           covermode: atomic
@@ -59,3 +77,6 @@ workflows:
   go-with-the-flow:
     jobs:
       - build_and_test
+      - deploy
+          requires:
+            - build_and_test
