@@ -42,8 +42,9 @@ jobs:
             ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA 1} -delete ${VERSION} ./artifacts/ 
       - run:
           name: "golangci-lint"
-          command: "curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh |
-  sh -s -- -b \"$(go env GOPATH)\"/bin v1.16.0" || true 
+          command: |
+            curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh |
+  sh -s -- -b "$(go env GOPATH)"/bin v1.16.0 || true 
       # go get github.com/mattn/goveralls 
       - go/test: # Runs 'go test ./...' but includes extensive parameterization for finer tuning.
           covermode: atomic
