@@ -77,8 +77,11 @@ jobs:
       tag: '1.12'
     steps:
       - checkout
-      - go/load-cache 
-      - go get github.com/mattn/goveralls 
+      - go/load-cache
+      - run:
+          name: "get goveralls"
+          command: | 
+            go get github.com/mattn/goveralls 
       - go/test: # Runs 'go test ./...' but includes extensive parameterization for finer tuning.
           covermode: atomic
           failfast: true
