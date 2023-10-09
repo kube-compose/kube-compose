@@ -9,13 +9,12 @@ orbs:
 jobs:
   build_and_test: # this can be any name you choose
     executor:
-      name: go/default # Use the default executor from the orb
-      tag: '1.12' # Specify a version tag
+      name: go/default
+      tag: '1.12'
     steps:
-      - checkout # checkout source code
+      - checkout
       - go/load-cache # Load cached Go modules.
       #- go/mod-download # Run 'go mod download'.
-      - go/save-cache # Save Go modules to cache.
       - run:
           name: "Build Linux + darwin" 
           command: |
@@ -34,6 +33,7 @@ jobs:
               )
             done
             ls -la artifacts/
+      - go/save-cache
       - persist_to_workspace:
           root: .
           paths: artifacts
