@@ -16,10 +16,9 @@ jobs:
       #- go/mod-download # Run 'go mod download'.
       - go/save-cache # Save Go modules to cache.
       - run:
-          name: "build" 
+          name: "Build Linux + darwin" 
           command: |
-            export CGO_ENABLED
-            CGO_ENABLED=0
+            export CGO_ENABLED=0
             export GOOS
             mkdir artifacts
             for T in linux darwin; do
@@ -42,7 +41,7 @@ jobs:
       name: go/default # Use the default executor from the orb
       tag: '1.18'
     steps:
-      - attach_workspace
+      - attach_workspace:
           at: /tmp/workspace 
       - run:
           name: "Publish Release on GitHub"
@@ -62,7 +61,9 @@ jobs:
           command: |
             # binary will be $(go env GOPATH)/bin/golangci-lint
             curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
-            golangci-lint --version 
+            golangci-lint --version
+            # https://golangci-lint.run/usage/quick-start 
+            golangci-lint run
       # go get github.com/mattn/goveralls 
       - go/test: # Runs 'go test ./...' but includes extensive parameterization for finer tuning.
           covermode: atomic
