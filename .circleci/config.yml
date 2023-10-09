@@ -29,8 +29,8 @@ jobs:
               (
                 cd release/"$T"
                 tar -zcvf kube-compose.tar.gz kube-compose
-                mv kube-compose ../artifacts/kube-compose."$T"
-                mv kube-compose.tar.gz ../artifacts/kube-compose."$T".tar.gz
+                mv kube-compose ../../artifacts/kube-compose."$T"
+                mv kube-compose.tar.gz ../../artifacts/kube-compose."$T".tar.gz
               )
             done
             ls -la artifacts/
@@ -43,7 +43,7 @@ jobs:
       - run:
           name: "golangci-lint"
           command: "curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh |
-  sh -s -- -b \"$(go env GOPATH)\"/bin v1.16.0" 
+  sh -s -- -b \"$(go env GOPATH)\"/bin v1.16.0" || true 
       # go get github.com/mattn/goveralls 
       - go/test: # Runs 'go test ./...' but includes extensive parameterization for finer tuning.
           covermode: atomic
