@@ -48,7 +48,7 @@ jobs:
           command: |
             ls -la /tmp/workspace/artifacts/ 
             export GOPROXY=https://proxy.golang.org 
-            go get github.com/tcnksm/ghr
+            go install github.com/tcnksm/ghr@latest
             VERSION=0.0.1
             ghr -t ${GITHUB_TOKEN} \
                 -u ${CIRCLE_PROJECT_USERNAME} \
@@ -56,6 +56,12 @@ jobs:
                 -c ${CIRCLE_SHA 1} \
                 -delete ${VERSION} \
                 /tmp/workspace/artifacts/ 
+  lint:
+    executor:
+      name: go/default
+      tag: '1.12'
+    steps:
+      - checkout
       - run:
           name: "golangci-lint"
           command: |
@@ -64,13 +70,19 @@ jobs:
             golangci-lint --version
             # https://golangci-lint.run/usage/quick-start 
             golangci-lint run
-      # go get github.com/mattn/goveralls 
+
+  test:
+    executor:
+      name: go/default
+      tag: '1.12'
+    steps:
+      - checkout
+      - go/load-cache 
+      - go get github.com/mattn/goveralls 
       - go/test: # Runs 'go test ./...' but includes extensive parameterization for finer tuning.
           covermode: atomic
           failfast: true
           race: true
-
-
 
 # Orchestrate jobs using workflows
 # See: https://circleci.com/docs/configuration-reference/#workflows
@@ -78,6 +90,8 @@ workflows:
   go-with-the-flow:
     jobs:
       - build_and_test
+      - test
+      - lint
       - deploy:
           requires:
             - build_and_test
