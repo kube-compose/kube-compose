@@ -4,7 +4,7 @@ version: 2.1
 
 orbs:
   go: circleci/go@1.7.3
-  golangci-lint: timakin/golangci-lint@stable
+  golangci-lint: timakin/golangci-lint@0.1.1
 
 jobs:
   build_and_test: # this can be any name you choose
