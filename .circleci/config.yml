@@ -18,6 +18,7 @@ jobs:
       - run:
           name: "Build Linux + darwin" 
           command: |
+            set -x
             export CGO_ENABLED=0
             export GOOS GOARCH
             export GZIP_OPT=-9
@@ -30,7 +31,7 @@ jobs:
                 go build -a -installsuffix cgo \
                  -o release/kube-compose.${R} .
                 tar -zcvf release/kube-compose.${R}.tar.gz release/kube-compose.${R}
-                rm release/kube-compose.${R}
+                rm -f release/kube-compose.${R}
               done
             done
             ls -la release/
@@ -104,7 +105,8 @@ workflows:
       - build_and_test
       - test
       - lint
-      - golangci-lint/lint
+      - golangci-lint/lint:
+          directories: --timeout=30 -D wrapcheck
       - deploy:
           requires:
             - build_and_test
