@@ -10,7 +10,7 @@ jobs:
   build_and_test: # this can be any name you choose
     executor:
       name: go/default
-      tag: '1.12'
+      tag: '1.16'
     steps:
       - checkout
       - go/load-cache # Load cached Go modules.
@@ -106,7 +106,7 @@ workflows:
       - test
       - lint
       - golangci-lint/lint:
-          directories: --timeout=30 -D wrapcheck
+          directories: --timeout=30s -D wrapcheck
       - deploy:
           requires:
             - build_and_test
