@@ -19,24 +19,25 @@ jobs:
           name: "Build Linux + darwin" 
           command: |
             export CGO_ENABLED=0
-            export GOOS
-            mkdir artifacts
+            export GOOS GOARCH
+            export GZIP_OPT=-9
+            mkdir release
             for T in linux darwin; do
-              mkdir -p release/"$T"
-              GOOS=$T
-              go build -a -installsuffix cgo -o release/"$T"/kube-compose .
-              (
-                cd release/"$T"
-                tar -zcvf kube-compose.tar.gz kube-compose
-                mv kube-compose ../../artifacts/kube-compose."$T"
-                mv kube-compose.tar.gz ../../artifacts/kube-compose."$T".tar.gz
-              )
+              for A in amd64 arm64; do
+                R=${T}_${A}
+                GOOS=$T
+                GOARCH=$A
+                go build -a -installsuffix cgo \
+                 -o release/kube-compose.${R} .
+                tar -zcvf release/kube-compose.${R}.tar.gz release/kube-compose.${R}
+                rm release/kube-compose.${R}
+              done
             done
-            ls -la artifacts/
+            ls -la release/
       - go/save-cache
       - persist_to_workspace:
           root: .
-          paths: artifacts
+          paths: release
   deploy:
     executor:
       name: go/default # Use the default executor from the orb
@@ -55,10 +56,11 @@ jobs:
             echo CIRCLE_TAG=${CIRCLE_TAG}
             ghr -t ${GITHUB_TOKEN} \
                 -u ${CIRCLE_PROJECT_USERNAME} \
-                -r ${CIRCLE_PROJECT_REPONAME} \
+                -r kube-compose \
                 -c ${CIRCLE_SHA1} \
-                -delete ${VERSION} \
-                /tmp/workspace/artifacts/ 
+                -delete \
+                ${VERSION} \
+                /tmp/workspace/release/ 
   lint:
     executor:
       name: go/default
