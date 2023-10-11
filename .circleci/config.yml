@@ -118,9 +118,12 @@ workflows:
             - attach_workspace: { at: /tmp/workspace } # for release binaries
             - run:
                 command: |
+                  set -x
                   echo "CIRCLE_PROJECT_REPONAME=kube-compose" >> $BASH_ENV
                   echo "CIRCLE_PROJECT_USERNAME=jubr" >> $BASH_ENV
+                  echo "CIRCLE_REPOSITORY_URL=https://github.com/jubr/kube-compose" >> $BASH_ENV
                   cat $BASH_ENV
+                  source $BASH_ENV
             - run:
                 command: |
                   echo "CIRCLE_PROJECT_REPONAME: $CIRCLE_PROJECT_REPONAME"
