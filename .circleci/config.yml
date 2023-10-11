@@ -13,14 +13,12 @@ commands:
         GOOS:   { type: string }
         GOARCH: { type: string }
     #name: "Build <<parameters.GOOS>> <<parameters.GOARCH>>" 
-    environment:
-        GOOS:   <<parameters.GOOS>>
-        GOARCH: <<parameters.GOARCH>>
+        
     steps:
       - run:
           command: |
             set -x
-            export CGO_ENABLED=0 GZIP_OPT=-9
+            export GOOS=<<parameters.GOOS>> GOARCH=<<parameters.GOARCH>> CGO_ENABLED=0 GZIP_OPT=-9
             mkdir -p release
             R=${GOOS}_${GOARCH}
             go build -a -o release/kube-compose.${R} .
