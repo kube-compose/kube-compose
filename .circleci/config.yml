@@ -30,11 +30,11 @@ jobs:
                 GOARCH=$A
                 go build -a -installsuffix cgo \
                  -o release/kube-compose.${R} .
-                tar -zcvf release/kube-compose.${R}.tar.gz release/kube-compose.${R}
-                rm -f release/kube-compose.${R}
+                tar --remove-files -zcf release/kube-compose.${R}.tar.gz release/kube-compose.${R}
+                #rm -f release/kube-compose.${R}
               done
             done
-            ls -la release/
+            du -h release/*
       - go/save-cache
       - persist_to_workspace:
           root: .
@@ -109,7 +109,7 @@ workflows:
     jobs:
       - build_and_test
       - test
-      - lint
+      #- lint
       - golangci-lint/lint:
           directories: --timeout=600s -D wrapcheck
       - deploy:
