@@ -66,18 +66,18 @@ jobs:
             go install github.com/tcnksm/ghr@latest
             which ghr
             ghr --version
-            curl -LO https://github.com/tcnksm/ghr/releases/download/v0.16.0/ghr_v0.16.0_linux_amd64.tar.gz \
+            curl -LO "https://github.com/tcnksm/ghr/releases/download/v0.16.0/ghr_v0.16.0_linux_amd64.tar.gz" \
               | tar zxO > ./ghr
             cp ghr /usr/local/bin || true
             chmod a+x ghr
-            file ghr || true
+            
             head ghr || true
             ./ghr --version
             VERSION=v0.0.2
             echo "CIRCLE_PROJECT_REPONAME: $CIRCLE_PROJECT_REPONAME"
             echo CIRCLE_TAG=${CIRCLE_TAG}
             ./ghr -t ${GITHUB_TOKEN} \
-                -u ${CIRCLE_PROJECT_USERNAME} \
+                -u jubr \
                 -r kube-compose \
                 -c ${CIRCLE_SHA1} \
                 -recreate \
@@ -118,12 +118,17 @@ workflows:
             - attach_workspace: { at: /tmp/workspace } # for release binaries
             - run:
                 command: |
-                  echo "CIRCLE_PROJECT_REPONAME=$CIRCLE_PROJECT_REPONAME"
+                  echo "CIRCLE_PROJECT_REPONAME=kube-compose" >> $BASH_ENV
+                  echo "CIRCLE_PROJECT_USERNAME=jubr" >> $BASH_ENV
+                  cat $BASH_ENV
+            - run:
+                command: |
+                  echo "CIRCLE_PROJECT_REPONAME: $CIRCLE_PROJECT_REPONAME"
           #notes-file: changelog.md
           tag: v0.0.3
           title: v0.0.3 Baby steps
           files: /tmp/workspace/release/*
-          additional_args: --repo $CIRCLE_REPOSITORY_URL
+          #additional_args: --repo $CIRCLE_REPOSITORY_URL
           requires:
             - build_and_test
           # filters:
