@@ -5,7 +5,7 @@ version: 2.1
 orbs:
   go: circleci/go@1.7.3
   golangci-lint: timakin/golangci-lint@0.1.1
-  gh: circleci/github-cli@1.0
+  gh: circleci/github-cli@2.2.0
 
 commands:
   build-one:
