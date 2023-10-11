@@ -53,7 +53,7 @@ jobs:
             ls -la /tmp/workspace/release/ 
             export GOPROXY=https://proxy.golang.org 
             go install github.com/tcnksm/ghr@latest
-            VERSION=v0.0.1
+            VERSION=v0.0.2
             echo CIRCLE_TAG=${CIRCLE_TAG}
             ghr -t ${GITHUB_TOKEN} \
                 -u ${CIRCLE_PROJECT_USERNAME} \
