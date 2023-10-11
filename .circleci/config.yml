@@ -53,13 +53,16 @@ jobs:
             du -h /tmp/workspace/release/*
             export GOPROXY=https://proxy.golang.org
             go install github.com/tcnksm/ghr@latest
+            curl -L -sS https://github.com/tcnksm/ghr/releases/download/v0.16.0/ghr_v0.16.0_linux_amd64.tar.gz | tar zx > ./ghr
+            cp ghr /usr/local/bin || true
+            chmod a+x ghr
             VERSION=v0.0.2
             echo CIRCLE_TAG=${CIRCLE_TAG}
-            ghr -t ${GITHUB_TOKEN} \
+            ./ghr -t ${GITHUB_TOKEN} \
                 -u ${CIRCLE_PROJECT_USERNAME} \
                 -r kube-compose \
                 -c ${CIRCLE_SHA1} \
-                -delete \
+                -recreate \
                 -replace \
                 -prerelease \
                 ${VERSION} \
