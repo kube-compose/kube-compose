@@ -32,7 +32,7 @@ jobs:
   build_and_test:
     executor:
       name: go/default
-      tag: '1.16'
+      tag: '1.18'
     steps:
       - checkout
       - go/load-cache # Load cached Go modules.
@@ -62,19 +62,12 @@ jobs:
           command: |
             set -x
             du -h /tmp/workspace/release/*
-            export GOPROXY=https://proxy.golang.org
-            go install github.com/tcnksm/ghr@latest
-            which ghr
-            ghr --version
-            curl -L -o f "https://github.com/tcnksm/ghr/releases/download/v0.15.0/ghr_v0.15.0_linux_amd64.tar.gz"
-            tar zxvf f 
-            mv ghr_*/ghr ghr
-            cp ghr /usr/local/bin || true
+            curl -LO "https://github.com/tcnksm/ghr/releases/download/v0.16.0/ghr_v0.16.0_linux_amd64.tar.gz" \
+              | tar zxO ghr
             chmod a+x ghr
-            head ghr || true
             ./ghr --version
             VERSION=v0.0.2
-            echo "CIRCLE_PROJECT_REPONAME: $CIRCLE_PROJECT_REPONAME"
+            echo "CIRCLE_PROJECT_REPONAME=$CIRCLE_PROJECT_REPONAME"
             echo CIRCLE_TAG=${CIRCLE_TAG}
             ./ghr -t ${GITHUB_TOKEN} \
                 -u jubr \
@@ -102,6 +95,11 @@ jobs:
           covermode: atomic
           failfast: true
           race: true
+      - run:
+          name: "get goveralls"
+          command: | 
+            go test -covermode=count -coverpkg=./... -coverprofile=coverage.txt ./...
+            $GOPATH/bin/goveralls -coverprofile=coverage.txt -service=travis-ci
 
 # Orchestrate jobs using workflows
 # See: https://circleci.com/docs/configuration-reference/#workflows
@@ -109,33 +107,31 @@ workflows:
   go-with-the-flow:
     jobs:
       - build_and_test
-      #- test
+      - test
       #- golangci-lint/lint:
       #    directories: --timeout=600s -D wrapcheck
       - gh/release:
+          requires:
+            - build_and_test
+            #- test
           pre-steps:
-            #- checkout # for `git config --get remote.origin.url`
             - attach_workspace: { at: /tmp/workspace } # for release binaries
             - run:
                 command: |
                   set -x
-                  ls -l /tmp/workspace
                   ls -l /tmp/workspace/release
                   echo "CIRCLE_PROJECT_REPONAME=kube-compose" >> $BASH_ENV
                   echo "CIRCLE_PROJECT_USERNAME=jubr" >> $BASH_ENV
                   echo "CIRCLE_REPOSITORY_URL=https://github.com/jubr/kube-compose" >> $BASH_ENV
-                  cat $BASH_ENV
+                  echo "RELEASE_FILES='" /tmp/workspace/release/* "'" >> $BASH_ENV
                   source $BASH_ENV
-            - run:
-                command: |
-                  echo "CIRCLE_PROJECT_REPONAME: $CIRCLE_PROJECT_REPONAME"
+          versiom: 2.36.0
           #notes-file: changelog.md
           tag: v0.0.3
           title: v0.0.3 Baby steps
-          files: /tmp/workspace/release/*
-          #additional_args: --repo $CIRCLE_REPOSITORY_URL
-          requires:
-            - build_and_test
+          files: ${RELEASE_FILES}
+          additional_args: --generate-notes
+          
           # filters:
           #   branches:
           #     only:
