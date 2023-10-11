@@ -8,6 +8,17 @@ orbs:
   gh: circleci/github-cli@2.2.0
 
 commands:
+  versionize-source:
+    parameters:
+      version: { type: string }
+    steps:
+      - run:
+          name: "Versionize with <<parameters.version>>"
+          command: |
+            set -x
+            V=<<parameters.version>>
+            sed -i cmd/root.go -r \
+              -e 's/(Version:          )".+"/\1"0.6.3+jubr-'$V'"/'
   build-one:
     parameters:
       GOOS:   { type: string }
@@ -35,6 +46,8 @@ jobs:
       tag: '1.18'
     steps:
       - checkout
+      - versionize-source:
+          version: v0.0.3
       - go/load-cache # Load cached Go modules.
       #- go/mod-download # Run 'go mod download'.
       - build-one: { GOOS: linux,  GOARCH: amd64 }
@@ -63,7 +76,7 @@ jobs:
             set -x
             du -h /tmp/workspace/release/*
             curl -LO "https://github.com/tcnksm/ghr/releases/download/v0.16.0/ghr_v0.16.0_linux_amd64.tar.gz" \
-              | tar zxO ghr
+              | tar -zvx --strip-components=1 --no-anchored ghr
             chmod a+x ghr
             ./ghr --version
             VERSION=v0.0.2
