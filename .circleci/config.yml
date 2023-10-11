@@ -125,7 +125,7 @@ workflows:
                   echo "CIRCLE_REPOSITORY_URL=https://github.com/jubr/kube-compose" >> $BASH_ENV
                   echo "RELEASE_FILES='" /tmp/workspace/release/* "'" >> $BASH_ENV
                   source $BASH_ENV
-          versiom: 2.36.0
+          version: 2.36.0
           #notes-file: changelog.md
           tag: v0.0.3
           title: v0.0.3 Baby steps
