@@ -50,8 +50,8 @@ jobs:
           name: "Publish Release on GitHub"
           command: |
             set -x
-            ls -la /tmp/workspace/release/ 
-            export GOPROXY=https://proxy.golang.org 
+            du -h /tmp/workspace/release/*
+            export GOPROXY=https://proxy.golang.org
             go install github.com/tcnksm/ghr@latest
             VERSION=v0.0.2
             echo CIRCLE_TAG=${CIRCLE_TAG}
@@ -60,6 +60,8 @@ jobs:
                 -r kube-compose \
                 -c ${CIRCLE_SHA1} \
                 -delete \
+                -replace \
+                -prerelease \
                 ${VERSION} \
                 /tmp/workspace/release/ 
   lint:
@@ -106,7 +108,7 @@ workflows:
       - test
       - lint
       - golangci-lint/lint:
-          directories: --timeout=300s -D wrapcheck
+          directories: --timeout=600s -D wrapcheck
       - deploy:
           requires:
             - build_and_test
