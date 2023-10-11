@@ -3,7 +3,7 @@
 version: 2.1
 
 orbs:
-  go: circleci/go@1.7.3
+  go: circleci/go@1.7.3 #1.9.0
   golangci-lint: timakin/golangci-lint@0.1.1
   gh: circleci/github-cli@2.2.0
 
@@ -88,18 +88,23 @@ jobs:
       - go/load-cache
       - run:
           name: "get goveralls"
-          command: | 
-            go get github.com/mattn/goveralls
+          command: |
+            set -x
+            go install github.com/mattn/goveralls
             go get golang.org/x/crypto/ssh/terminal@v0.0.0-20210921155107-089bfa567519 
+      # https://circleci.com/developer/orbs/orb/circleci/go 
       - go/test: # Runs 'go test ./...' but includes extensive parameterization for finer tuning.
           covermode: atomic
           failfast: true
           race: true
+          coverprofile: coverage.txt
       - run:
-          name: "get goveralls"
-          command: | 
-            go test -covermode=count -coverpkg=./... -coverprofile=coverage.txt ./...
-            $GOPATH/bin/goveralls -coverprofile=coverage.txt -service=travis-ci
+          name: "run goveralls"
+          command: |
+            set -x
+            #go test -covermode=count -coverpkg=./... -coverprofile=coverage.txt ./...
+            ls -la $GOPATH/bin/
+            $GOPATH/bin/goveralls -coverprofile=coverage.txt -service=circle-ci
 
 # Orchestrate jobs using workflows
 # See: https://circleci.com/docs/configuration-reference/#workflows
