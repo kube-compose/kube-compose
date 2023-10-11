@@ -5,6 +5,7 @@ version: 2.1
 orbs:
   go: circleci/go@1.7.3
   golangci-lint: timakin/golangci-lint@0.1.1
+  gh: circleci/github-cli@1.0
 
 jobs:
   build_and_test: # this can be any name you choose
@@ -44,7 +45,7 @@ jobs:
       name: go/default # Use the default executor from the orb
       tag: '1.18'
     steps:
-      - attach_workspace:
+      - &attach_workspace attach_workspace:
           at: /tmp/workspace 
       - run:
           name: "Publish Release on GitHub"
@@ -53,9 +54,12 @@ jobs:
             du -h /tmp/workspace/release/*
             export GOPROXY=https://proxy.golang.org
             go install github.com/tcnksm/ghr@latest
+            which ghr
+            ghr --version
             curl -L -sS https://github.com/tcnksm/ghr/releases/download/v0.16.0/ghr_v0.16.0_linux_amd64.tar.gz | tar zx > ./ghr
             cp ghr /usr/local/bin || true
             chmod a+x ghr
+            ./ghr --version
             VERSION=v0.0.2
             echo CIRCLE_TAG=${CIRCLE_TAG}
             ./ghr -t ${GITHUB_TOKEN} \
@@ -112,6 +116,22 @@ workflows:
       #- lint
       - golangci-lint/lint:
           directories: --timeout=600s -D wrapcheck
+      - gh/release:
+          pre-steps:
+            - *attach_workspace
+            - run: 
+                command: |
+                  ls -la /tmp/workspace/release
+          #notes-file: changelog.md
+          tag: v1.0.0
+          title: v1.0.0 Baby steps
+          files: /tmp/workspace/release/*
+          requires:
+            - build_and_test
+          # filters:
+          #   branches:
+          #     only:
+          #       - main
       - deploy:
           requires:
             - build_and_test
