@@ -66,9 +66,9 @@ jobs:
             go install github.com/tcnksm/ghr@latest
             which ghr
             ghr --version
-            curl -L -o f "https://github.com/tcnksm/ghr/releases/download/v0.16.0/ghr_v0.16.0_linux_amd64.tar.gz"
+            curl -L -o f "https://github.com/tcnksm/ghr/releases/download/v0.15.0/ghr_v0.15.0_linux_amd64.tar.gz"
             tar zxf f 
-            mv ghr_* ghr
+            mv ghr_*/ghr_v0.15.0_linux_amd64 ghr
             cp ghr /usr/local/bin || true
             chmod a+x ghr
             head ghr || true
@@ -114,7 +114,7 @@ workflows:
       #    directories: --timeout=600s -D wrapcheck
       - gh/release:
           pre-steps:
-            - checkout # for `git config --get remote.origin.url`
+            #- checkout # for `git config --get remote.origin.url`
             - attach_workspace: { at: /tmp/workspace } # for release binaries
             - run:
                 command: |
