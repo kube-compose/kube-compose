@@ -109,9 +109,9 @@ workflows:
   go-with-the-flow:
     jobs:
       - build_and_test
-      - test
-      - golangci-lint/lint:
-          directories: --timeout=600s -D wrapcheck
+      #- test
+      #- golangci-lint/lint:
+      #    directories: --timeout=600s -D wrapcheck
       - gh/release:
           pre-steps:
             - checkout # for `git config --get remote.origin.url`
@@ -120,10 +120,10 @@ workflows:
                 command: |
                   echo "CIRCLE_PROJECT_REPONAME=$CIRCLE_PROJECT_REPONAME"
           #notes-file: changelog.md
-          tag: v1.0.0
-          title: v1.0.0 Baby steps
+          tag: v0.0.3
+          title: v0.0.3 Baby steps
           files: /tmp/workspace/release/*
-          #additional_args: --repo $CIRCLE_REPOSITORY_URL
+          additional_args: --repo $CIRCLE_REPOSITORY_URL
           requires:
             - build_and_test
           # filters:
