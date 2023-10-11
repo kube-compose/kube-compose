@@ -66,7 +66,8 @@ jobs:
             go install github.com/tcnksm/ghr@latest
             which ghr
             ghr --version
-            curl -L -sS https://github.com/tcnksm/ghr/releases/download/v0.16.0/ghr_v0.16.0_linux_amd64.tar.gz | tar zx > ./ghr
+            curl -L -sS https://github.com/tcnksm/ghr/releases/download/v0.16.0/ghr_v0.16.0_linux_amd64.tar.gz \
+              | tar zxO > ./ghr
             cp ghr /usr/local/bin || true
             chmod a+x ghr
             ./ghr --version
