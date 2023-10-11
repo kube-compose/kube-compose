@@ -7,9 +7,6 @@ orbs:
   golangci-lint: timakin/golangci-lint@0.1.1
   gh: circleci/github-cli@1.0
 
-environment:
-  CIRCLE_PROJECT_REPONAME: kube-compose
-
 commands:
   build-one:
     parameters:
@@ -31,7 +28,7 @@ commands:
 
 jobs:
 
-  build_and_test: # this can be any name you choose
+  build_and_test:
     executor:
       name: go/default
       tag: '1.16'
@@ -84,23 +81,6 @@ jobs:
                 -prerelease \
                 ${VERSION} \
                 /tmp/workspace/release/
-  lint:
-    executor:
-      name: go/default
-      tag: '1.12'
-    steps:
-      - checkout
-      - run:
-          name: "golangci-lint"
-          command: |
-            # binary will be $(go env GOPATH)/bin/golangci-lint
-            curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
-            golangci-lint --version
-            export CGO_ENABLED=0
-            export GOOS
-            export GOPROXY=https://proxy.golang.org
-            # https://golangci-lint.run/usage/quick-start 
-            golangci-lint run -D wrapchwck
 
   test:
     executor:
@@ -126,10 +106,11 @@ workflows:
     jobs:
       - build_and_test
       - test
-      #- lint
       - golangci-lint/lint:
           directories: --timeout=600s -D wrapcheck
       - gh/release:
+          environment:
+            CIRCLE_PROJECT_REPONAME: kube-compose
           pre-steps:
             - checkout # for `git config --get remote.origin.url`
             - attach_workspace: { at: /tmp/workspace } # for release binaries
