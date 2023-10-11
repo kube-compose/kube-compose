@@ -12,7 +12,7 @@ commands:
     parameters:
         GOOS:   { type: string }
         GOARCH: { type: string }
-    name: "Build <<parameters.GOOS>> <<parameters.GOARCH>>" 
+    #name: "Build <<parameters.GOOS>> <<parameters.GOARCH>>" 
     environment:
         GOOS:   <<parameters.GOOS>>
         GOARCH: <<parameters.GOARCH>>
@@ -36,10 +36,10 @@ jobs:
       - checkout
       - go/load-cache # Load cached Go modules.
       #- go/mod-download # Run 'go mod download'.
-      - build-one: { parameters: { GOOS: linux,  GOARCH: amd64 } }
-      - build-one: { parameters: { GOOS: linux,  GOARCH: arm64 } }
-      - build-one: { parameters: { GOOS: darwin, GOARCH: amd64 } }
-      - build-one: { parameters: { GOOS: darwin, GOARCH: arm64 } }
+      - build-one: { GOOS: linux,  GOARCH: amd64 }
+      - build-one: { GOOS: linux,  GOARCH: arm64 }
+      - build-one: { GOOS: darwin, GOARCH: amd64 }
+      - build-one: { GOOS: darwin, GOARCH: arm64 }
       - run:
           command: |
             set -x
