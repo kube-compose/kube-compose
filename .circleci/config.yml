@@ -16,9 +16,13 @@ commands:
         
     steps:
       - run:
+          environment:
+            GOOS: <<parameters.GOOS>>
+            GOARCH: <<parameters.GOARCH>>
+            CGO_ENABLED: 0
+            GZIP_OPT: -9
           command: |
             set -x
-            export GOOS=<<parameters.GOOS>> GOARCH=<<parameters.GOARCH>> CGO_ENABLED=0 GZIP_OPT=-9
             mkdir -p release
             R=${GOOS}_${GOARCH}
             go build -a -o release/kube-compose.${R} .
@@ -107,8 +111,6 @@ workflows:
       - golangci-lint/lint:
           directories: --timeout=600s -D wrapcheck
       - gh/release:
-          environment:
-            CIRCLE_PROJECT_REPONAME: kube-compose
           pre-steps:
             - checkout # for `git config --get remote.origin.url`
             - attach_workspace: { at: /tmp/workspace } # for release binaries
