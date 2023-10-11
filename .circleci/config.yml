@@ -12,9 +12,9 @@ commands:
     parameters:
       GOOS:   { type: string }
       GOARCH: { type: string }
-    #name: "Build <<parameters.GOOS>> <<parameters.GOARCH>>"
     steps:
       - run:
+          name: "Build <<parameters.GOOS>> <<parameters.GOARCH>>"
           environment:
             GOOS: <<parameters.GOOS>>
             GOARCH: <<parameters.GOARCH>>
@@ -66,10 +66,12 @@ jobs:
             go install github.com/tcnksm/ghr@latest
             which ghr
             ghr --version
-            curl -L -sS https://github.com/tcnksm/ghr/releases/download/v0.16.0/ghr_v0.16.0_linux_amd64.tar.gz \
+            curl -L https://github.com/tcnksm/ghr/releases/download/v0.16.0/ghr_v0.16.0_linux_amd64.tar.gz \
               | tar zxO > ./ghr
             cp ghr /usr/local/bin || true
             chmod a+x ghr
+            file ghr || true
+            head ghr || true
             ./ghr --version
             VERSION=v0.0.2
             echo "CIRCLE_PROJECT_REPONAME: $CIRCLE_PROJECT_REPONAME"
