@@ -10,10 +10,9 @@ orbs:
 commands:
   build-one:
     parameters:
-        GOOS:   { type: string }
-        GOARCH: { type: string }
-    #name: "Build <<parameters.GOOS>> <<parameters.GOARCH>>" 
-        
+      GOOS:   { type: string }
+      GOARCH: { type: string }
+    #name: "Build <<parameters.GOOS>> <<parameters.GOARCH>>"
     steps:
       - run:
           environment:
@@ -115,9 +114,8 @@ workflows:
             - checkout # for `git config --get remote.origin.url`
             - attach_workspace: { at: /tmp/workspace } # for release binaries
             - run:
-              command: |
-                echo "CIRCLE_PROJECT_REPONAME=$CIRCLE_PROJECT_REPONAME"
-
+                command: |
+                  echo "CIRCLE_PROJECT_REPONAME=$CIRCLE_PROJECT_REPONAME"
           #notes-file: changelog.md
           tag: v1.0.0
           title: v1.0.0 Baby steps
