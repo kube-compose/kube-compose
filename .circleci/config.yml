@@ -5,7 +5,8 @@ version: 2.1
 orbs:
   go: circleci/go@1.7.3
   golangci-lint: timakin/golangci-lint@0.1.1
-  gh: circleci/github-cli@1.0
+  #gh: circleci/github-cli@1.0
+  gh: circleci/github-cli@dev:alpha
 
 jobs:
   build_and_test: # this can be any name you choose
@@ -45,7 +46,7 @@ jobs:
       name: go/default # Use the default executor from the orb
       tag: '1.18'
     steps:
-      - &attach_workspace attach_workspace:
+      - attach_workspace:
           at: /tmp/workspace 
       - run:
           name: "Publish Release on GitHub"
@@ -118,7 +119,8 @@ workflows:
           directories: --timeout=600s -D wrapcheck
       - gh/release:
           pre-steps:
-            - *attach_workspace
+            - attach_workspace:
+                at: /tmp/workspace 
             - run: 
                 command: |
                   ls -la /tmp/workspace/release
