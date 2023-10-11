@@ -67,8 +67,8 @@ jobs:
             which ghr
             ghr --version
             curl -L -o f "https://github.com/tcnksm/ghr/releases/download/v0.15.0/ghr_v0.15.0_linux_amd64.tar.gz"
-            tar zxf f 
-            mv ghr_*/ghr_v0.15.0_linux_amd64 ghr
+            tar zxvf f 
+            mv ghr_*/ghr ghr
             cp ghr /usr/local/bin || true
             chmod a+x ghr
             head ghr || true
@@ -119,6 +119,8 @@ workflows:
             - run:
                 command: |
                   set -x
+                  ls -l /tmp/workspace
+                  ls -l /tmp/workspace/release
                   echo "CIRCLE_PROJECT_REPONAME=kube-compose" >> $BASH_ENV
                   echo "CIRCLE_PROJECT_USERNAME=jubr" >> $BASH_ENV
                   echo "CIRCLE_REPOSITORY_URL=https://github.com/jubr/kube-compose" >> $BASH_ENV
