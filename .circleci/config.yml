@@ -118,11 +118,8 @@ workflows:
           directories: --timeout=600s -D wrapcheck
       - gh/release:
           pre-steps:
-            - attach_workspace:
-                at: /tmp/workspace 
-            - run: 
-                command: |
-                  ls -la /tmp/workspace/release
+            - checkout # for `git config --get remote.origin.url`
+            - attach_workspace: { at: /tmp/workspace } # for release binaries
           #notes-file: changelog.md
           tag: v1.0.0
           title: v1.0.0 Baby steps
