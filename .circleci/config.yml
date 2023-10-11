@@ -6,8 +6,28 @@ orbs:
   go: circleci/go@1.7.3
   golangci-lint: timakin/golangci-lint@0.1.1
   gh: circleci/github-cli@1.0
-  
+
+commands:
+  build-one:
+    parameters:
+        GOOS:   { type: string }
+        GOARCH: { type: string }
+    name: "Build <<parameters.GOOS>> <<parameters.GOARCH>>" 
+    environment:
+        GOOS:   <<parameters.GOOS>>
+        GOARCH: <<parameters.GOARCH>>
+    steps:
+      - run:
+          command: |
+            set -x
+            export CGO_ENABLED=0 GZIP_OPT=-9
+            mkdir -p release
+            R=${GOOS}_${GOARCH}
+            go build -a -o release/kube-compose.${R} .
+            tar --remove-files -zcf release/kube-compose.${R}.tar.gz release/kube-compose.${R}
+
 jobs:
+
   build_and_test: # this can be any name you choose
     executor:
       name: go/default
@@ -16,30 +36,19 @@ jobs:
       - checkout
       - go/load-cache # Load cached Go modules.
       #- go/mod-download # Run 'go mod download'.
+      - build-one: { parameters: { GOOS: linux, GOARCH: amd64 } }
+      - build-one: { parameters: { GOOS: linux, GOARCH: arm64 } }
+      - build-one: { parameters: { GOOS: darwin, GOARCH: amd64 } }
+      - build-one: { parameters: { GOOS: darwin, GOARCH: arm64 } }
       - run:
-          name: "Build Linux + darwin" 
           command: |
             set -x
-            export CGO_ENABLED=0
-            export GOOS GOARCH
-            export GZIP_OPT=-9
-            mkdir release
-            for T in linux darwin; do
-              for A in amd64 arm64; do
-                R=${T}_${A}
-                GOOS=$T
-                GOARCH=$A
-                go build -a -installsuffix cgo \
-                 -o release/kube-compose.${R} .
-                tar --remove-files -zcf release/kube-compose.${R}.tar.gz release/kube-compose.${R}
-                #rm -f release/kube-compose.${R}
-              done
-            done
             du -h release/*
       - go/save-cache
       - persist_to_workspace:
           root: .
           paths: release
+
   deploy:
     executor:
       name: go/default # Use the default executor from the orb
@@ -70,7 +79,7 @@ jobs:
                 -replace \
                 -prerelease \
                 ${VERSION} \
-                /tmp/workspace/release/ 
+                /tmp/workspace/release/
   lint:
     executor:
       name: go/default
@@ -124,6 +133,7 @@ workflows:
           tag: v1.0.0
           title: v1.0.0 Baby steps
           files: /tmp/workspace/release/*
+          #additional_args: --repo $CIRCLE_REPOSITORY_URL
           requires:
             - build_and_test
           # filters:
