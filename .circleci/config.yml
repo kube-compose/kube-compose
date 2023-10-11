@@ -7,6 +7,9 @@ orbs:
   golangci-lint: timakin/golangci-lint@0.1.1
   gh: circleci/github-cli@1.0
 
+environment:
+  CIRCLE_PROJECT_REPONAME: kube-compose
+
 commands:
   build-one:
     parameters:
@@ -36,8 +39,8 @@ jobs:
       - checkout
       - go/load-cache # Load cached Go modules.
       #- go/mod-download # Run 'go mod download'.
-      - build-one: { parameters: { GOOS: linux, GOARCH: amd64 } }
-      - build-one: { parameters: { GOOS: linux, GOARCH: arm64 } }
+      - build-one: { parameters: { GOOS: linux,  GOARCH: amd64 } }
+      - build-one: { parameters: { GOOS: linux,  GOARCH: arm64 } }
       - build-one: { parameters: { GOOS: darwin, GOARCH: amd64 } }
       - build-one: { parameters: { GOOS: darwin, GOARCH: arm64 } }
       - run:
@@ -70,6 +73,7 @@ jobs:
             chmod a+x ghr
             ./ghr --version
             VERSION=v0.0.2
+            echo "CIRCLE_PROJECT_REPONAME: $CIRCLE_PROJECT_REPONAME"
             echo CIRCLE_TAG=${CIRCLE_TAG}
             ./ghr -t ${GITHUB_TOKEN} \
                 -u ${CIRCLE_PROJECT_USERNAME} \
@@ -129,6 +133,10 @@ workflows:
           pre-steps:
             - checkout # for `git config --get remote.origin.url`
             - attach_workspace: { at: /tmp/workspace } # for release binaries
+            - run:
+              command: |
+                echo "CIRCLE_PROJECT_REPONAME=$CIRCLE_PROJECT_REPONAME"
+
           #notes-file: changelog.md
           tag: v1.0.0
           title: v1.0.0 Baby steps
