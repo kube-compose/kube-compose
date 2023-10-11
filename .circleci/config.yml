@@ -66,11 +66,11 @@ jobs:
             go install github.com/tcnksm/ghr@latest
             which ghr
             ghr --version
-            curl -LO "https://github.com/tcnksm/ghr/releases/download/v0.16.0/ghr_v0.16.0_linux_amd64.tar.gz" \
-              | tar zxO > ./ghr
+            curl -L -o f "https://github.com/tcnksm/ghr/releases/download/v0.16.0/ghr_v0.16.0_linux_amd64.tar.gz"
+            tar zxf f 
+            mv ghr_* ghr
             cp ghr /usr/local/bin || true
             chmod a+x ghr
-            
             head ghr || true
             ./ghr --version
             VERSION=v0.0.2
