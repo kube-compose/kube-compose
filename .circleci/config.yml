@@ -148,7 +148,7 @@ workflows:
           #notes-file: changelog.md
           tag: v0.0.3
           title: v0.0.3 Baby steps
-          files: /tmp/workspace/release/ #${RELEASE_FILES}
+          files: /tmp/workspace/release/kube-compose.linux_amd64 #${RELEASE_FILES}
           additional_args: --generate-notes
           
           # filters:
