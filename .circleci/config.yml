@@ -76,7 +76,8 @@ jobs:
             set -x
             du -h /tmp/workspace/release/*
             curl -LO "https://github.com/tcnksm/ghr/releases/download/v0.16.0/ghr_v0.16.0_linux_amd64.tar.gz" \
-              | tar -zvx --strip-components=1
+              | tar -zvx
+            mv -v ghr_*/ghr ghr
             chmod a+x ghr
             ./ghr --version
             VERSION=v0.0.2
@@ -148,8 +149,9 @@ workflows:
           #notes-file: changelog.md
           tag: v0.0.3
           title: v0.0.3 Baby steps
-          files: /tmp/workspace/release/kube-compose.linux_amd64 #${RELEASE_FILES}
-          additional_args: --generate-notes
+          #broken files:
+          #files: /tmp/workspace/release/kube-compose.linux_amd64 #${RELEASE_FILES}
+          additional_args: tmp/workspace/release/kube-compose.linux_amd64.tar.gz --generate-notes
           
           # filters:
           #   branches:
