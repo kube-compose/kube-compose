@@ -3,7 +3,7 @@
 version: 2.1
 
 orbs:
-  go: circleci/go@1.7.3 #1.9.0
+  go: circleci/go@1.9.0
   golangci-lint: timakin/golangci-lint@0.1.1
   gh: circleci/github-cli@2.2.0
 
@@ -75,7 +75,7 @@ jobs:
           command: |
             set -x
             du -h /tmp/workspace/release/*
-            curl -LO "https://github.com/tcnksm/ghr/releases/download/v0.16.0/ghr_v0.16.0_linux_amd64.tar.gz" \
+            curl -LO "https://github.com/tcnksm/ghr/releases/download/v0.15.0/ghr_v0.15.0_linux_amd64.tar.gz" \
               | tar -zvx
             mv -v ghr_*/ghr ghr
             chmod a+x ghr
