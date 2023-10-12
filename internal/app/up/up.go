@@ -844,6 +844,18 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 			RestartPolicy: getRestartPolicyforService(app),
 		},
 	}
+	var serviceAccountName = os.Getenv("POD_SPEC_SERVICE_ACCOUNT")
+	if serviceAccountName != "" {
+		pod.Spec.ServiceAccountName = serviceAccountName
+	}
+
+	var imagePullSecret = os.Getenv("POD_SPEC_IMAGE_PULL_SECRET")
+	if imagePullSecret != "" {
+		pod.Spec.ImagePullSecrets = []v1.LocalObjectReference{ { Name: imagePullSecret } }
+	}
+
+	app.newLogEntry().Tracef("creating %s", pod)
+
 	err = app.GetArgsAndCommand(&pod.Spec.Containers[0])
 	if err != nil {
 		return nil, err
