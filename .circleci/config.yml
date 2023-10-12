@@ -75,7 +75,7 @@ jobs:
           command: |
             set -x
             du -h /tmp/workspace/release/*
-            curl -LO "https://github.com/tcnksm/ghr/releases/download/v0.15.0/ghr_v0.15.0_linux_amd64.tar.gz" \
+            curl -sSLO "https://github.com/tcnksm/ghr/releases/download/v0.15.0/ghr_v0.15.0_linux_amd64.tar.gz" \
               | tar -zvx
             mv -v ghr_*/ghr ghr
             chmod a+x ghr
@@ -151,7 +151,7 @@ workflows:
           title: v0.0.3 Baby steps
           #broken files:
           #files: /tmp/workspace/release/kube-compose.linux_amd64 #${RELEASE_FILES}
-          additional_args: ${RELEASE_FILES} --generate-notes
+          additional_args: /tmp/workspace/release/kube-compose.linux_amd64.tar.gz --generate-notes
           
           # filters:
           #   branches:
