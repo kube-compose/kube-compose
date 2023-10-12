@@ -2,25 +2,161 @@
 # See: https://circleci.com/docs/configuration-reference
 version: 2.1
 
-# Define a job to be invoked later in a workflow.
-# See: https://circleci.com/docs/configuration-reference/#jobs
+orbs:
+  go: circleci/go@1.9.0
+  golangci-lint: timakin/golangci-lint@0.1.1
+  gh: circleci/github-cli@2.2.0
+
+commands:
+  versionize-source:
+    parameters:
+      version: { type: string }
+    steps:
+      - run:
+          name: "Versionize with <<parameters.version>>"
+          command: |
+            set -x
+            V=<<parameters.version>>
+            sed -i cmd/root.go -r \
+              -e 's/(Version:          )".+"/\1"0.6.3+jubr-'$V'"/'
+  build-one:
+    parameters:
+      GOOS:   { type: string }
+      GOARCH: { type: string }
+    steps:
+      - run:
+          name: "Build <<parameters.GOOS>> <<parameters.GOARCH>>"
+          environment:
+            GOOS: <<parameters.GOOS>>
+            GOARCH: <<parameters.GOARCH>>
+            CGO_ENABLED: 0
+            GZIP_OPT: -9
+          command: |
+            set -x
+            mkdir -p release
+            R=${GOOS}_${GOARCH}
+            go build -a -o release/kube-compose.${R} .
+            tar --remove-files -zcf release/kube-compose.${R}.tar.gz release/kube-compose.${R}
+
 jobs:
-  say-hello:
-    # Specify the execution environment. You can specify an image from Docker Hub or use one of our convenience images from CircleCI's Developer Hub.
-    # See: https://circleci.com/docs/configuration-reference/#executor-job
-    docker:
-      - image: cimg/base:stable
-    # Add steps to the job
-    # See: https://circleci.com/docs/configuration-reference/#steps
+
+  build_and_test:
+    executor:
+      name: go/default
+      tag: '1.18'
     steps:
       - checkout
+      - versionize-source:
+          version: v0.0.3
+      - go/load-cache # Load cached Go modules.
+      #- go/mod-download # Run 'go mod download'.
+      - build-one: { GOOS: linux,  GOARCH: amd64 }
+      - build-one: { GOOS: linux,  GOARCH: arm64 }
+      - build-one: { GOOS: darwin, GOARCH: amd64 }
+      - build-one: { GOOS: darwin, GOARCH: arm64 }
       - run:
-          name: "Say hello"
-          command: "echo Hello, World!"
+          command: |
+            set -x
+            du -h release/*
+      - go/save-cache
+      - persist_to_workspace:
+          root: .
+          paths: release
+
+  deploy:
+    executor:
+      name: go/default # Use the default executor from the orb
+      tag: '1.18'
+    steps:
+      - attach_workspace:
+          at: /tmp/workspace 
+      - run:
+          name: "Publish Release on GitHub"
+          command: |
+            set -x
+            du -h /tmp/workspace/release/*
+            curl -sSLO "https://github.com/tcnksm/ghr/releases/download/v0.15.0/ghr_v0.15.0_linux_amd64.tar.gz" \
+              | tar -zvx
+            mv -v ghr_*/ghr ghr
+            chmod a+x ghr
+            ./ghr --version
+            VERSION=v0.0.2
+            echo "CIRCLE_PROJECT_REPONAME=$CIRCLE_PROJECT_REPONAME"
+            echo CIRCLE_TAG=${CIRCLE_TAG}
+            ./ghr -t ${GITHUB_TOKEN} \
+                -u jubr \
+                -r kube-compose \
+                -c ${CIRCLE_SHA1} \
+                -recreate \
+                -replace \
+                -prerelease \
+                ${VERSION} \
+                /tmp/workspace/release/
+
+  test:
+    executor:
+      name: go/default
+      tag: '1.18'
+    steps:
+      - checkout
+      - go/load-cache
+      - run:
+          name: "get goveralls"
+          command: |
+            set -x
+            go get     github.com/mattn/goveralls
+            go install github.com/mattn/goveralls
+            go get golang.org/x/crypto/ssh/terminal@v0.0.0-20210921155107-089bfa567519 
+      # https://circleci.com/developer/orbs/orb/circleci/go 
+      - go/test: # Runs 'go test ./...' but includes extensive parameterization for finer tuning.
+          covermode: atomic
+          failfast: true
+          race: true
+          coverprofile: coverage.txt
+      - run:
+          name: "run goveralls"
+          command: |
+            set -x
+            #go test -covermode=count -coverpkg=./... -coverprofile=coverage.txt ./...
+            ls -la $GOPATH/bin/
+            $GOPATH/bin/goveralls -coverprofile=coverage.txt -service=circle-ci
 
 # Orchestrate jobs using workflows
 # See: https://circleci.com/docs/configuration-reference/#workflows
 workflows:
-  say-hello-workflow:
+  go-with-the-flow:
     jobs:
-      - say-hello
+      - build_and_test
+      - test
+      #- golangci-lint/lint:
+      #    directories: --timeout=600s -D wrapcheck
+      - gh/release:
+          requires:
+            - build_and_test
+            #- test
+          pre-steps:
+            - attach_workspace: { at: /tmp/workspace } # for release binaries
+            - run:
+                command: |
+                  set -x
+                  ls -l /tmp/workspace/release
+                  echo "CIRCLE_PROJECT_REPONAME=kube-compose" >> $BASH_ENV
+                  echo "CIRCLE_PROJECT_USERNAME=jubr" >> $BASH_ENV
+                  echo "CIRCLE_REPOSITORY_URL=https://github.com/jubr/kube-compose" >> $BASH_ENV
+                  echo "RELEASE_FILES='" /tmp/workspace/release/* "'" >> $BASH_ENV
+                  source $BASH_ENV
+          version: 2.36.0
+          #notes-file: changelog.md
+          tag: v0.0.3
+          title: v0.0.3 Baby steps
+          #broken files:
+          #files: /tmp/workspace/release/kube-compose.linux_amd64 #${RELEASE_FILES}
+          additional_args: /tmp/workspace/release/kube-compose.linux_amd64.tar.gz --generate-notes
+          
+          # filters:
+          #   branches:
+          #     only:
+          #       - main
+      - deploy:
+          requires:
+            - build_and_test
