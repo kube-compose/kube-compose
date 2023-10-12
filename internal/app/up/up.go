@@ -261,27 +261,53 @@ func (u *upRunner) getAppVolumeInitImage(a *app) error {
 	return nil
 }
 
+func ternary(truthy string, fallback string) string {
+	if truthy != "" {
+		return truthy
+	}
+	return fallback
+}
+
 func (u *upRunner) pushImage(sourceImageID, name, tag, imageDescr string, a *app) (podImage string, err error) {
+	var registryInCluster = ternary(os.Getenv("REGISTRY_HOST_IN_CLUSTER"), "docker-registry.default.svc:5000")
+	var user = ternary(os.Getenv("DOCKER_REGISTRY_USER"), "unused")
+	var pass = ternary(os.Getenv("DOCKER_REGISTRY_PASS"), u.cfg.KubeConfig.BearerToken)
+	var imagePath = u.cfg.Namespace
+
+	// check if we even need to push it?
+	if strings.HasPrefix(sourceImageID, registryInCluster) || strings.HasPrefix(sourceImageID, u.cfg.ClusterImageStorage.DockerRegistry.Host) {
+		log.Debugf("source image %s does not need to be pushed to %s, leaving unmodified\n", sourceImageID, u.cfg.ClusterImageStorage.DockerRegistry.Host)
+		podImage = sourceImageID
+		return
+	}
 	pt := a.reporterRow.AddProgressTask("pushing " + imageDescr)
 	defer pt.Done()
 	a.reporterRow.AddStatus(reporter.StatusDockerPush)
 	defer a.reporterRow.RemoveStatus(reporter.StatusDockerPush)
-	imagePush := fmt.Sprintf("%s/%s/%s:%s", u.cfg.ClusterImageStorage.DockerRegistry.Host, u.cfg.Namespace, name, tag)
+	imagePush := fmt.Sprintf("%s/%s/%s:%s", u.cfg.ClusterImageStorage.DockerRegistry.Host, imagePath, name, tag)
 	err = u.dockerClient.ImageTag(u.opts.Context, sourceImageID, imagePush)
 	if err != nil {
+		log.Warnf("tagging % as %s failed with: %s (does the source image exist locally?)\n", sourceImageID, imagePush, err)
 		return
 	}
 	var digest string
-	var user string = os.Getenv("DOCKER_REGISTRY_USER")
-	var pass string = os.Getenv("DOCKER_REGISTRY_PASS")
 	registryAuth := docker.EncodeRegistryAuth(user, pass)
+	log.Tracef("pushing %s\n", imagePush)
 	digest, err = docker.PushImage(u.opts.Context, u.dockerClient, imagePush, registryAuth, func(push *docker.PullOrPush) {
 		pt.Update(push.Progress())
 	})
+	log.Tracef("pushing %s done\n", imagePush)
 	if err != nil {
+		err = errors.Wrapf(err, "pushImage failed: %s", err)
 		return
 	}
-	podImage = fmt.Sprintf("docker-registry.default.svc:5000/%s/%s@%s", u.cfg.Namespace, name, digest)
+
+	// TODO: podImage host can be one of 3 things here:
+	// - the original from sourceImageID
+	// - hardcoded "docker-registry.default.svc:5000"
+	// - specified u.cfg.ClusterImageStorage.DockerRegistry.Host
+	podImage = fmt.Sprintf("%s/%s/%s:%s", registryInCluster, imagePath, name, tag)
+	log.Tracef("podImage: %s (%s)\n", podImage, digest)
 	return
 }
 
