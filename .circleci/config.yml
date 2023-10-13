@@ -17,7 +17,10 @@ commands:
             ls -l /tmp/workspace/
             if [ ! -f /tmp/workspace/env ]; then
               V="$(git describe --tags | sed -r -e 's/(.+)-(.+)-(.+)/\1-\2/')"
-              echo "VERSION='0.6.3~${V}'"                                          > /tmp/workspace/env
+              VTAG="$(git describe --tags --abbrev=0)"
+              echo "VERSION='0.6.3+${V}'"                                          > /tmp/workspace/env
+              echo "PRERELEASE=$( [ $V = $VTAG ] && echo false || echo true)"     >> /tmp/workspace/env
+              echo "PRERELEASE_OPT=$( [ $V = $VTAG ] && echo '' || echo '-prerelease')" >> /tmp/workspace/env
               echo "CIRCLE_PROJECT_REPONAME=kube-compose"                         >> /tmp/workspace/env
               echo "CIRCLE_PROJECT_USERNAME=jubr"                                 >> /tmp/workspace/env
               echo "CIRCLE_REPOSITORY_URL=https://github.com/jubr/kube-compose"   >> /tmp/workspace/env
@@ -26,8 +29,6 @@ commands:
             cat /tmp/workspace/env >> $BASH_ENV
             source /tmp/workspace/env
   versionize-source:
-    #parameters:
-    #  version: { type: string }
     steps:
       - run:
           name: "Versionize with ${VERSION}"
@@ -90,9 +91,7 @@ jobs:
       name: go/default # Use the default executor from the orb
       tag: '1.18'
     steps:
-      #- checkout
-      - attach_workspace:
-          at: /tmp/workspace 
+      - attach_workspace: { at: /tmp/workspace }
       - enhance-env
       - run:
           name: "Publish Release on GitHub"
@@ -114,7 +113,8 @@ jobs:
                 -c ${CIRCLE_SHA1} \
                 -recreate \
                 -replace \
-                -prerelease \
+                ${PRERELEASE_OPT} \
+                -generatenotes \
                 ${VERSION} \
                 /tmp/workspace/release/
 
@@ -169,13 +169,19 @@ workflows:
             - attach_workspace: { at: /tmp/workspace } # for release binaries
             - enhance-env
             - run:
-                name: "Wipe checkout"
+                name: "Delete $VERSION release"
                 command: |
                   set -x
                   rm -rvf * .[a-z]
                   ls -la
+                  gh release delete \
+                      "$VERSION" \
+                      --yes \
+                      --cleanup-tag \
+                      --repo "${CIRCLE_REPOSITORY_URL}"
+                    set +x
           version: 2.36.0
-          prerelease: true
+          prerelease: ${PRERELEASE}
           #notes-file: changelog.md
           tag: v0.0.4
           title: v0.0.4 Toddler steps
