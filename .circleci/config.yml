@@ -161,8 +161,14 @@ workflows:
             - checkout
             - attach_workspace: { at: /tmp/workspace } # for release binaries
             - enhance-env
+            - run:
+                name: "Wipe checkout"
+                command: |
+                  set -x
+                  rm -rvf * .[a-Z]
+                  ls -la
           version: 2.36.0
-          dir: no
+          prerelease: true
           #notes-file: changelog.md
           tag: v0.0.4
           title: v0.0.4 Toddler steps
