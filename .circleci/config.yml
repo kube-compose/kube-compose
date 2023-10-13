@@ -14,12 +14,16 @@ commands:
           name: "Enhance env"
           command: |
             set -x
-            V="$(git describe --tags | sed -r -e 's/(.+)-(.+)-(.+)/\1-\2/')"
-            echo "VERSION='0.6.3~${V}'"                                          > /tmp/workspace/env
-            echo "CIRCLE_PROJECT_REPONAME=kube-compose"                         >> /tmp/workspace/env
-            echo "CIRCLE_PROJECT_USERNAME=jubr"                                 >> /tmp/workspace/env
-            echo "CIRCLE_REPOSITORY_URL=https://github.com/jubr/kube-compose"   >> /tmp/workspace/env
-            echo "RELEASE_FILES='" /tmp/workspace/release/* "'"                 >> /tmp/workspace/env
+            ls -l /tmp/workspace/
+            if [ ! -f /tmp/workspace/env ]; then
+              V="$(git describe --tags | sed -r -e 's/(.+)-(.+)-(.+)/\1-\2/')"
+              echo "VERSION='0.6.3~${V}'"                                          > /tmp/workspace/env
+              echo "CIRCLE_PROJECT_REPONAME=kube-compose"                         >> /tmp/workspace/env
+              echo "CIRCLE_PROJECT_USERNAME=jubr"                                 >> /tmp/workspace/env
+              echo "CIRCLE_REPOSITORY_URL=https://github.com/jubr/kube-compose"   >> /tmp/workspace/env
+              echo "RELEASE_FILES='" /tmp/workspace/release/* "'"                 >> /tmp/workspace/env
+            fi
+            cat /tmp/workspace/env >> $BASH_ENV
             source /tmp/workspace/env
   versionize-source:
     #parameters:
@@ -77,13 +81,16 @@ jobs:
       - persist_to_workspace:
           root: .
           paths: release
+      - persist_to_workspace:
+          root: /tmp/workspace 
+          paths: env
 
   deploy:
     executor:
       name: go/default # Use the default executor from the orb
       tag: '1.18'
     steps:
-      - checkout
+      #- checkout
       - attach_workspace:
           at: /tmp/workspace 
       - enhance-env
@@ -92,7 +99,7 @@ jobs:
           command: |
             set -x
             du -h /tmp/workspace/release/*
-            curl -sSLO "https://github.com/tcnksm/ghr/releases/download/v0.15.0/ghr_v0.15.0_linux_amd64.tar.gz" \
+            curl -L "https://github.com/tcnksm/ghr/releases/download/v0.15.0/ghr_v0.15.0_linux_amd64.tar.gz" \
               | tar -zvx
             mv -v ghr_*/ghr ghr
             chmod a+x ghr
@@ -158,14 +165,14 @@ workflows:
             - build_and_test
             #- test
           pre-steps:
-            - checkout
+            #- checkout
             - attach_workspace: { at: /tmp/workspace } # for release binaries
             - enhance-env
             - run:
                 name: "Wipe checkout"
                 command: |
                   set -x
-                  rm -rvf * .[a-Z]
+                  rm -rvf * .[a-z]
                   ls -la
           version: 2.36.0
           prerelease: true
