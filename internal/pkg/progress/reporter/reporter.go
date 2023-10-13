@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -119,6 +120,9 @@ func GetTerminalSize(w io.Writer) (width, height int, err error) {
 }
 
 func IsTerminal(w io.Writer) bool {
+	if os.Getenv("FORCE_TERMINAL_HEIGHT") != "" {
+		return true
+	}
 	if rlw, ok := w.(*reporterLogWriter); ok {
 		return IsTerminal(rlw.r.out)
 	}
@@ -169,8 +173,13 @@ func (r *Reporter) refresh() {
 	}()
 	_, terminalLines, err := getTerminalSizeFunction(r.out)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error while getting size of terminal: %v\n", err)
-		return
+		if os.Getenv("FORCE_TERMINAL_HEIGHT") != "" {
+			terminalLines, _ = strconv.Atoi(os.Getenv("FORCE_TERMINAL_HEIGHT"))
+			err = nil // make error go away
+		} else {
+			fmt.Fprintf(os.Stderr, "error while getting size of terminal: %v\n", err)
+			return
+		}
 	}
 	if terminalLines == 0 {
 		r.flushLogs()
