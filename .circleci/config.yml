@@ -154,8 +154,8 @@ workflows:
       #- golangci-lint/lint:
       #    directories: --timeout=600s -D wrapcheck
       - gh/release:
-         filters:
-           branches:
+          filters:
+            branches:
               only:
                 - master
                 - main
