@@ -98,14 +98,12 @@ jobs:
           command: |
             set -x
             du -h /tmp/workspace/release/*
-            curl -L "https://github.com/tcnksm/ghr/releases/download/v0.15.0/ghr_v0.15.0_linux_amd64.tar.gz" \
+            curl -L "https://github.com/tcnksm/ghr/releases/download/v0.16.0/ghr_v0.16.0_linux_amd64.tar.gz" \
               | tar -zvx
             mv -v ghr_*/ghr ghr
             chmod a+x ghr
             ./ghr --version
             source /tmp/workspace/env
-            #VERSION=v0.0.2
-            echo "CIRCLE_PROJECT_REPONAME=$CIRCLE_PROJECT_REPONAME"
             echo CIRCLE_TAG=${CIRCLE_TAG}
             ./ghr -t ${GITHUB_TOKEN} \
                 -u jubr \
@@ -156,11 +154,11 @@ workflows:
       #- golangci-lint/lint:
       #    directories: --timeout=600s -D wrapcheck
       - gh/release:
-          # filters:
-          #   branches:
-          #     only:
-          #       - master
-          #       - main
+         filters:
+           branches:
+              only:
+                - master
+                - main
           requires:
             - build_and_test
             #- test
@@ -181,7 +179,7 @@ workflows:
                       --repo "${CIRCLE_REPOSITORY_URL}"
                     set +x
           version: 2.36.0
-          prerelease: ${PRERELEASE}
+          prerelease: true
           #notes-file: changelog.md
           tag: v0.0.4
           title: v0.0.4 Toddler steps
