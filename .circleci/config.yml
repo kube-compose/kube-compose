@@ -14,7 +14,7 @@ commands:
           name: "Enhance env"
           command: |
             set -x
-            V="$(git describe | sed -r -e 's/(.+)-(.+)-(.+)/\1-\2/')"
+            V="$(git describe --tags | sed -r -e 's/(.+)-(.+)-(.+)/\1-\2/')"
             echo "VERSION='0.6.3~${V}'"                                          > /tmp/workspace/env
             echo "CIRCLE_PROJECT_REPONAME=kube-compose"                         >> /tmp/workspace/env
             echo "CIRCLE_PROJECT_USERNAME=jubr"                                 >> /tmp/workspace/env
