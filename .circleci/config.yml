@@ -157,9 +157,11 @@ workflows:
             - build_and_test
             #- test
           pre-steps:
+            - checkout
             - attach_workspace: { at: /tmp/workspace } # for release binaries
             - enhance-env
           version: 2.36.0
+          dir: no
           #notes-file: changelog.md
           tag: v0.0.4
           title: v0.0.4 Toddler steps
