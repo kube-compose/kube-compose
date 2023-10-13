@@ -47,25 +47,29 @@ commands:
           environment:
             GOOS: <<parameters.GOOS>>
             GOARCH: <<parameters.GOARCH>>
-            CGO_ENABLED: 0
+            #CGO_ENABLED: 0
             GZIP_OPT: -9
           command: |
             set -x
             mkdir -p release
             R=${GOOS}_${GOARCH}
             go build -a -o release/kube-compose.${R} .
-            tar --remove-files -zcf release/kube-compose.${R}.tar.gz release/kube-compose.${R}
+            if [ ${GOOS} = windows ]; then
+              # -move -junk paths
+              zip -9 -m -j release/kube-compose.${R}.zip release/kube-compose.${R} 
+            else
+              tar --remove-files -zcf release/kube-compose.${R}.tar.gz -C release/ kube-compose.${R}
+            fi
 
 jobs:
 
-  build_and_test:
+  build:
     executor:
       name: go/default
-      tag: '1.18'
+      tag: '1.21'
     steps:
       - checkout
-      - attach_workspace:
-          at: /tmp/workspace 
+      - attach_workspace: { at: /tmp/workspace }
       - enhance-env
       - versionize-source
       - go/load-cache # Load cached Go modules.
@@ -74,6 +78,7 @@ jobs:
       - build-one: { GOOS: linux,  GOARCH: arm64 }
       - build-one: { GOOS: darwin, GOARCH: amd64 }
       - build-one: { GOOS: darwin, GOARCH: arm64 }
+      - build-one: { GOOS: windows, GOARCH: amd64 }
       - run:
           command: |
             set -x
@@ -89,7 +94,7 @@ jobs:
   deploy:
     executor:
       name: go/default # Use the default executor from the orb
-      tag: '1.18'
+      tag: '1.21'
     steps:
       - attach_workspace: { at: /tmp/workspace }
       - enhance-env
@@ -119,7 +124,7 @@ jobs:
   test:
     executor:
       name: go/default
-      tag: '1.18'
+      tag: '1.21'
     steps:
       - checkout
       - go/load-cache
@@ -149,7 +154,7 @@ jobs:
 workflows:
   go-with-the-flow:
     jobs:
-      - build_and_test
+      - build
       - test
       #- golangci-lint/lint:
       #    directories: --timeout=600s -D wrapcheck
@@ -160,7 +165,7 @@ workflows:
                 - master
                 - main
           requires:
-            - build_and_test
+            - build
             #- test
           pre-steps:
             #- checkout
@@ -193,4 +198,4 @@ workflows:
             --generate-notes
       - deploy:
           requires:
-            - build_and_test
+            - build
