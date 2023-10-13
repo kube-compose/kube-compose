@@ -123,6 +123,7 @@ type upRunner struct {
 func (u *upRunner) initKubernetesClientset() error {
 	k8sClientset, err := kubernetes.NewForConfig(u.cfg.KubeConfig)
 	if err != nil {
+		log.Errorf("no access to cluster %s", u.cfg.Namespace)
 		return err
 	}
 	u.k8sClientset = k8sClientset
@@ -821,6 +822,9 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	}
 	hostAliases, err := u.createServicesAndGetPodHostAliasesOnce()
 	if err != nil {
+		if err.Error() == "Unauthorized" {
+			log.Warnf("%s: while accessing k8s (are you logged in?)", err)
+		}
 		return nil, err
 	}
 
