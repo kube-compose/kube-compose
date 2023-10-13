@@ -83,6 +83,7 @@ jobs:
       name: go/default # Use the default executor from the orb
       tag: '1.18'
     steps:
+      - checkout
       - attach_workspace:
           at: /tmp/workspace 
       - enhance-env
