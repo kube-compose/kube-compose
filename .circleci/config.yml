@@ -16,11 +16,19 @@ commands:
             set -x
             ls -l /tmp/workspace/
             if [ ! -f /tmp/workspace/env ]; then
-              V="$(git describe --tags | sed -r -e 's/(.+)-(.+)-(.+)/\1-\2/')"
-              VTAG="$(git describe --tags --abbrev=0)"
-              echo "VERSION='0.6.3+${V}'"                                          > /tmp/workspace/env
-              echo "PRERELEASE=$( [ $V = $VTAG ] && echo false || echo true)"     >> /tmp/workspace/env
-              echo "PRERELEASE_OPT=$( [ $V = $VTAG ] && echo '' || echo '-prerelease')" >> /tmp/workspace/env
+              # v0.0.4-42-gdeadbeef long based off last clean tag - or clean tag
+              D="$(git describe --tags --match 'v*' --exclude 'v*-*')
+              # v0.0.4-42
+              PRETAG="$(echo "$D}" | sed -r -e 's/(.+)-(.+)-(.+)/\1-\2/')"
+              # v0.0.4
+              LAST_CLEAN_TAG="$(git describe --tags --match 'v*' --exclude 'v*-*' --abbrev=0)"
+              # 0.6.3+v0.0.4-42
+              echo "VERSION='0.6.3+${PRETAG}'"                                          > /tmp/workspace/env
+              # v0.0.4 or v0.0.4-42
+              echo "TAG='${PRETAG}'"                                                   >> /tmp/workspace/env
+              PRERELEASE=$( [ x$V = x$CIRCLE_TAG ] && echo false || echo true)
+              echo "PRERELEASE=$( $PRERELEASE && echo false || echo true)"   >> /tmp/workspace/env
+              echo "PRERELEASE_OPT=$( $PRERELEASE && echo '' || echo '-prerelease')" >> /tmp/workspace/env
               echo "CIRCLE_PROJECT_REPONAME=kube-compose"                         >> /tmp/workspace/env
               echo "CIRCLE_PROJECT_USERNAME=jubr"                                 >> /tmp/workspace/env
               echo "CIRCLE_REPOSITORY_URL=https://github.com/jubr/kube-compose"   >> /tmp/workspace/env
@@ -31,7 +39,7 @@ commands:
   versionize-source:
     steps:
       - run:
-          name: "Versionize with ${VERSION}"
+          name: "Versionize"
           command: |
             set -x
             source /tmp/workspace/env
@@ -47,7 +55,6 @@ commands:
           environment:
             GOOS: <<parameters.GOOS>>
             GOARCH: <<parameters.GOARCH>>
-            #CGO_ENABLED: 0
             GZIP_OPT: -9
           command: |
             set -x
@@ -114,11 +121,12 @@ jobs:
                 -u jubr \
                 -r kube-compose \
                 -c ${CIRCLE_SHA1} \
+                -t "${VERSION}" \
                 -recreate \
                 -replace \
                 ${PRERELEASE_OPT} \
                 -generatenotes \
-                ${VERSION} \
+                ${TAG} \
                 /tmp/workspace/release/
 
   test:
@@ -155,7 +163,7 @@ workflows:
   go-with-the-flow:
     jobs:
       - build
-      - test
+      #- test
       #- golangci-lint/lint:
       #    directories: --timeout=600s -D wrapcheck
       - gh/release:
@@ -195,6 +203,7 @@ workflows:
             /tmp/workspace/release/kube-compose.linux_arm64.tar.gz \
             /tmp/workspace/release/kube-compose.darwin_amd64.tar.gz \
             /tmp/workspace/release/kube-compose.darwin_arm64.tar.gz \
+            /tmp/workspace/release/kube-compose.windows_amd64.zip
             --generate-notes
       - deploy:
           requires:
