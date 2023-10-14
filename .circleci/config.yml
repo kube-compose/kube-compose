@@ -110,7 +110,7 @@ jobs:
           command: |
             set -x
             du -h /tmp/workspace/release/*
-            curl -L "https://github.com/tcnksm/ghr/releases/download/v0.16.0/ghr_v0.16.0_linux_amd64.tar.gz" \
+            curl -L "https://github.com/tcnksm/ghr/releases/download/v0.16.1/ghr_v0.16.1_linux_amd64.tar.gz" \
               | tar -zvx
             mv -v ghr_*/ghr ghr
             chmod a+x ghr
@@ -121,7 +121,7 @@ jobs:
                 -u jubr \
                 -r kube-compose \
                 -c ${CIRCLE_SHA1} \
-                -t "${VERSION}" \
+                -n "${VERSION}" \
                 -recreate \
                 -replace \
                 ${PRERELEASE_OPT} \
