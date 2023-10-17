@@ -282,7 +282,11 @@ func buildVolumeInitImage(
 		return nil, err
 	}
 	r := &buildVolumeInitImageResult{}
-	decoder := json.NewDecoder(response.Body)
+
+	// duplicate the Reader, so we can print the json content on error
+	var bodyContent bytes.Buffer
+	jsonTee := io.TeeReader(response.Body, &bodyContent)
+	decoder := json.NewDecoder(jsonTee)
 	for {
 		var msg jsonmessage.JSONMessage
 		err = decoder.Decode(&msg)
@@ -298,8 +302,8 @@ func buildVolumeInitImage(
 		}
 	}
 	if r.imageID == "" {
-		log.Warnf("Json content: %s\n", response.Body)
-		return nil, fmt.Errorf("could not parse image ID from docker build output stream")
+		log.Warnf("ImageBuild() JSON response: %s\n", bodyContent)
+		return nil, fmt.Errorf("buildVolumeInitImage: could not parse image ID from docker build output stream")
 	}
 	return r, nil
 }
