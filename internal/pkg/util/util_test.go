@@ -150,3 +150,15 @@ func Test_NewBool_Success(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func Test_Ternary_Truthy(t *testing.T) {
+	if "truthy" != Ternary("truthy", "else") {
+		t.Fail()
+	}
+}
+
+func Test_Ternary_Otherwise(t *testing.T) {
+	if "else" != Ternary("", "else") {
+		t.Fail()
+	}
+}
