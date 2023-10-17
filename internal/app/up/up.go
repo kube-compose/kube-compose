@@ -262,17 +262,12 @@ func (u *upRunner) getAppVolumeInitImage(a *app) error {
 	return nil
 }
 
-func ternary(truthy string, fallback string) string {
-	if truthy != "" {
-		return truthy
-	}
-	return fallback
-}
+
 
 func (u *upRunner) pushImage(sourceImageID, name, tag, imageDescr string, a *app) (podImage string, err error) {
 	var registryInCluster = ternary(os.Getenv("REGISTRY_HOST_IN_CLUSTER"), "docker-registry.default.svc:5000")
-	var user = ternary(os.Getenv("DOCKER_REGISTRY_USER"), "unused")
-	var pass = ternary(os.Getenv("DOCKER_REGISTRY_PASS"), u.cfg.KubeConfig.BearerToken)
+	var user = u.opts.RegistryUser
+	var pass = util.Ternary(u.opts.RegistryPass, u.cfg.KubeConfig.BearerToken)
 	var imagePath = u.cfg.Namespace
 
 	// check if we even need to push it?
