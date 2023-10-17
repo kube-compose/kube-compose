@@ -19,20 +19,20 @@ commands:
               # v0.0.4-42-gdeadbeef long based off last clean tag - or clean tag
               D="$(git describe --tags --match 'v*' --exclude 'v*-*')"
               # v0.0.4-42
-              PRETAG="$(echo "$D}" | sed -r -e 's/(.+)-(.+)-(.+)/\1-\2/')"
+              PRETAG="$(echo "${D}" | sed -r -e 's/(.+)-(.+)-(.+)/\1-\2/')"
               # v0.0.4
               LAST_CLEAN_TAG="$(git describe --tags --match 'v*' --exclude 'v*-*' --abbrev=0)"
               # 0.6.3+v0.0.4-42
-              echo "VERSION='0.6.3+${PRETAG}'"                                        > /tmp/workspace/env
+              echo "VERSION='0.6.3+${PRETAG}'"                                         > /tmp/workspace/env
               # v0.0.4 or v0.0.4-42
-              echo "TAG='${PRETAG}'"                                                 >> /tmp/workspace/env
-              PRERELEASE=$( [ x$V = x$CIRCLE_TAG ] && echo false || echo true)
-              echo "PRERELEASE=$PRERELEASE"                                          >> /tmp/workspace/env
-              echo "PRERELEASE_OPT=$( $PRERELEASE && echo '' || echo '-prerelease')" >> /tmp/workspace/env
-              echo "CIRCLE_PROJECT_REPONAME=kube-compose"                            >> /tmp/workspace/env
-              echo "CIRCLE_PROJECT_USERNAME=jubr"                                    >> /tmp/workspace/env
-              echo "CIRCLE_REPOSITORY_URL=https://github.com/jubr/kube-compose"      >> /tmp/workspace/env
-              echo "RELEASE_FILES='" /tmp/workspace/release/* "'"                    >> /tmp/workspace/env
+              echo "TAG='${PRETAG}'"                                                  >> /tmp/workspace/env
+              PRERELEASE=$( [ x$V = x$LAST_CLEAN_TAG ] && echo false || echo true )
+              echo "PRERELEASE=$PRERELEASE"                                           >> /tmp/workspace/env
+              echo "PRERELEASE_OPT=$( $PRERELEASE && echo '' || echo '-prerelease' )" >> /tmp/workspace/env
+              echo "CIRCLE_PROJECT_REPONAME=kube-compose"                             >> /tmp/workspace/env
+              echo "CIRCLE_PROJECT_USERNAME=jubr"                                     >> /tmp/workspace/env
+              echo "CIRCLE_REPOSITORY_URL=https://github.com/jubr/kube-compose"       >> /tmp/workspace/env
+              echo "RELEASE_FILES='" /tmp/workspace/release/* "'"                     >> /tmp/workspace/env
             fi
             cat /tmp/workspace/env >> $BASH_ENV
             source /tmp/workspace/env
