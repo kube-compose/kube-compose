@@ -283,7 +283,7 @@ func (u *upRunner) pushImage(sourceImageID, name, tag, imageDescr string, a *app
 	imagePush := fmt.Sprintf("%s/%s/%s:%s", u.cfg.ClusterImageStorage.DockerRegistry.Host, imagePath, name, tag)
 	err = u.dockerClient.ImageTag(u.opts.Context, sourceImageID, imagePush)
 	if err != nil {
-		log.Warnf("tagging % as %s failed with: %s (does the source image exist locally?)\n", sourceImageID, imagePush, err)
+		log.Warnf("tagging %s as %s failed with: %s (does the source image exist locally?)\n", sourceImageID, imagePush, err)
 		return
 	}
 	var digest string
@@ -345,26 +345,30 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 	}
 	err = u.getAppImageInfoEnsureSourceImageID(sourceImage, sourceImageRef, app, localImageIDSet)
 	if err != nil {
-		return err
+		log.Warnf("err: '%s'", err.Error())
+		if strings.Contains(err.Error(), "no basic auth credentials") {
+			log.Warnf("saw 'no basic auth credentials': does the source image %#v exist locally?", sourceImage)
+		}
+		return errors.Wrapf(err, "getAppImageInfoEnsureSourceImageID")
 	}
 	inspect, inspectRaw, err := u.dockerClient.ImageInspectWithRaw(u.opts.Context, app.imageInfo.sourceImageID)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "ImageInspectWithRaw")
 	}
 	app.imageInfo.cmd = inspect.Config.Cmd
 	err = u.getAppImageEnsureCorrectPodImage(app, sourceImageRef, sourceImage)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "getAppImageEnsureCorrectPodImage")
 	}
 	imageHealthcheck, err := inspectImageRawParseHealthcheck(inspectRaw)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "inspectImageRawParseHealthcheck")
 	}
 	app.imageInfo.imageHealthcheck = imageHealthcheck
 	if u.opts.RunAsUser {
 		err = u.getAppImageInfoUser(app, &inspect, sourceImage)
 	}
-	return err
+	return errors.Wrapf(err, "getAppImageInfoUser")
 }
 
 func (u *upRunner) getAppImageEnsureCorrectPodImage(a *app, sourceImageRef dockerRef.Reference, sourceImage string) error {
@@ -791,7 +795,7 @@ func (u *upRunner) createPodVolumes(a *app, pod *v1.Pod) error {
 func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	err := u.getAppImageInfoOnce(app)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "creating %s pod", app.name())
 	}
 	readinessProbe := app.GetReadinessProbe()
 

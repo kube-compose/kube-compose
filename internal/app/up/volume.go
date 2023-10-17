@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	log "github.com/Sirupsen/logrus"
 	"io"
 	"os"
 	"path/filepath"
@@ -297,6 +298,7 @@ func buildVolumeInitImage(
 		}
 	}
 	if r.imageID == "" {
+		log.Warnf("Json content: %s\n", response.Body)
 		return nil, fmt.Errorf("could not parse image ID from docker build output stream")
 	}
 	return r, nil
