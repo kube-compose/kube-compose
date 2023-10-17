@@ -265,7 +265,7 @@ func (u *upRunner) getAppVolumeInitImage(a *app) error {
 
 
 func (u *upRunner) pushImage(sourceImageID, name, tag, imageDescr string, a *app) (podImage string, err error) {
-	var registryInCluster = ternary(os.Getenv("REGISTRY_HOST_IN_CLUSTER"), "docker-registry.default.svc:5000")
+	var registryInCluster = u.cfg.ClusterImageStorage.DockerRegistry.HostInCluster
 	var user = u.opts.RegistryUser
 	var pass = util.Ternary(u.opts.RegistryPass, u.cfg.KubeConfig.BearerToken)
 	var imagePath = u.cfg.Namespace
