@@ -9,6 +9,7 @@ import (
 )
 
 const testDigest = "sha256:f0b6db8bb4b757d0c3c9e120f4ac091286be5815ad576fbd48d8b953e8d2b06d"
+var testDigestWithoutPrefix = testDigest[7:]
 
 func TestPullProgress_Done(t *testing.T) {
 	// If there is 1 layer that is only observed to be pulled then there should be 1 progress update of 100%.
@@ -139,6 +140,39 @@ func TestFindDigest_Success(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestFindDigest_SuccessWithoutPrefix(t *testing.T) {
+	r := FindDigest(fmt.Sprintf(`{"stream":"%s"}`, testDigestWithoutPrefix))
+	if r != testDigest {
+		t.Fail()
+	}
+	shouldMatch := []string{
+		`{"stream":"%s"}`,
+		`{"stream":"%s`,
+		`%s`,
+	}
+	for _, v := range shouldMatch {
+		if FindDigest(fmt.Sprintf(v, testDigestWithoutPrefix)) != testDigest {
+			t.Fail()
+		}
+	}
+}
+
+func TestFindDigest_ErrorImproperSurroundings(t *testing.T) {
+	shouldNotMatch := []string{
+		`{"stream":"abc%s"}`,
+		`{"stream":"%sabc"}`,
+		`{"stream":"123%s"}`,
+		`{"stream":"%s123"}`,
+		`Z%s"}`,
+	}
+	for _, v := range shouldNotMatch {
+		if FindDigest(fmt.Sprintf(v, testDigestWithoutPrefix)) != "" {
+			t.Fail()
+		}
+	}
+}
+
 func TestFindDigest_Error(t *testing.T) {
 	r := FindDigest("zz")
 	if r != "" {
