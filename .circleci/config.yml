@@ -28,7 +28,7 @@ commands:
               echo "TAG='${PRETAG}'"                                                  >> /tmp/workspace/env
               PRERELEASE=$( [ x$V = x$LAST_CLEAN_TAG ] && echo false || echo true )
               echo "PRERELEASE=$PRERELEASE"                                           >> /tmp/workspace/env
-              echo "PRERELEASE_OPT=$( $PRERELEASE && echo '' || echo '-prerelease' )" >> /tmp/workspace/env
+              echo "PRERELEASE_OPT=$( $PRERELEASE && echo '-prerelease' || echo '' )" >> /tmp/workspace/env
               echo "CIRCLE_PROJECT_REPONAME=kube-compose"                             >> /tmp/workspace/env
               echo "CIRCLE_PROJECT_USERNAME=jubr"                                     >> /tmp/workspace/env
               echo "CIRCLE_REPOSITORY_URL=https://github.com/jubr/kube-compose"       >> /tmp/workspace/env
