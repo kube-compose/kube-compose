@@ -44,7 +44,7 @@ commands:
             set -x
             source /tmp/workspace/env
             sed -i.orig cmd/root.go -r -e 's/(Version:\s+)".+"/\1"'${VERSION}'"/'
-            diff -u --color=always cmd/root.go{.orig,}
+            diff -u --color=always cmd/root.go{.orig,} || :
   build-one:
     parameters:
       GOOS:   { type: string }
