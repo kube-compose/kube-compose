@@ -43,8 +43,8 @@ commands:
           command: |
             set -x
             source /tmp/workspace/env
-            sed -i cmd/root.go -r \
-              -e 's/(Version:          )".+"/\1"'${VERSION}'"/'
+            sed -i.orig cmd/root.go -r -e 's/(Version:\s+)".+"/\1"'${VERSION}'"/'
+            diff -u --color=always cmd/root.go{.orig,}
   build-one:
     parameters:
       GOOS:   { type: string }
