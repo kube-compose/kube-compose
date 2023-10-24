@@ -150,7 +150,7 @@ jobs:
           failfast: true
           race: true
           coverprofile: coverage.txt
-          packages: ./... -skip Test_New_MergeSuccess
+          packages: ./...
       - run:
           name: "run goveralls"
           command: |
