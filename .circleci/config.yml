@@ -175,7 +175,7 @@ workflows:
           #requires: [ build ]
       - golangci-lint/lint:
           filters: *filters1
-          directories: --timeout=600s -D wrapcheck
+          directories: --timeout=30m -D wrapcheck
   go-with-the-flow:
     jobs:
       - build:
