@@ -60,8 +60,7 @@ commands:
             set -x
             mkdir -p release
             R=${GOOS}_${GOARCH}
-            git -c color.status=always
-            git diff
+            git -c color.ui=always diff || :
             go build -a -o release/kube-compose.${R} .
             if [ ${GOOS} = windows ]; then
               # -move -junk paths
