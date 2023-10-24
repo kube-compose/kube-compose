@@ -150,6 +150,7 @@ jobs:
           failfast: true
           race: true
           coverprofile: coverage.txt
+          short: true
       - run:
           name: "run goveralls"
           command: |
