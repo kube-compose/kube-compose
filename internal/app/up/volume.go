@@ -302,7 +302,7 @@ func buildVolumeInitImage(
 		}
 	}
 	if r.imageID == "" {
-		log.Warnf("ImageBuild() JSON response: %s\n", bodyContent)
+		log.Warnf("ImageBuild() JSON response: %s\n", bodyContent.String())
 		return nil, fmt.Errorf("buildVolumeInitImage: could not parse image ID from docker build output stream")
 	}
 	return r, nil
