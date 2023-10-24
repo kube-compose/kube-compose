@@ -100,7 +100,7 @@ jobs:
           root: /tmp/workspace 
           paths: env
 
-  deploy:
+  publish:
     executor:
       name: go/default # Use the default executor from the orb
       tag: '1.21'
@@ -162,18 +162,41 @@ jobs:
 # Orchestrate jobs using workflows
 # See: https://circleci.com/docs/configuration-reference/#workflows
 workflows:
+  new-branches:
+    jobs:
+      - build:
+          filters: &filters1
+            branches:
+              only:
+                - /^dependabot.*/
+                - /^jubr-.*/
+      - test:
+          filters: *filters1
+          #requires: [ build ]
+      - golangci-lint/lint:
+          filters: *filters1
+          directories: --timeout=600s -D wrapcheck
   go-with-the-flow:
     jobs:
-      - build
+      - build:
+          filters: &filters2
+            branches:
+              only:
+                - main
+                - /^jubr-.*/ 
       #- test
       #- golangci-lint/lint:
       #    directories: --timeout=600s -D wrapcheck
+      - publish:
+          filters: *filters2
+          requires:
+            - build
       - gh/release:
           filters:
             branches:
               only:
-                - master
-                - main
+                - no-master
+                - no-main
           requires:
             - build
             #- test
@@ -207,6 +230,4 @@ workflows:
             /tmp/workspace/release/kube-compose.darwin_arm64.tar.gz \
             /tmp/workspace/release/kube-compose.windows_amd64.zip
             --generate-notes
-      - deploy:
-          requires:
-            - build
+      
