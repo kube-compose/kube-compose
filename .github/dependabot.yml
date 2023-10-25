@@ -7,7 +7,7 @@ updates:
     schedule:
       interval: weekly
     groups:
-      angular:
+      minor-patch:
         patterns:
           - "*"
         update-types:
