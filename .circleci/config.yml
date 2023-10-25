@@ -75,6 +75,7 @@ jobs:
     executor:
       name: go/default
       tag: '1.21'
+    resource_class: medium
     steps:
       - checkout
       - attach_workspace: { at: /tmp/workspace }
