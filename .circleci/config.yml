@@ -140,7 +140,7 @@ jobs:
       - run:
           name: "get goveralls"
           command: |
-            set -x
+            set -ux
             go get     github.com/mattn/goveralls
             go install github.com/mattn/goveralls
             go get golang.org/x/crypto/ssh/terminal@v0.0.0-20210921155107-089bfa567519 
@@ -154,11 +154,23 @@ jobs:
       - run:
           name: "run goveralls"
           command: |
-            set -x
-            #go test -covermode=count -coverpkg=./... -coverprofile=coverage.txt ./...
-            ls -la $GOPATH/bin/
+            set -ux
             $GOPATH/bin/goveralls -coverprofile=coverage.txt -service=circle-ci
 
+  lint:
+    description: Lint the Go project with golangci-lint
+    executor:
+      name: golangci-lint/golangci
+      tag: latest
+    resource_class: medium
+    steps:
+    - golangci-lint/lint:
+        attach-workspace: false
+        workspace-root: .
+        checkout: true
+        directories: ./... --timeout=30m -D wrapcheck
+        working-directory: .
+        
 # Orchestrate jobs using workflows
 # See: https://circleci.com/docs/configuration-reference/#workflows
 workflows:
@@ -173,10 +185,8 @@ workflows:
       - test:
           filters: *filters1
           #requires: [ build ]
-      - golangci-lint/lint:
-          resource_class: medium
+      - lint:
           filters: *filters1
-          directories: --timeout=30m -D wrapcheck
   go-with-the-flow:
     jobs:
       - build:
