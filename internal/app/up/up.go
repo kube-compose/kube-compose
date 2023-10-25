@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"sync"
 
@@ -122,6 +123,7 @@ type upRunner struct {
 func (u *upRunner) initKubernetesClientset() error {
 	k8sClientset, err := kubernetes.NewForConfig(u.cfg.KubeConfig)
 	if err != nil {
+		log.Errorf("no access to cluster %s", u.cfg.Namespace)
 		return err
 	}
 	u.k8sClientset = k8sClientset
@@ -260,25 +262,48 @@ func (u *upRunner) getAppVolumeInitImage(a *app) error {
 	return nil
 }
 
+
+
 func (u *upRunner) pushImage(sourceImageID, name, tag, imageDescr string, a *app) (podImage string, err error) {
+	var registryInCluster = u.cfg.ClusterImageStorage.DockerRegistry.HostInCluster
+	var user = u.opts.RegistryUser
+	var pass = util.Ternary(u.opts.RegistryPass, u.cfg.KubeConfig.BearerToken)
+	var imagePath = u.cfg.Namespace
+
+	// check if we even need to push it?
+	if strings.HasPrefix(sourceImageID, registryInCluster) || strings.HasPrefix(sourceImageID, u.cfg.ClusterImageStorage.DockerRegistry.Host) {
+		log.Debugf("source image %s does not need to be pushed to %s, leaving unmodified\n", sourceImageID, u.cfg.ClusterImageStorage.DockerRegistry.Host)
+		podImage = sourceImageID
+		return
+	}
 	pt := a.reporterRow.AddProgressTask("pushing " + imageDescr)
 	defer pt.Done()
 	a.reporterRow.AddStatus(reporter.StatusDockerPush)
 	defer a.reporterRow.RemoveStatus(reporter.StatusDockerPush)
-	imagePush := fmt.Sprintf("%s/%s/%s:%s", u.cfg.ClusterImageStorage.DockerRegistry.Host, u.cfg.Namespace, name, tag)
+	imagePush := fmt.Sprintf("%s/%s/%s:%s", u.cfg.ClusterImageStorage.DockerRegistry.Host, imagePath, name, tag)
 	err = u.dockerClient.ImageTag(u.opts.Context, sourceImageID, imagePush)
 	if err != nil {
+		log.Warnf("tagging %s as %s failed with: %s (does the source image exist locally?)\n", sourceImageID, imagePush, err)
 		return
 	}
 	var digest string
-	registryAuth := docker.EncodeRegistryAuth("unused", u.cfg.KubeConfig.BearerToken)
+	registryAuth := docker.EncodeRegistryAuth(user, pass)
+	log.Tracef("pushing %s\n", imagePush)
 	digest, err = docker.PushImage(u.opts.Context, u.dockerClient, imagePush, registryAuth, func(push *docker.PullOrPush) {
 		pt.Update(push.Progress())
 	})
+	log.Tracef("pushing %s done\n", imagePush)
 	if err != nil {
+		err = errors.Wrapf(err, "pushImage failed: %s", err)
 		return
 	}
-	podImage = fmt.Sprintf("docker-registry.default.svc:5000/%s/%s@%s", u.cfg.Namespace, name, digest)
+
+	// TODO: podImage host can be one of 3 things here:
+	// - the original from sourceImageID
+	// - hardcoded "docker-registry.default.svc:5000"
+	// - specified u.cfg.ClusterImageStorage.DockerRegistry.Host
+	podImage = fmt.Sprintf("%s/%s/%s:%s", registryInCluster, imagePath, name, tag)
+	log.Tracef("podImage: %s (%s)\n", podImage, digest)
 	return
 }
 
@@ -320,26 +345,30 @@ func (u *upRunner) getAppImageInfo(app *app) error {
 	}
 	err = u.getAppImageInfoEnsureSourceImageID(sourceImage, sourceImageRef, app, localImageIDSet)
 	if err != nil {
-		return err
+		log.Warnf("err: '%s'", err.Error())
+		if strings.Contains(err.Error(), "no basic auth credentials") {
+			log.Warnf("saw 'no basic auth credentials': does the source image %#v exist locally?", sourceImage)
+		}
+		return errors.Wrapf(err, "getAppImageInfoEnsureSourceImageID")
 	}
 	inspect, inspectRaw, err := u.dockerClient.ImageInspectWithRaw(u.opts.Context, app.imageInfo.sourceImageID)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "ImageInspectWithRaw")
 	}
 	app.imageInfo.cmd = inspect.Config.Cmd
 	err = u.getAppImageEnsureCorrectPodImage(app, sourceImageRef, sourceImage)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "getAppImageEnsureCorrectPodImage")
 	}
 	imageHealthcheck, err := inspectImageRawParseHealthcheck(inspectRaw)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "inspectImageRawParseHealthcheck")
 	}
 	app.imageInfo.imageHealthcheck = imageHealthcheck
 	if u.opts.RunAsUser {
 		err = u.getAppImageInfoUser(app, &inspect, sourceImage)
 	}
-	return err
+	return errors.Wrapf(err, "getAppImageInfoUser")
 }
 
 func (u *upRunner) getAppImageEnsureCorrectPodImage(a *app, sourceImageRef dockerRef.Reference, sourceImage string) error {
@@ -766,7 +795,7 @@ func (u *upRunner) createPodVolumes(a *app, pod *v1.Pod) error {
 func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	err := u.getAppImageInfoOnce(app)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "creating %s pod", app.name())
 	}
 	readinessProbe := app.GetReadinessProbe()
 
@@ -792,6 +821,9 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 	}
 	hostAliases, err := u.createServicesAndGetPodHostAliasesOnce()
 	if err != nil {
+		if err.Error() == "Unauthorized" {
+			log.Warnf("%s: while accessing k8s (are you logged in?)", err)
+		}
 		return nil, err
 	}
 
@@ -815,6 +847,18 @@ func (u *upRunner) createPod(app *app) (*v1.Pod, error) {
 			RestartPolicy: getRestartPolicyforService(app),
 		},
 	}
+	var serviceAccountName = os.Getenv("POD_SPEC_SERVICE_ACCOUNT")
+	if serviceAccountName != "" {
+		pod.Spec.ServiceAccountName = serviceAccountName
+	}
+
+	var imagePullSecret = os.Getenv("POD_SPEC_IMAGE_PULL_SECRET")
+	if imagePullSecret != "" {
+		pod.Spec.ImagePullSecrets = []v1.LocalObjectReference{ { Name: imagePullSecret } }
+	}
+
+	app.newLogEntry().Tracef("creating %s", pod)
+
 	err = app.GetArgsAndCommand(&pod.Spec.Containers[0])
 	if err != nil {
 		return nil, err

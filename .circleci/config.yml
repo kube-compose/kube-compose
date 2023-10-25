@@ -8,17 +8,43 @@ orbs:
   gh: circleci/github-cli@2.2.0
 
 commands:
-  versionize-source:
-    parameters:
-      version: { type: string }
+  enhance-env:
     steps:
       - run:
-          name: "Versionize with <<parameters.version>>"
+          name: "Enhance env"
           command: |
             set -x
-            V=<<parameters.version>>
-            sed -i cmd/root.go -r \
-              -e 's/(Version:          )".+"/\1"0.6.3+jubr-'$V'"/'
+            ls -l /tmp/workspace/
+            if [ ! -f /tmp/workspace/env ]; then
+              # v0.0.4-42-gdeadbeef long based off last clean tag - or clean tag
+              D="$(git describe --tags --match 'v*' --exclude 'v*-*')"
+              # v0.0.4-42
+              PRETAG="$(echo "${D}" | sed -r -e 's/(.+)-(.+)-(.+)/\1-\2/')"
+              # v0.0.4
+              LAST_CLEAN_TAG="$(git describe --tags --match 'v*' --exclude 'v*-*' --abbrev=0)"
+              # 0.6.3+v0.0.4-42
+              echo "VERSION='0.6.3+${PRETAG}'"                                         > /tmp/workspace/env
+              # v0.0.4 or v0.0.4-42
+              echo "TAG='${PRETAG}'"                                                  >> /tmp/workspace/env
+              PRERELEASE=$( [ x$V = x$LAST_CLEAN_TAG ] && echo false || echo true )
+              echo "PRERELEASE=$PRERELEASE"                                           >> /tmp/workspace/env
+              echo "PRERELEASE_OPT=$( $PRERELEASE && echo '-prerelease' || echo '' )" >> /tmp/workspace/env
+              echo "CIRCLE_PROJECT_REPONAME=kube-compose"                             >> /tmp/workspace/env
+              echo "CIRCLE_PROJECT_USERNAME=jubr"                                     >> /tmp/workspace/env
+              echo "CIRCLE_REPOSITORY_URL=https://github.com/jubr/kube-compose"       >> /tmp/workspace/env
+              echo "RELEASE_FILES='" /tmp/workspace/release/* "'"                     >> /tmp/workspace/env
+            fi
+            cat /tmp/workspace/env >> $BASH_ENV
+            source /tmp/workspace/env
+  versionize-source:
+    steps:
+      - run:
+          name: "Versionize"
+          command: |
+            set -x
+            source /tmp/workspace/env
+            sed -i.orig cmd/root.go -r -e 's/(Version:\s+)".+"/\1"'${VERSION}'"/'
+            diff -u --color=always cmd/root.go{.orig,} || :
   build-one:
     parameters:
       GOOS:   { type: string }
@@ -29,31 +55,38 @@ commands:
           environment:
             GOOS: <<parameters.GOOS>>
             GOARCH: <<parameters.GOARCH>>
-            CGO_ENABLED: 0
             GZIP_OPT: -9
           command: |
             set -x
             mkdir -p release
             R=${GOOS}_${GOARCH}
+            git -c color.ui=always diff || :
             go build -a -o release/kube-compose.${R} .
-            tar --remove-files -zcf release/kube-compose.${R}.tar.gz release/kube-compose.${R}
+            if [ ${GOOS} = windows ]; then
+              # -move -junk paths
+              zip -9 -m -j release/kube-compose.${R}.zip release/kube-compose.${R} 
+            else
+              tar --remove-files -zcf release/kube-compose.${R}.tar.gz -C release/ kube-compose.${R}
+            fi
 
 jobs:
 
-  build_and_test:
+  build:
     executor:
       name: go/default
-      tag: '1.18'
+      tag: '1.21'
     steps:
       - checkout
-      - versionize-source:
-          version: v0.0.3
+      - attach_workspace: { at: /tmp/workspace }
+      - enhance-env
+      - versionize-source
       - go/load-cache # Load cached Go modules.
       #- go/mod-download # Run 'go mod download'.
       - build-one: { GOOS: linux,  GOARCH: amd64 }
       - build-one: { GOOS: linux,  GOARCH: arm64 }
       - build-one: { GOOS: darwin, GOARCH: amd64 }
       - build-one: { GOOS: darwin, GOARCH: arm64 }
+      - build-one: { GOOS: windows, GOARCH: amd64 }
       - run:
           command: |
             set -x
@@ -62,41 +95,45 @@ jobs:
       - persist_to_workspace:
           root: .
           paths: release
+      - persist_to_workspace:
+          root: /tmp/workspace 
+          paths: env
 
-  deploy:
+  publish:
     executor:
       name: go/default # Use the default executor from the orb
-      tag: '1.18'
+      tag: '1.21'
     steps:
-      - attach_workspace:
-          at: /tmp/workspace 
+      - attach_workspace: { at: /tmp/workspace }
+      - enhance-env
       - run:
           name: "Publish Release on GitHub"
           command: |
             set -x
             du -h /tmp/workspace/release/*
-            curl -sSLO "https://github.com/tcnksm/ghr/releases/download/v0.15.0/ghr_v0.15.0_linux_amd64.tar.gz" \
+            curl -L "https://github.com/tcnksm/ghr/releases/download/v0.16.1/ghr_v0.16.1_linux_amd64.tar.gz" \
               | tar -zvx
             mv -v ghr_*/ghr ghr
             chmod a+x ghr
             ./ghr --version
-            VERSION=v0.0.2
-            echo "CIRCLE_PROJECT_REPONAME=$CIRCLE_PROJECT_REPONAME"
+            source /tmp/workspace/env
             echo CIRCLE_TAG=${CIRCLE_TAG}
             ./ghr -t ${GITHUB_TOKEN} \
                 -u jubr \
                 -r kube-compose \
                 -c ${CIRCLE_SHA1} \
+                -n "${VERSION}" \
                 -recreate \
                 -replace \
-                -prerelease \
-                ${VERSION} \
+                ${PRERELEASE_OPT} \
+                -generatenotes \
+                ${TAG} \
                 /tmp/workspace/release/
 
   test:
     executor:
       name: go/default
-      tag: '1.18'
+      tag: '1.21'
     steps:
       - checkout
       - go/load-cache
@@ -113,6 +150,7 @@ jobs:
           failfast: true
           race: true
           coverprofile: coverage.txt
+          packages: ./...
       - run:
           name: "run goveralls"
           command: |
@@ -124,39 +162,73 @@ jobs:
 # Orchestrate jobs using workflows
 # See: https://circleci.com/docs/configuration-reference/#workflows
 workflows:
+  new-branches:
+    jobs:
+      - build:
+          filters: &filters1
+            branches:
+              only:
+                - /^dependabot.*/
+                - /^jubr-.*/
+      - test:
+          filters: *filters1
+          #requires: [ build ]
+      - golangci-lint/lint:
+          filters: *filters1
+          directories: --timeout=30m -D wrapcheck
   go-with-the-flow:
     jobs:
-      - build_and_test
-      - test
+      - build:
+          filters: &filters2
+            branches:
+              only:
+                - main
+                - /^jubr-.*/ 
+      #- test
       #- golangci-lint/lint:
       #    directories: --timeout=600s -D wrapcheck
-      - gh/release:
+      - publish:
+          filters: *filters2
           requires:
-            - build_and_test
+            - build
+      - gh/release:
+          filters:
+            branches:
+              only:
+                - no-master
+                - no-main
+          requires:
+            - build
             #- test
           pre-steps:
+            #- checkout
             - attach_workspace: { at: /tmp/workspace } # for release binaries
+            - enhance-env
             - run:
+                name: "Delete $VERSION release"
                 command: |
                   set -x
-                  ls -l /tmp/workspace/release
-                  echo "CIRCLE_PROJECT_REPONAME=kube-compose" >> $BASH_ENV
-                  echo "CIRCLE_PROJECT_USERNAME=jubr" >> $BASH_ENV
-                  echo "CIRCLE_REPOSITORY_URL=https://github.com/jubr/kube-compose" >> $BASH_ENV
-                  echo "RELEASE_FILES='" /tmp/workspace/release/* "'" >> $BASH_ENV
-                  source $BASH_ENV
+                  rm -rvf * .[a-z]
+                  ls -la
+                  gh release delete \
+                      "$VERSION" \
+                      --yes \
+                      --cleanup-tag \
+                      --repo "${CIRCLE_REPOSITORY_URL}"
+                    set +x
           version: 2.36.0
+          prerelease: true
           #notes-file: changelog.md
-          tag: v0.0.3
-          title: v0.0.3 Baby steps
+          tag: v0.0.4
+          title: v0.0.4 Toddler steps
           #broken files:
           #files: /tmp/workspace/release/kube-compose.linux_amd64 #${RELEASE_FILES}
-          additional_args: /tmp/workspace/release/kube-compose.linux_amd64.tar.gz --generate-notes
-          
-          # filters:
-          #   branches:
-          #     only:
-          #       - main
-      - deploy:
-          requires:
-            - build_and_test
+          additional_args: |
+            /tmp/workspace/release/kube-compose.linux_amd64.tar.gz \
+            /tmp/workspace/release/kube-compose.linux_arm64.tar.gz \
+            /tmp/workspace/release/kube-compose.darwin_amd64.tar.gz \
+            /tmp/workspace/release/kube-compose.darwin_arm64.tar.gz \
+            /tmp/workspace/release/kube-compose.windows_amd64.zip
+            --generate-notes
+      
+

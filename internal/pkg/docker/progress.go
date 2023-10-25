@@ -28,6 +28,14 @@ var (
 			sha256BitLength/4,
 		),
 	)
+	digestRegexpAlt = regexp.MustCompile(
+		fmt.Sprintf(
+			// basically: begin-or-non-alphanum + 64-hex-chars + non-alphanum-or-end
+			// using non-capture (?:) groups
+			"(?:^|[^a-zA-Z0-9])([a-fA-F0-9]{%d})(?:[^a-zA-Z0-9]|$)",
+			sha256BitLength/4,
+		),
+	)
 	maxPullWeight             float64
 	maxPushWeight             float64
 	staticPullStatusInfoSlice = []*staticStatusInfo{
@@ -193,11 +201,17 @@ func (waiter *pullOrPushWaiter) handleMessage(d *PullOrPush, msg *jsonmessage.JS
 func FindDigest(s string) string {
 	// TODO https://github.com/kube-compose/kube-compose/issues/5 support non-sha256 digests
 	loc := digestRegexp.FindStringIndex(s)
-	if loc == nil {
-		return ""
+	if loc != nil {
+		i := sha256BitLength/4 + len(sha256Prefix)
+		return s[ loc[0] : loc[0]+i ]
 	}
-	i := sha256BitLength/4 + len(sha256Prefix)
-	return s[loc[0] : loc[0]+i]
+
+	matches := digestRegexpAlt.FindStringSubmatch(s)
+	if matches != nil {
+		return sha256Prefix + matches[1]
+	}
+
+	return ""
 }
 
 func (waiter *pullOrPushWaiter) end(d *PullOrPush) (string, error) {

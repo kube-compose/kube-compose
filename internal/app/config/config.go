@@ -14,6 +14,7 @@ import (
 
 type DockerRegistryClusterImageStorage struct {
 	Host string
+	HostInCluster string
 }
 
 type Service struct {
@@ -85,8 +86,9 @@ func New(files []string) (*Config, error) {
 }
 
 type clusterImageStorage struct {
-	Type string  `mapdecode:"type"`
-	Host *string `mapdecode:"host"`
+	Type          string  `mapdecode:"type"`
+	Host          *string `mapdecode:"host"`
+	HostInCluster *string `mapdecode:"host_in_cluster"`
 }
 
 type xKubeCompose struct {
@@ -141,6 +143,7 @@ func loadClusterImageStorage(cfg *Config, v *clusterImageStorage) error {
 		}
 		cfg.ClusterImageStorage.DockerRegistry = &DockerRegistryClusterImageStorage{
 			Host: *v.Host,
+			HostInCluster: *v.HostInCluster,
 		}
 	default:
 		return fmt.Errorf("a docker compose file has an invalid value at \"x-kube-compose\".\"cluster_image_storage\".\"type\": " +

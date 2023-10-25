@@ -23,7 +23,7 @@ func Execute() error {
 		Use:               "kube-compose",
 		Short:             "k8s",
 		Long:              "Environments on k8s made easy",
-		Version:           "0.6.1",
+		Version:           "0.6.3",
 		PersistentPreRunE: setupLogging,
 	}
 	rootCmd.AddCommand(newDownCli(), newUpCli(), newGetCli())

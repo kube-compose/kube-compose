@@ -169,3 +169,10 @@ func FormatTable(rows [][]string) string {
 	}
 	return sb.String()
 }
+
+func Ternary(truthy string, otherwise string) string {
+	if truthy != "" {
+		return truthy
+	}
+	return otherwise
+}
