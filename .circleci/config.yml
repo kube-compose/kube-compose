@@ -231,3 +231,4 @@ workflows:
             /tmp/workspace/release/kube-compose.windows_amd64.zip
             --generate-notes
       
+
