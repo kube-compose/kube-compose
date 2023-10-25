@@ -45,6 +45,7 @@ commands:
             source /tmp/workspace/env
             sed -i.orig cmd/root.go -r -e 's/(Version:\s+)".+"/\1"'${VERSION}'"/'
             diff -u --color=always cmd/root.go{.orig,} || :
+            go mod download golang.org/x/sys || :
   build-one:
     parameters:
       GOOS:   { type: string }
