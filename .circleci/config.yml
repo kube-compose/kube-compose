@@ -75,7 +75,6 @@ jobs:
     executor:
       name: go/default
       tag: '1.21'
-    resource_class: medium
     steps:
       - checkout
       - attach_workspace: { at: /tmp/workspace }
@@ -175,6 +174,7 @@ workflows:
           filters: *filters1
           #requires: [ build ]
       - golangci-lint/lint:
+          resource_class: medium
           filters: *filters1
           directories: --timeout=30m -D wrapcheck
   go-with-the-flow:
