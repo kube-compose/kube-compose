@@ -47,6 +47,16 @@ linters:
     - prealloc
     - gochecknoglobals
     - depguard
+    - wrapcheck
+    - godot # comments.
+    - godox #TODO
+    - lll # line len
+    - gofumpt # gofmt²
+    - wsl # cuddling
+    - exhaustruct
+    - testpackage
+    - varnamelen
+    - gci #indent?
 
 run:
   skip-files:
