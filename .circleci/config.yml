@@ -11,9 +11,11 @@ orbs:
 commands:
 
   enhance-env:
+    parameters:
+      from-workflow: { type: string, default: unknown }
     steps:
       - run:
-          name: "Enhance env"
+          name: "Enhance env (<<parameters.from-workflow>>)"
           command: |
             set -x
             ls -l /tmp/workspace/
@@ -22,16 +24,35 @@ commands:
               D="$(git describe --tags --match 'v*' --exclude 'v*-*')"
               # Prep PRETAG like 'v0.0.4-42'
               PRETAG="$(echo "${D}" | sed -r -e 's/(.+)-(.+)-(.+)/\1-\2/')"
-              # Append branch if not main: PRETAG like 'v0.0.4-42-registry-auth'
-              RE='^main|master$'
-              [[ "${CIRCLE_BRANCH}" =~ $RE ]] || PRETAG="${PRETAG}-${CIRCLE_BRANCH//jubr-/}"
               # Find LAST_CLEAN_TAG looking like 'v0.0.4'
               LAST_CLEAN_TAG="$(git describe --tags --match 'v*' --exclude 'v*-*' --abbrev=0)"
+              RE='^main|master$'
+              if [[ "${CIRCLE_BRANCH}" =~ $RE ]]; then
+                if [ "<<parameters.from-workflow>>" = "main-build-test-release" ]; then
+                  # Here we've passed test+lint, so:
+                  # Increment version
+                  MAJOR=$(echo ${LAST_CLEAN_TAG//v/} | awk -F "." '{print $1}')
+                  MINOR=$(echo ${LAST_CLEAN_TAG//v/} | awk -F "." '{print $2}')
+                  PATCH=$(echo ${LAST_CLEAN_TAG//v/} | awk -F "." '{print $3}')
+                  #if [ "$BRANCH_NAME" == "feature.*" ]; then
+                  #  PRETAG="v$MAJOR.$(($MINOR + 1)).0"
+                  #else
+                    PRETAG="v$MAJOR.$MINOR.$(($PATCH + 1))"
+                  #fi
+                  PRERELEASE=false
+                else
+                  # Prerelease on branch 'main'? (can this happen?)
+                  PRERELEASE=true
+                fi
+              else
+                # Append branch if not main: PRETAG like 'v0.0.4-42-registry-auth'
+                PRETAG="${PRETAG}-${CIRCLE_BRANCH//jubr-/}"
+                PRERELEASE=true
+              fi
               # TAG is v0.0.4 or v0.0.4-42 or v0.0.4-42-registry-auth
-              echo "TAG='${PRETAG}'"                                                  >> /tmp/workspace/env
+              echo "TAG='${PRETAG}'"                                                   > /tmp/workspace/env
               # Prep VERSION like '0.6.3+v0.0.4-42' - on top of the original author's version
-              echo "VERSION='0.6.3+${PRETAG}'"                                         > /tmp/workspace/env
-              PRERELEASE=$( [ "${PRETAG}" != "${LAST_CLEAN_TAG}" ] && echo true || echo false )
+              echo "VERSION='0.6.3+${PRETAG}'"                                        >> /tmp/workspace/env
               echo "PRERELEASE=$PRERELEASE"                                           >> /tmp/workspace/env
               echo "PRERELEASE_OPT=$( $PRERELEASE && echo '-prerelease' || echo '' )" >> /tmp/workspace/env
               echo "CIRCLE_PROJECT_REPONAME=kube-compose"                             >> /tmp/workspace/env
@@ -84,10 +105,13 @@ jobs:
     executor:
       name: go/default
       tag: '1.21'
+    parameters:
+      from-workflow: { type: string, default: unknown }
     steps:
       - checkout
       - attach_workspace: { at: /tmp/workspace }
-      - enhance-env
+      - enhance-env:
+          from-workflow: <<parameters.from-workflow>>
       - versionize-source
       - go/load-cache # Load cached Go modules.
       #- go/mod-download # Run 'go mod download'.
@@ -208,58 +232,61 @@ workflows:
 
   main-build-test-release:
     jobs:
-      - build-job:
+      - test-job:
           filters: &main-filters
             branches:
               only:
                 - master
                 - main
-                #- /^jubr-.*/
-      - test-job:
+      - lint-job:
           filters: *main-filters
-      #- golangci-lint/lint:
-      #    directories: --timeout=600s -D wrapcheck
+      - build-job:
+          filters: *main-filters
+          requires:
+            - test-job
+            - lint-job
+          from-workflow: main-build-test-release
       - publish-job:
           filters: *main-filters
           requires:
             - build-job
             - test-job
-      - gh/release:
-          filters:
-            branches:
-              only:
-                - no-master
-                - no-main
-          requires:
-            - build-job
-            #- test
-          pre-steps:
-            #- checkout
-            - attach_workspace: { at: /tmp/workspace } # for release binaries
-            - enhance-env
-            - run:
-                name: "Delete $VERSION release"
-                command: |
-                  set -x
-                  rm -rvf * .[a-z]
-                  ls -la
-                  gh release delete \
-                      "$VERSION" \
-                      --yes \
-                      --cleanup-tag \
-                      --repo "${CIRCLE_REPOSITORY_URL}"
-                  set +x
-          version: 2.36.0
-          prerelease: true
-          #notes-file: changelog.md
-          tag: v0.0.4
-          title: v0.0.4 Toddler steps
-          #broken files:
-          #files: /tmp/workspace/release/kube-compose.linux_amd64 #${RELEASE_FILES}
-          additional_args: |
-            /tmp/workspace/release/kube-compose.linux_amd64.tar.gz \
-            /tmp/workspace/release/kube-compose.linux_arm64.tar.gz \
-            /tmp/workspace/release/kube-compose.darwin_amd64.tar.gz \
-            /tmp/workspace/release/kube-compose.darwin_arm64.tar.gz \
-            /tmp/workspace/release/kube-compose.windows_amd64.zip
-            --generate-notes
+#      - gh/release:
+#          filters:
+#            branches:
+#              only:
+#                - no-master
+#                - no-main
+#          requires:
+#            - build-job
+#            #- test
+#          pre-steps:
+#            #- checkout
+#            - attach_workspace: { at: /tmp/workspace } # for release binaries
+#            - enhance-env
+#            - run:
+#                name: "Delete $VERSION release"
+#                command: |
+#                  set -x
+#                  rm -rvf * .[a-z]
+#                  ls -la
+#                  gh release delete \
+#                      "$VERSION" \
+#                      --yes \
+#                      --cleanup-tag \
+#                      --repo "${CIRCLE_REPOSITORY_URL}"
+#                  set +x
+#          version: 2.36.0
+#          prerelease: true
+#          #notes-file: changelog.md
+#          tag: v0.0.4
+#          title: v0.0.4 Toddler steps
+#          #broken files:
+#          #files: /tmp/workspace/release/kube-compose.linux_amd64 #${RELEASE_FILES}
+#          additional_args: |
+#            /tmp/workspace/release/kube-compose.linux_amd64.tar.gz \
+#            /tmp/workspace/release/kube-compose.linux_arm64.tar.gz \
+#            /tmp/workspace/release/kube-compose.darwin_amd64.tar.gz \
+#            /tmp/workspace/release/kube-compose.darwin_arm64.tar.gz \
+#            /tmp/workspace/release/kube-compose.windows_amd64.zip
+#            --generate-notes
