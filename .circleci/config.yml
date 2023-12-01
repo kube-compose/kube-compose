@@ -157,7 +157,8 @@ jobs:
           command: |
             set -ux
             $GOPATH/bin/goveralls -coverprofile=coverage.txt -service=circle-ci
-      - store_test_results
+      - store_test_results:
+          path: ./
 
   lint:
     description: Lint the Go project with golangci-lint
