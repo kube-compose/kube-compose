@@ -172,7 +172,7 @@ jobs:
     - versionize-source
     - golangci-lint/lint:
         checkout: false
-        directories: ./... --timeout=30m -D wrapcheck || : # ignore linting failures while working on fixing them
+        directories: "./... --timeout=30m -D wrapcheck || : # ignore linting failures while working on fixing them"
         working-directory: .
         
 # Orchestrate jobs using workflows
