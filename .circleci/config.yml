@@ -31,7 +31,7 @@ commands:
               echo "TAG='${PRETAG}'"                                                  >> /tmp/workspace/env
               # Prep VERSION like '0.6.3+v0.0.4-42' - on top of the original author's version
               echo "VERSION='0.6.3+${PRETAG}'"                                         > /tmp/workspace/env
-              PRERELEASE=$( [ "${PRETAG} != "${LAST_CLEAN_TAG}" ] && echo true || echo false )
+              PRERELEASE=$( [ "${PRETAG}" != "${LAST_CLEAN_TAG}" ] && echo true || echo false )
               echo "PRERELEASE=$PRERELEASE"                                           >> /tmp/workspace/env
               echo "PRERELEASE_OPT=$( $PRERELEASE && echo '-prerelease' || echo '' )" >> /tmp/workspace/env
               echo "CIRCLE_PROJECT_REPONAME=kube-compose"                             >> /tmp/workspace/env
