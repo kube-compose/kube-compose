@@ -27,11 +27,11 @@ commands:
               [[ "${CIRCLE_BRANCH}" =~ $RE ]] || PRETAG="${PRETAG}-${CIRCLE_BRANCH//jubr-/}"
               # Find LAST_CLEAN_TAG looking like 'v0.0.4'
               LAST_CLEAN_TAG="$(git describe --tags --match 'v*' --exclude 'v*-*' --abbrev=0)"
-              # Prep VERSION like '0.6.3+v0.0.4-42' - on top of the original author's version
-              echo "VERSION='0.6.3+${PRETAG}'"                                         > /tmp/workspace/env
               # TAG is v0.0.4 or v0.0.4-42 or v0.0.4-42-registry-auth
               echo "TAG='${PRETAG}'"                                                  >> /tmp/workspace/env
-              PRERELEASE=$( [ x$PRETAG = x$LAST_CLEAN_TAG ] && echo false || echo true )
+              # Prep VERSION like '0.6.3+v0.0.4-42' - on top of the original author's version
+              echo "VERSION='0.6.3+${PRETAG}'"                                         > /tmp/workspace/env
+              PRERELEASE=$( [ "${PRETAG} != "${LAST_CLEAN_TAG}" ] && echo true || echo false )
               echo "PRERELEASE=$PRERELEASE"                                           >> /tmp/workspace/env
               echo "PRERELEASE_OPT=$( $PRERELEASE && echo '-prerelease' || echo '' )" >> /tmp/workspace/env
               echo "CIRCLE_PROJECT_REPONAME=kube-compose"                             >> /tmp/workspace/env
