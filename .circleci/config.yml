@@ -18,13 +18,15 @@ commands:
             if [ ! -f /tmp/workspace/env ]; then
               # v0.0.4-42-gdeadbeef long based off last clean tag - or clean tag
               D="$(git describe --tags --match 'v*' --exclude 'v*-*')"
-              # v0.0.4-42
+              # Prep PRETAG like 'v0.0.4-42'
               PRETAG="$(echo "${D}" | sed -r -e 's/(.+)-(.+)-(.+)/\1-\2/')"
-              # v0.0.4
+              # Append branch if not main: PRETAG like 'v0.0.4-42-registry-auth'
+              [ "$CIRCLE_BRANCH" =~ ^main|master$ ] || PRETAG="${PRETAG}-${CIRCLE_BRANCH//jubr-/}"
+              # Find LAST_CLEAN_TAG looking like 'v0.0.4'
               LAST_CLEAN_TAG="$(git describe --tags --match 'v*' --exclude 'v*-*' --abbrev=0)"
-              # 0.6.3+v0.0.4-42
+              # Prep VERSION like '0.6.3+v0.0.4-42' - on top of the original author's version
               echo "VERSION='0.6.3+${PRETAG}'"                                         > /tmp/workspace/env
-              # v0.0.4 or v0.0.4-42
+              # TAG is v0.0.4 or v0.0.4-42 or v0.0.4-42-registry-auth
               echo "TAG='${PRETAG}'"                                                  >> /tmp/workspace/env
               PRERELEASE=$( [ x$V = x$LAST_CLEAN_TAG ] && echo false || echo true )
               echo "PRERELEASE=$PRERELEASE"                                           >> /tmp/workspace/env
