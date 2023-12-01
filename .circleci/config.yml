@@ -23,14 +23,15 @@ commands:
               # Prep PRETAG like 'v0.0.4-42'
               PRETAG="$(echo "${D}" | sed -r -e 's/(.+)-(.+)-(.+)/\1-\2/')"
               # Append branch if not main: PRETAG like 'v0.0.4-42-registry-auth'
-              [ "$CIRCLE_BRANCH" =~ ^main|master$ ] || PRETAG="${PRETAG}-${CIRCLE_BRANCH//jubr-/}"
+              RE='^main|master$'
+              [[ "${CIRCLE_BRANCH}" =~ $RE ]] || PRETAG="${PRETAG}-${CIRCLE_BRANCH//jubr-/}"
               # Find LAST_CLEAN_TAG looking like 'v0.0.4'
               LAST_CLEAN_TAG="$(git describe --tags --match 'v*' --exclude 'v*-*' --abbrev=0)"
               # Prep VERSION like '0.6.3+v0.0.4-42' - on top of the original author's version
               echo "VERSION='0.6.3+${PRETAG}'"                                         > /tmp/workspace/env
               # TAG is v0.0.4 or v0.0.4-42 or v0.0.4-42-registry-auth
               echo "TAG='${PRETAG}'"                                                  >> /tmp/workspace/env
-              PRERELEASE=$( [ x$V = x$LAST_CLEAN_TAG ] && echo false || echo true )
+              PRERELEASE=$( [ x$PRETAG = x$LAST_CLEAN_TAG ] && echo false || echo true )
               echo "PRERELEASE=$PRERELEASE"                                           >> /tmp/workspace/env
               echo "PRERELEASE_OPT=$( $PRERELEASE && echo '-prerelease' || echo '' )" >> /tmp/workspace/env
               echo "CIRCLE_PROJECT_REPONAME=kube-compose"                             >> /tmp/workspace/env
@@ -71,7 +72,7 @@ commands:
             go build -a -o release/kube-compose.${R} .
             if [ ${GOOS} = windows ]; then
               # -move -junk paths
-              zip -9 -m -j release/kube-compose.${R}.zip release/kube-compose.${R} 
+              zip -9 -m -j release/kube-compose.${R}.zip release/kube-compose.${R}
             else
               tar --remove-files -zcf release/kube-compose.${R}.tar.gz -C release/ kube-compose.${R}
             fi
@@ -104,7 +105,7 @@ jobs:
           root: .
           paths: release
       - persist_to_workspace:
-          root: /tmp/workspace 
+          root: /tmp/workspace
           paths: env
 
   publish-job:
@@ -151,8 +152,8 @@ jobs:
             set -ux
             go get     github.com/mattn/goveralls
             go install github.com/mattn/goveralls
-            go get golang.org/x/crypto/ssh/terminal@v0.0.0-20210921155107-089bfa567519 
-      # https://circleci.com/developer/orbs/orb/circleci/go 
+            go get golang.org/x/crypto/ssh/terminal@v0.0.0-20210921155107-089bfa567519
+      # https://circleci.com/developer/orbs/orb/circleci/go
       - go/test: # Runs 'go test ./...' but includes extensive parameterization for finer tuning.
           covermode: atomic
           failfast: true
@@ -182,7 +183,7 @@ jobs:
         checkout: false
         directories: "./... --timeout=30m -D wrapcheck || : # ignore linting failures while working on fixing them"
         working-directory: .
-        
+
 
 #########
 workflows:
