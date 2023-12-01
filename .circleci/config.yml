@@ -74,7 +74,7 @@ commands:
 
 jobs:
 
-  build:
+  build-job:
     executor:
       name: go/default
       tag: '1.21'
@@ -133,7 +133,7 @@ jobs:
                 ${TAG} \
                 /tmp/workspace/release/
 
-  test:
+  test-job:
     executor:
       name: go/default
       tag: '1.21'
@@ -181,32 +181,37 @@ jobs:
 # Orchestrate jobs using workflows
 # See: https://circleci.com/docs/configuration-reference/#workflows
 workflows:
-  new-branches:
+  new-branch-build-prerelease:
     jobs:
-      - build:
-          filters: &filters1
+      - build-job:
+          filters: &branch-filters
             branches:
               only:
                 - /^dependabot.*/
                 - /^jubr-.*/
-      - test:
-          filters: *filters1
+      - test-job:
+          filters: *branch-filters
           #requires: [ build ]
       - lint:
-          filters: *filters1
-  go-with-the-flow:
+          filters: *branch-filters
+      - publish:
+          filters: *branch-filters
+          requires:
+            - build
+  main-build-test-release:
     jobs:
-      - build:
-          filters: &filters2
+      - build-job:
+          filters: &main-filters
             branches:
               only:
+                - master
                 - main
-                - /^jubr-.*/ 
-      #- test
+                #- /^jubr-.*/
+      #- test-job
       #- golangci-lint/lint:
       #    directories: --timeout=600s -D wrapcheck
       - publish:
-          filters: *filters2
+          filters: *main-filters
           requires:
             - build
       - gh/release:
@@ -233,7 +238,7 @@ workflows:
                       --yes \
                       --cleanup-tag \
                       --repo "${CIRCLE_REPOSITORY_URL}"
-                    set +x
+                  set +x
           version: 2.36.0
           prerelease: true
           #notes-file: changelog.md
