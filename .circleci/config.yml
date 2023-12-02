@@ -229,13 +229,13 @@ workflows:
           name: build-j0b # change name from the 'other' parametrized 'build-job', to prevent 'build-job-1' -- see https://discuss.circleci.com/t/getting-number-suffix-appended-to-job-names-when-converting-to-2-1-config/28912/17
       - test-job:
           filters: *branch-filters
-          #requires: [ build-job ]
+          #requires: [ build-j0b ]
       - lint-job:
           filters: *branch-filters
       - publish-job:
           filters: *branch-filters
           requires:
-            - build-job
+            - build-j0b
 
   main-build-test-release:
     jobs:
