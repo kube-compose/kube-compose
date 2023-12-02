@@ -215,7 +215,6 @@ jobs:
     - enhance-env
     - versionize-source
     - golangci-lint/lint:
-        name: Run golangci-lint
         checkout: false
         directories: "./... --timeout=30m -D wrapcheck || : # ignore linting failures while working on fixing them"
         working-directory: .
