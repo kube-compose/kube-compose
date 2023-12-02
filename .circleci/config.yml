@@ -6,6 +6,7 @@ orbs:
   go: circleci/go@1.9.0
   golangci-lint: timakin/golangci-lint@0.1.1
   gh: circleci/github-cli@2.2.0
+  slack: circleci/slack@4.12.5
 
 ########
 commands:
@@ -111,7 +112,7 @@ jobs:
       name: go/default
       tag: '1.21'
     parameters:
-      from-workflow: { type: string, default: unknown }
+      from-workflow: { type: string }
     steps:
       - checkout
       - attach_workspace: { at: /tmp/workspace }
@@ -167,6 +168,11 @@ jobs:
                 -generatenotes \
                 ${TAG} \
                 /tmp/workspace/release/
+      # See https://circleci.com/developer/orbs/orb/circleci/slack for docs
+      - slack/notify:
+          channel: C068PQGHUHX
+          event: pass
+          template: success_tagged_deploy_1
 
   test-job:
     executor:
@@ -209,6 +215,7 @@ jobs:
     - enhance-env
     - versionize-source
     - golangci-lint/lint:
+        name: Run golangci-lint
         checkout: false
         directories: "./... --timeout=30m -D wrapcheck || : # ignore linting failures while working on fixing them"
         working-directory: .
@@ -221,10 +228,7 @@ workflows:
     jobs:
       - build-job:
           filters: &branch-filters
-            branches:
-              only:
-                - /^dependabot.*/
-                - /^jubr-.*/
+            branches: { only: [ /^dependabot.*/, /^jubr-.*/ ] }
           from-workflow: new-branch-build-prerelease
           name: build-j0b # change name from the 'other' parametrized 'build-job', to prevent 'build-job-1' -- see https://discuss.circleci.com/t/getting-number-suffix-appended-to-job-names-when-converting-to-2-1-config/28912/17
       - test-job:
@@ -234,29 +238,24 @@ workflows:
           filters: *branch-filters
       - publish-job:
           filters: *branch-filters
-          requires:
-            - build-j0b
+          requires: [ build-j0b ]
+          context: [ slack-secrets ]
 
   main-build-test-release:
     jobs:
       - test-job:
           filters: &main-filters
-            branches:
-              only:
-                - master
-                - main
+            branches: { only: [ master, main ] }
       - lint-job:
           filters: *main-filters
       - build-job:
           filters: *main-filters
-          requires:
-            - test-job
-            - lint-job
+          requires: [ test-job, lint-job ]
           from-workflow: main-build-test-release
       - publish-job:
           filters: *main-filters
-          requires:
-            - build-job
+          requires: [ build-job ]
+          context: [ slack-secrets ]
 #      - gh/release:
 #          filters:
 #            branches:
