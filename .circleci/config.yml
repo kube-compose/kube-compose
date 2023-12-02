@@ -45,8 +45,13 @@ commands:
                   PRERELEASE=true
                 fi
               else
+                CLEAN_BRANCH="${CIRCLE_BRANCH/jubr-/}"
+                # dependabot/go_modules/github.com/spf13/cobra-1.8.0 -> cobra-1.8.0
+                CLEAN_BRANCH="${CLEAN_BRANCH/*\//}"
+                # remove special chars
+                CLEAN_BRANCH=$(echo "${CLEAN_BRANCH}" | tr -c -d 'a-z0-9_~.-')
                 # Append branch if not main: PRETAG like 'v0.0.4-42-registry-auth'
-                PRETAG="${PRETAG}-${CIRCLE_BRANCH//jubr-/}"
+                PRETAG="${PRETAG}-${CLEAN_BRANCH}"
                 PRERELEASE=true
               fi
               # TAG is v0.0.4 or v0.0.4-42 or v0.0.4-42-registry-auth
