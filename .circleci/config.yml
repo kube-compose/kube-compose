@@ -225,6 +225,8 @@ workflows:
               only:
                 - /^dependabot.*/
                 - /^jubr-.*/
+          from-workflow: new-branch-build-prerelease
+          name: build-j0b # change name from the 'other' parametrized 'build-job', to prevent 'build-job-1' -- see https://discuss.circleci.com/t/getting-number-suffix-appended-to-job-names-when-converting-to-2-1-config/28912/17
       - test-job:
           filters: *branch-filters
           #requires: [ build-job ]
@@ -255,7 +257,6 @@ workflows:
           filters: *main-filters
           requires:
             - build-job
-            - test-job
 #      - gh/release:
 #          filters:
 #            branches:
