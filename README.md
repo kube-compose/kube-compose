@@ -1,4 +1,4 @@
-[![CircleCI](https://dl.circleci.com/status-badge/img/circleci/WUufkK7NNgafZsXX9AUM9B/CoAmWRbb8443DV3gwBzz3D/tree/master.svg?style=shield)](https://dl.circleci.com/status-badge/redirect/circleci/WUufkK7NNgafZsXX9AUM9B/CoAmWRbb8443DV3gwBzz3D/tree/master)
+[![CircleCI](https://dl.circleci.com/status-badge/img/circleci/WUufkK7NNgafZsXX9AUM9B/CoAmWRbb8443DV3gwBzz3D/tree/main.svg?style=shield&circle-token=4c9eb1a999e3f97e390b12e9eacb31f5bc6df836)](https://dl.circleci.com/status-badge/redirect/circleci/WUufkK7NNgafZsXX9AUM9B/CoAmWRbb8443DV3gwBzz3D/tree/main)
 [![License](https://img.shields.io/badge/license-Apache_v2.0-blue.svg)](https://github.com/kube-compose/kube-compose/blob/master/LICENSE.md)
 [![Coverage Status](https://coveralls.io/repos/github/jubr/kube-compose/badge.svg?branch=master&r=6)](https://coveralls.io/github/jubr/kube-compose?branch=master?r=6)
 
